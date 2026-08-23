@@ -1,0 +1,24 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Services{% endblock %}
+{% block page_title %}Services{% endblock %}
+
+{% block page_subtitle %}
+    <p>Lab-wide service experiments and shared records.</p>
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+        </div>
+    </div>
+
+    {% if cards %}
+        {% include "lab/components/card_grid.html" with cards=cards %}
+    {% else %}
+        <p class="empty-state">No services match this view.</p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,274 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Add litter{% endblock %}
+{% block page_title %}Add litter{% endblock %}
+{% block main_class %}container{% endblock %}
+
+{% block page_subtitle %}
+    {% if selected_protocol %}
+        <p>Protocol {{ selected_protocol.protocol_number }}</p>
+    {% else %}
+        <p>Select a protocol before saving.</p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <form method="post">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% if form.non_field_errors %}
+            <ul class="error-list">
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% for hidden_field in form.hidden_fields %}
+            {{ hidden_field }}
+
+            {% if hidden_field.errors %}
+                <ul class="error-list">
+                    {% for error in hidden_field.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endfor %}
+
+        <section class="bulk-section">
+            <h2 class="bulk-title">Litter IDs</h2>
+
+            <div class="bulk-fields">
+                <div class="bulk-field">
+                    <div class="bulk-input">
+                        {{ form.mouse_count.label_tag }}
+                        {{ form.mouse_count }}
+
+                        {% if form.mouse_count.errors %}
+                            <ul class="error-list">
+                                {% for error in form.mouse_count.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="bulk-field">
+                    <div class="bulk-input">
+                        {{ form.tattoo_start.label_tag }}
+                        {{ form.tattoo_start }}
+
+                        {% if form.tattoo_start.errors %}
+                            <ul class="error-list">
+                                {% for error in form.tattoo_start.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="bulk-field">
+                    <div class="bulk-toggle">
+                        {{ form.use_progressive_mouse_ids }}
+                        {{ form.use_progressive_mouse_ids.label_tag }}
+                    </div>
+
+                    {% if form.use_progressive_mouse_ids.errors %}
+                        <ul class="error-list">
+                            {% for error in form.use_progressive_mouse_ids.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                <div class="bulk-field">
+                    <div class="bulk-input">
+                        {{ form.mouse_id_prefix.label_tag }}
+                        {{ form.mouse_id_prefix }}
+
+                        {% if form.mouse_id_prefix.help_text %}
+                            <small>{{ form.mouse_id_prefix.help_text }}</small>
+                        {% endif %}
+
+                        {% if form.mouse_id_prefix.errors %}
+                            <ul class="error-list">
+                                {% for error in form.mouse_id_prefix.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="bulk-field">
+                    <div class="bulk-input">
+                        {{ form.mouse_id_start.label_tag }}
+                        {{ form.mouse_id_start }}
+
+                        {% if form.mouse_id_start.help_text %}
+                            <small>{{ form.mouse_id_start.help_text }}</small>
+                        {% endif %}
+
+                        {% if form.mouse_id_start.errors %}
+                            <ul class="error-list">
+                                {% for error in form.mouse_id_start.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="bulk-section">
+            <h2 class="bulk-title">Mouse fields</h2>
+
+            {% for section in form.mouse_bound_field_sections %}
+                {% if section.title %}
+                    <fieldset
+                        class="form-subset {{ section.class }}"
+                        data-genotype-subset="true"
+                    >
+                        <legend>{{ section.title }}</legend>
+
+                        {% for field in section.fields %}
+                            <div class="form-field">
+                                {{ field.label_tag }}
+                                {{ field }}
+
+                                {% if field.help_text %}
+                                    <small>{{ field.help_text }}</small>
+                                {% endif %}
+
+                                {% if field.errors %}
+                                    <ul class="error-list">
+                                        {% for error in field.errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </fieldset>
+                {% else %}
+                    <div class="bulk-fields">
+                        {% for field in section.fields %}
+                            <div class="bulk-field">
+                                <div class="bulk-input">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+
+                                    {% if field.help_text %}
+                                        <small>{{ field.help_text }}</small>
+                                    {% endif %}
+
+                                    {% if field.errors %}
+                                        <ul class="error-list">
+                                            {% for error in field.errors %}
+                                                <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </section>
+
+        <section class="bulk-section">
+            <h2 class="bulk-title">Procedure</h2>
+            <p
+                class="bulk-help"
+                data-procedure-disabled-help
+                {% if can_add_litter_procedure %}hidden{% endif %}
+            >
+                Select a protocol that allows regulated procedures before adding procedures.
+            </p>
+            <fieldset
+                data-procedure-fieldset
+                {% if not can_add_litter_procedure %}disabled{% endif %}
+            >
+                <div class="bulk-fields">
+                    {% for field in form.procedure_bound_fields %}
+                        <div class="bulk-field">
+                            <div class="bulk-input">
+                                {{ field.label_tag }}
+                                {{ field }}
+
+                                {% if field.help_text %}
+                                    <small>{{ field.help_text }}</small>
+                                {% endif %}
+
+                                {% if field.errors %}
+                                    <ul class="error-list">
+                                        {% for error in field.errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+        </section>
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Add litter
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    {{ protocol_procedure_permissions|json_script:"protocol-procedure-permissions" }}
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const protocolSelect = document.getElementById("id_protocol");
+        const procedureFieldset = document.querySelector("[data-procedure-fieldset]");
+        const disabledHelp = document.querySelector("[data-procedure-disabled-help]");
+        const permissionsElement = document.getElementById("protocol-procedure-permissions");
+
+        if (!protocolSelect || !procedureFieldset || !permissionsElement) {
+            return;
+        }
+
+        const protocolPermissions = JSON.parse(permissionsElement.textContent);
+
+        function updateProcedureFields() {
+            const selectedProtocol = protocolSelect.value;
+            const canAddProcedure = (
+                Boolean(selectedProtocol)
+                && protocolPermissions[selectedProtocol] !== false
+            );
+
+            procedureFieldset.disabled = !canAddProcedure;
+
+            if (disabledHelp) {
+                disabledHelp.hidden = canAddProcedure;
+            }
+        }
+
+        protocolSelect.addEventListener("change", updateProcedureFields);
+        updateProcedureFields();
+    });
+    </script>
+    {% include "lab/components/crossing_selector_script.html" %}
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Edit mouse {{ mouse.mouse_id }}{% endblock %}
+{% block page_title %}Edit mouse{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
+
+{% block page_subtitle %}
+    <p>Mouse ID remains the primary key. Use Rename to change it safely.</p>
+{% endblock %}
+
+{% block content %}
+    <div class="read-only-field identity-field">
+        <div>
+            <p class="read-only-label">Mouse ID</p>
+            <p class="read-only-value">{{ mouse.mouse_id }}</p>
+        </div>
+
+        <div class="actions">
+            <a
+                class="button"
+                href="{% url 'lab:rename_mouse' mouse.pk %}?return_url={{ return_url|urlencode }}"
+            >
+                Rename
+            </a>
+        </div>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% if mouse_form.legacy_genetics_summary %}
+            <div class="read-only-field">
+                <p class="read-only-label">Existing free-text genetics</p>
+                <p class="read-only-value">
+                    {{ mouse_form.legacy_genetics_summary.crossing|default:"n/a" }}
+                </p>
+                <p>
+                    Type:
+                    {{ mouse_form.legacy_genetics_summary.crossing_type|default:"n/a" }}
+                    <br>
+                    Genotype:
+                    {{ mouse_form.legacy_genetics_summary.genotype|default:"n/a" }}
+                </p>
+            </div>
+        {% endif %}
+
+        {% include "lab/components/form_fields.html" with form=mouse_form %}
+
+        <div class="actions">
+            <button
+                class="button button-primary"
+                type="submit"
+                name="save_mouse"
+                value="1"
+            >
+                Save changes
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+
+            <a
+                class="button button-danger"
+                href="{% url 'lab:delete_mouse' mouse.pk %}?return_url={{ return_url|urlencode }}"
+            >
+                Delete
+            </a>
+        </div>
+    </form>
+
+    <section class="section">
+        <h2 class="section-title">Procedures</h2>
+
+        <div class="table-card">
+            {% if procedures %}
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Procedure type</th>
+                                <th>Lab member</th>
+                                <th>Lab-book page</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for procedure in procedures %}
+                                <tr>
+                                    <td>
+                                        {% if procedure.date %}
+                                            {{ procedure.date|date:"d/m/Y" }}
+                                        {% else %}
+                                            <span class="empty-mark">&mdash;</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ procedure.procedure_type }}</td>
+                                    <td>
+                                        {{ procedure.lab_member|default:"" }}
+                                        {% if not procedure.lab_member %}
+                                            <span class="empty-mark">&mdash;</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ procedure.lab_book_page|default:"" }}
+                                        {% if not procedure.lab_book_page %}
+                                            <span class="empty-mark">&mdash;</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="row-actions">
+                                            <a
+                                                class="button"
+                                                href="{% url 'lab:edit_mouse_procedure' mouse.pk procedure.pk %}?return_url={{ return_url|urlencode }}"
+                                            >
+                                                Edit
+                                            </a>
+
+                                            <form
+                                                method="post"
+                                                action="{% url 'lab:delete_mouse_procedure' mouse.pk procedure.pk %}"
+                                                onsubmit="return confirm('Delete this procedure?');"
+                                            >
+                                                {% csrf_token %}
+                                                <input
+                                                    type="hidden"
+                                                    name="return_url"
+                                                    value="{{ return_url }}"
+                                                >
+                                                <button
+                                                    class="button button-danger"
+                                                    type="submit"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-message">
+                    No procedures recorded.
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {% include "lab/components/service_recording_actions.html" %}
+
+    <section class="section">
+        <h2 class="section-title">Add procedure</h2>
+            {% if not procedure_form.can_create_procedure %}
+                <p class="bulk-help">
+                    Regulated procedure creation is disabled for this protocol.
+                </p>
+            {% endif %}
+        <form method="post" class="form-card">
+            {% csrf_token %}
+            <input
+                type="hidden"
+                name="return_url"
+                value="{{ return_url }}"
+            >
+
+            {% include "lab/components/form_fields.html" with form=procedure_form %}
+
+            <div class="actions">
+                <button
+                    class="button button-primary"
+                    type="submit"
+                    name="save_procedure"
+                    value="1"
+                    {% if not procedure_form.can_create_procedure %}disabled{% endif %}
+                >
+                    Add procedure
+                </button>
+
+                <a class="button" href="{{ return_url }}">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+    {% include "lab/components/crossing_selector_script.html" %}
+{% endblock %}

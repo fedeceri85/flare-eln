@@ -1,0 +1,27 @@
+{% if page_size_control %}
+    <form method="get" class="page-size-form">
+        {% for field in page_size_control.hidden_fields %}
+            <input
+                type="hidden"
+                name="{{ field.name }}"
+                value="{{ field.value }}"
+            >
+        {% endfor %}
+
+        <label for="page-size-select">{{ page_size_control.label }}</label>
+        <select
+            id="page-size-select"
+            name="{{ page_size_control.name }}"
+            onchange="this.form.submit()"
+        >
+            {% for option in page_size_control.options %}
+                <option
+                    value="{{ option.value }}"
+                    {% if option.selected %}selected{% endif %}
+                >
+                    {{ option.label }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+{% endif %}

@@ -1,0 +1,73 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Recordings{% endblock %}
+{% block page_title %}Recordings{% endblock %}
+{% block main_class %}container container-fluid{% endblock %}
+
+{% block page_subtitle %}
+    <p>
+        {{ project.name }} -
+        {{ experiment.name }}
+        {% if experiment.recording_type %}
+            | {{ experiment.recording_type }}
+        {% endif %}
+    </p>
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+
+            <a class="button" href="{{ experiments_url }}">
+                {{ experiments_link_label }}
+            </a>
+
+            <a
+                class="button button-primary"
+                href="{{ add_recording_url }}?return_url={{ request.get_full_path|urlencode }}"
+            >
+                Add one recording
+            </a>
+
+            <button
+                class="button"
+                type="submit"
+                form="selected-recording-form"
+            >
+                Duplicate selected recording
+            </button>
+        </div>
+    </div>
+
+    {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+
+    <div class="table-summary">
+        <div class="record-count">
+            Showing {{ record_count.start }}&ndash;{{ record_count.end }}
+            of {{ record_count.count }}
+            {{ record_count.noun }}{{ record_count.count|pluralize }}
+        </div>
+
+        {% include "lab/components/page_size_select.html" with page_size_control=page_size_control %}
+    </div>
+
+    <form
+        id="selected-recording-form"
+        method="post"
+        action="{{ duplicate_recording_url }}"
+    >
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ request.get_full_path }}"
+        >
+
+        {% include "lab/components/table.html" with table=table %}
+    </form>
+
+    {% include "lab/components/pagination.html" with pagination=pagination %}
+{% endblock %}

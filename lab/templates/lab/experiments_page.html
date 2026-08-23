@@ -1,0 +1,55 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Experiments{% endblock %}
+{% block page_title %}Experiments{% endblock %}
+{% block main_class %}container container-fluid{% endblock %}
+
+{% block page_subtitle %}
+    <p>{{ project.name }}</p>
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="procedure-nav">
+            <nav class="protocol-tabs" aria-label="Experiment status">
+                {% for tab in experiment_tabs %}
+                    <a
+                        href="{{ tab.url }}"
+                        class="protocol-tab{% if tab.active %} active{% endif %}"
+                    >
+                        {{ tab.label }}
+                    </a>
+                {% endfor %}
+            </nav>
+        </div>
+
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+
+            <a class="button" href="{% url 'lab:projects_page' %}">
+                Projects
+            </a>
+
+            <a
+                class="button button-primary"
+                href="{% url 'lab:add_experiment' project.pk %}?return_url={{ request.get_full_path|urlencode }}"
+            >
+                Add an experiment
+            </a>
+        </div>
+    </div>
+
+    {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+
+    <div class="record-count">
+        Showing {{ record_count.start }}&ndash;{{ record_count.end }}
+        of {{ record_count.count }}
+        {{ record_count.noun }}{{ record_count.count|pluralize }}
+    </div>
+
+    {% include "lab/components/table.html" with table=table %}
+
+    {% include "lab/components/pagination.html" with pagination=pagination %}
+{% endblock %}

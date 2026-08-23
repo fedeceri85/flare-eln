@@ -1,0 +1,45 @@
+{% if service_recording_actions %}
+    <section class="{% if service_recording_actions_bulk_layout %}bulk-section{% else %}section{% endif %}">
+        <h2 class="{% if service_recording_actions_bulk_layout %}bulk-title{% else %}section-title{% endif %}">Services</h2>
+        {% if service_recording_actions_bulk_layout %}
+            <p class="bulk-help">
+                Add a service record for the selected mice.
+            </p>
+        {% endif %}
+
+        {% if not service_recording_actions_bulk_layout %}
+        <div class="table-card">
+        {% endif %}
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Details</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for action in service_recording_actions %}
+                            <tr>
+                                <td>{{ action.title }}</td>
+                                <td>{{ action.description }}</td>
+                                <td>
+                                    <a
+                                        class="button button-primary"
+                                        href="{{ action.url }}"
+                                    >
+                                        Add record
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% if not service_recording_actions_bulk_layout %}
+        </div>
+        {% endif %}
+    </section>
+{% endif %}

@@ -1,0 +1,244 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Edit selected mice{% endblock %}
+{% block page_title %}Edit selected mice{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
+
+{% block page_subtitle %}
+    <p>
+        {% if selected_protocol %}
+            Protocol {{ selected_protocol.protocol_number }}.
+        {% else %}
+            All mice.
+        {% endif %}
+        Checked fields are applied to every selected mouse.
+    </p>
+{% endblock %}
+
+{% block content %}
+    <div class="selected-list">
+        <p class="selected-list-label">
+            Selected mice
+        </p>
+
+        <ul class="selected-list-items">
+            {% for mouse in selected_mice %}
+                <li class="selected-list-item">
+                    {{ mouse.mouse_id }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+        <input
+            type="hidden"
+            name="apply_bulk_edit"
+            value="1"
+        >
+
+        {% for mouse in selected_mice %}
+            <input
+                type="hidden"
+                name="selected_mouse"
+                value="{{ mouse.pk }}"
+            >
+        {% endfor %}
+
+        {% if form.non_field_errors %}
+            <ul class="error-list">
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% for hidden_field in form.hidden_fields %}
+            {{ hidden_field }}
+
+            {% if hidden_field.errors %}
+                <ul class="error-list">
+                    {% for error in hidden_field.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endfor %}
+
+        <section class="bulk-section">
+            <h2 class="bulk-title">Mouse fields</h2>
+            <p class="bulk-help">
+                Checked blank fields are cleared. Unchecked fields are left unchanged.
+            </p>
+
+            <div class="bulk-fields">
+                {% for item in form.mouse_update_bound_fields %}
+                    <div class="bulk-field">
+                        <div class="bulk-toggle">
+                            {{ item.checkbox }}
+                            {{ item.checkbox.label_tag }}
+                        </div>
+
+                        {% if item.secondary_checkbox %}
+                            <div class="bulk-toggle">
+                                {{ item.secondary_checkbox }}
+                                {{ item.secondary_checkbox.label_tag }}
+                            </div>
+                        {% endif %}
+
+                        <div class="bulk-input">
+                            {{ item.field.label_tag }}
+                            {{ item.field }}
+
+                            {% if item.field.errors %}
+                                <ul class="error-list">
+                                    {% for error in item.field.errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+
+                        {% if item.genotype_fields %}
+                            <fieldset
+                                class="form-subset genotype-subset"
+                                data-genotype-subset="true"
+                            >
+                                <legend>Genotype</legend>
+
+                                {% for genotype_field in item.genotype_fields %}
+                                    <div class="form-field">
+                                        {{ genotype_field.label_tag }}
+                                        {{ genotype_field }}
+
+                                        {% if genotype_field.help_text %}
+                                            <small>{{ genotype_field.help_text }}</small>
+                                        {% endif %}
+
+                                        {% if genotype_field.errors %}
+                                            <ul class="error-list">
+                                                {% for error in genotype_field.errors %}
+                                                    <li>{{ error }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </fieldset>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <div class="bulk-field">
+                    <div class="bulk-toggle">
+                        {{ form.append_notes }}
+                        {{ form.append_notes.label_tag }}
+                    </div>
+
+                    <div class="bulk-input">
+                        {{ form.notes.label_tag }}
+                        {{ form.notes }}
+
+                        {% if form.notes.help_text %}
+                            <small>{{ form.notes.help_text }}</small>
+                        {% endif %}
+
+                        {% if form.notes.errors %}
+                            <ul class="error-list">
+                                {% for error in form.notes.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="bulk-section">
+            <h2 class="bulk-title">Procedure</h2>
+            <p class="bulk-help">
+                {% if can_add_bulk_procedure %}
+                    This adds one new procedure record for each selected mouse.
+                    Checked procedure fields are set on the new rows.
+                {% else %}
+                    Regulated procedure creation is disabled for one or more selected mice.
+                {% endif %}
+            </p>
+
+            <fieldset {% if not can_add_bulk_procedure %}disabled{% endif %}>
+                <div class="form-field">
+                    {{ form.procedure_type.label_tag }}
+                    {{ form.procedure_type }}
+
+                    {% if form.procedure_type.help_text %}
+                        <small>{{ form.procedure_type.help_text }}</small>
+                    {% endif %}
+
+                    {% if form.procedure_type.errors %}
+                        <ul class="error-list">
+                            {% for error in form.procedure_type.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                <div class="bulk-fields">
+                    {% for item in form.procedure_update_bound_fields %}
+                        <div class="bulk-field">
+                            <div class="bulk-toggle">
+                                {{ item.checkbox }}
+                                {{ item.checkbox.label_tag }}
+                            </div>
+
+                            <div class="bulk-input">
+                                {{ item.field.label_tag }}
+                                {{ item.field }}
+
+                                {% if item.field.errors %}
+                                    <ul class="error-list">
+                                        {% for error in item.field.errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+        </section>
+
+        {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Save bulk changes
+            </button>
+
+            <button
+                class="button button-danger"
+                type="submit"
+                formaction="{{ delete_selected_url }}"
+                formmethod="post"
+            >
+                Delete selected
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    {% include "lab/components/crossing_selector_script.html" %}
+{% endblock %}

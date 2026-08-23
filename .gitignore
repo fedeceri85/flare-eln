@@ -1,0 +1,16 @@
+.venv/*
+*pyc
+*.DS_Store*
+.env
+.env.*
+.env_*
+!.env.example
+!.env.*.example
+backups/
+staticfiles/
+media/
+private/
+*__pycache__/*
+*.DS_Store∂
+release/
+flare-eln/

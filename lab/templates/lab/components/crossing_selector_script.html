@@ -1,0 +1,150 @@
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const crossingInput = document.querySelector("[data-crossing-lookup-input]");
+    const crossingIdInput = document.querySelector("[data-crossing-definition-input]");
+
+    if (!crossingInput || !crossingIdInput) {
+        return;
+    }
+
+    const lookupUrl = "{{ crossing_lookup_url|escapejs }}";
+    const genotypeFieldsUrl = "{{ crossing_genotype_fields_url|escapejs }}";
+    const mouseId = "{{ crossing_mouse_id|default:''|escapejs }}";
+    const crossingField = crossingInput.closest(".form-field, .bulk-field");
+    const results = document.createElement("div");
+    let lookupTimeout;
+
+    if (!crossingField) {
+        return;
+    }
+
+    results.className = "lookup-results";
+    crossingField.appendChild(results);
+
+    function removeGenotypeFields() {
+        document.querySelectorAll("[data-genotype-subset]").forEach(function (subset) {
+            subset.remove();
+        });
+
+        document.querySelectorAll("[data-genotype-field]").forEach(function (field) {
+            const wrapper = field.closest(".form-field");
+
+            if (wrapper) {
+                wrapper.remove();
+            }
+        });
+    }
+
+    function insertGenotypeFields(lines, choices) {
+        removeGenotypeFields();
+
+        if (!lines.length) {
+            return;
+        }
+
+        const subset = document.createElement("fieldset");
+        const legend = document.createElement("legend");
+
+        subset.className = "form-subset genotype-subset";
+        subset.dataset.genotypeSubset = "true";
+        legend.textContent = "Genotype";
+        subset.appendChild(legend);
+
+        lines.forEach(function (line) {
+            const wrapper = document.createElement("div");
+            const label = document.createElement("label");
+            const select = document.createElement("select");
+
+            wrapper.className = "form-field";
+            label.setAttribute("for", "id_" + line.field_name);
+            label.textContent = line.name;
+            select.name = line.field_name;
+            select.id = "id_" + line.field_name;
+            select.dataset.genotypeField = "true";
+            select.dataset.lineId = line.id;
+
+            choices.forEach(function (choice) {
+                const option = document.createElement("option");
+                option.value = choice.value;
+                option.textContent = choice.label;
+
+                if (choice.value === line.value) {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            });
+
+            wrapper.appendChild(label);
+            wrapper.appendChild(select);
+            subset.appendChild(wrapper);
+        });
+
+        crossingField.insertAdjacentElement("afterend", subset);
+    }
+
+    async function loadGenotypeFields(crossingId) {
+        const params = new URLSearchParams({crossing: crossingId});
+
+        if (mouseId) {
+            params.set("mouse", mouseId);
+        }
+
+        const response = await fetch(
+            genotypeFieldsUrl + "?" + params.toString()
+        );
+
+        if (!response.ok) {
+            removeGenotypeFields();
+            return;
+        }
+
+        const data = await response.json();
+        insertGenotypeFields(data.lines || [], data.choices || []);
+    }
+
+    function showResults(resultsData) {
+        results.innerHTML = "";
+
+        resultsData.forEach(function (crossing) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "button";
+            button.textContent = crossing.label;
+            button.addEventListener("click", function () {
+                crossingIdInput.value = crossing.id;
+                crossingInput.value = crossing.label;
+                results.innerHTML = "";
+                loadGenotypeFields(crossing.id);
+            });
+            results.appendChild(button);
+        });
+    }
+
+    crossingInput.addEventListener("input", function () {
+        clearTimeout(lookupTimeout);
+        crossingIdInput.value = "";
+        removeGenotypeFields();
+
+        const query = crossingInput.value.trim();
+
+        if (!query) {
+            results.innerHTML = "";
+            return;
+        }
+
+        lookupTimeout = setTimeout(async function () {
+            const params = new URLSearchParams({q: query});
+            const response = await fetch(lookupUrl + "?" + params.toString());
+
+            if (!response.ok) {
+                results.innerHTML = "";
+                return;
+            }
+
+            const data = await response.json();
+            showResults(data.results || []);
+        }, 200);
+    });
+});
+</script>

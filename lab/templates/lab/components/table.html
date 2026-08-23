@@ -1,0 +1,79 @@
+<div class="table-card">
+    {% if table.rows %}
+        {% if table.has_selectable_rows %}
+            <div class="table-controls">
+                <button
+                    class="button"
+                    type="button"
+                    data-table-select-all-button
+                >
+                    Select all
+                </button>
+            </div>
+        {% endif %}
+
+        <div class="table-scroll">
+            <table class="data-table {{ table.class }}">
+                <thead>
+                    <tr>
+                        {% for column in table.columns %}
+                            <th class="{{ column.class }}">
+                                {% if column.header_checkbox %}
+                                    <input
+                                        type="checkbox"
+                                        data-select-all
+                                        aria-label="{{ column.header_checkbox.aria_label }}"
+                                    >
+                                {% elif column.sort_url %}
+                                    <a href="{{ column.sort_url }}">
+                                        {{ column.label }}
+
+                                        {% if column.sort_state == "asc" %}
+                                            <span aria-hidden="true">&uarr;</span>
+                                        {% elif column.sort_state == "desc" %}
+                                            <span aria-hidden="true">&darr;</span>
+                                        {% endif %}
+                                    </a>
+                                {% else %}
+                                    {{ column.label }}
+                                {% endif %}
+                            </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for row in table.rows %}
+                        <tr{% if row.id %} id="{{ row.id }}"{% endif %}{% if row.class %} class="{{ row.class }}"{% endif %}>
+                            {% for cell in row.cells %}
+                                <td class="{{ cell.class }}">
+                                    {% if cell.checkbox %}
+                                        <input
+                                            type="checkbox"
+                                            data-row-checkbox
+                                            name="{{ cell.checkbox.name }}"
+                                            value="{{ cell.checkbox.value }}"
+                                            aria-label="{{ cell.checkbox.aria_label }}"
+                                            {% if cell.checkbox.checked %}checked{% endif %}
+                                        >
+                                    {% elif cell.url %}
+                                        <a
+                                            class="{{ cell.link_class }}"
+                                            href="{{ cell.url }}"
+                                        >
+                                            {{ cell.value }}
+                                        </a>
+                                    {% else %}
+                                        {{ cell.value }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-message">{{ table.empty_message }}</div>
+    {% endif %}
+</div>

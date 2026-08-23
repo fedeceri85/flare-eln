@@ -1,0 +1,70 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Mice{% endblock %}
+{% block page_title %}Mice{% endblock %}
+{% block main_class %}container container-fluid{% endblock %}
+
+{% block page_subtitle %}
+    <p>All mouse records, including mice with no protocol.</p>
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+
+            <button
+                class="button"
+                type="submit"
+                form="selected-mice-form"
+            >
+                Edit selected mice
+            </button>
+
+            <a
+                class="button"
+                href="{{ add_mouse_url }}?return_url={{ request.get_full_path|urlencode }}"
+            >
+                Add mouse
+            </a>
+
+            <a
+                class="button button-primary"
+                href="{{ add_litter_url }}?return_url={{ request.get_full_path|urlencode }}"
+            >
+                Add litter
+            </a>
+        </div>
+    </div>
+
+    {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+
+    <div class="table-summary">
+        <div class="record-count">
+            Showing {{ record_count.start }}&ndash;{{ record_count.end }}
+            of {{ record_count.count }}
+            {{ record_count.noun }}{{ record_count.count|pluralize }}
+        </div>
+
+        {% include "lab/components/page_size_select.html" with page_size_control=page_size_control %}
+    </div>
+
+    <form
+        id="selected-mice-form"
+        method="post"
+        action="{{ edit_selected_url }}"
+    >
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ request.get_full_path }}"
+        >
+
+        {% include "lab/components/table.html" with table=table %}
+    </form>
+
+    {% include "lab/components/pagination.html" with pagination=pagination %}
+{% endblock %}

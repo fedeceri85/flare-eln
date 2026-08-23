@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: "${LABDB_STACK_DB_NAME:-lab_container_stack}"
+      POSTGRES_USER: "${LABDB_STACK_DB_USER:-labdb_lesson}"
+      POSTGRES_PASSWORD: "${LABDB_STACK_DB_PASSWORD:?Set LABDB_STACK_DB_PASSWORD in .env before running Compose}"
+    ports:
+      - "${LABDB_STACK_DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_lesson_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: "django-insecure-local-stack-lesson-only"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "${LABDB_STACK_DB_NAME:-lab_container_stack}"
+      DB_USER: "${LABDB_STACK_DB_USER:-labdb_lesson}"
+      DB_PASSWORD: "${LABDB_STACK_DB_PASSWORD:?Set LABDB_STACK_DB_PASSWORD in .env before running Compose}"
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_lesson_data:
+    name: labdb_postgres_lesson_data

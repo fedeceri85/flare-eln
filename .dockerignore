@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+.env
+.env.*
+.env_*
+staticfiles
+media
+private
+RELEASE
+release
+*.ipynb
+SQL_script

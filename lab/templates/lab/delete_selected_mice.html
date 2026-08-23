@@ -1,0 +1,77 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Delete selected mice{% endblock %}
+{% block page_title %}Delete selected mice{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
+
+{% block page_subtitle %}
+    <p>
+        {% if selected_protocol %}
+            Protocol {{ selected_protocol.protocol_number }}.
+        {% else %}
+            All mice.
+        {% endif %}
+        This action permanently deletes the selected mice.
+    </p>
+{% endblock %}
+
+{% block content %}
+    <div class="selected-list">
+        <p class="selected-list-label">
+            Selected mice
+        </p>
+
+        <ul class="selected-list-items">
+            {% for mouse in selected_mice %}
+                <li class="selected-list-item">
+                    {{ mouse.mouse_id }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="warning-message">
+        <p>
+            {{ procedure_count }} procedure{{ procedure_count|pluralize }}
+            will be deleted with these mice.
+        </p>
+
+        {% if recording_count %}
+            <p>
+                Associated recording links will be removed.
+                {{ recording_count }}
+                recording{{ recording_count|pluralize }} will remain in the
+                database.
+            </p>
+        {% endif %}
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% for mouse in selected_mice %}
+            <input
+                type="hidden"
+                name="selected_mouse"
+                value="{{ mouse.pk }}"
+            >
+        {% endfor %}
+
+        {% include "lab/components/form_fields.html" with form=form %}
+
+        <div class="actions">
+            <button class="button button-danger" type="submit">
+                Delete selected mice
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}

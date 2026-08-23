@@ -1,0 +1,130 @@
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-filter-autocomplete-input]").forEach(function (input) {
+        if (input.dataset.filterAutocompleteInitialized === "true") {
+            return;
+        }
+
+        const lookupUrl = input.dataset.autocompleteUrl;
+        const valueKey = input.dataset.autocompleteValueKey || "value";
+        const labelKey = input.dataset.autocompleteLabelKey || "label";
+        const field = input.closest(".filter-field");
+        const results = document.createElement("div");
+        let lookupTimeout = null;
+        let requestController = null;
+
+        if (!lookupUrl || !field) {
+            return;
+        }
+
+        input.dataset.filterAutocompleteInitialized = "true";
+        results.className = "autocomplete-results";
+        results.setAttribute("role", "listbox");
+        field.appendChild(results);
+
+        function resultValue(row) {
+            return row[valueKey] || row.label || "";
+        }
+
+        function resultLabel(row) {
+            return row[labelKey] || row.label || resultValue(row);
+        }
+
+        function hideResults() {
+            results.classList.remove("visible");
+            results.textContent = "";
+        }
+
+        function showResults(rows) {
+            results.textContent = "";
+
+            rows.forEach(function (row) {
+                const option = document.createElement("button");
+                option.type = "button";
+                option.className = "autocomplete-option";
+                option.setAttribute("role", "option");
+                option.dataset.value = resultValue(row);
+                option.textContent = resultLabel(row);
+                results.appendChild(option);
+            });
+
+            results.classList.toggle("visible", rows.length > 0);
+        }
+
+        function fetchResults() {
+            const query = input.value.trim();
+
+            if (!query) {
+                hideResults();
+                return;
+            }
+
+            if (requestController) {
+                requestController.abort();
+            }
+
+            requestController = new AbortController();
+
+            fetch(lookupUrl + "?q=" + encodeURIComponent(query), {
+                headers: {
+                    "Accept": "application/json",
+                },
+                signal: requestController.signal,
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Lookup failed.");
+                    }
+
+                    return response.json();
+                })
+                .then(function (payload) {
+                    showResults(payload.results || []);
+                })
+                .catch(function (error) {
+                    if (error.name !== "AbortError") {
+                        hideResults();
+                    }
+                });
+        }
+
+        input.addEventListener("input", function () {
+            clearTimeout(lookupTimeout);
+            lookupTimeout = setTimeout(fetchResults, 150);
+        });
+
+        input.addEventListener("focus", function () {
+            if (input.value.trim()) {
+                fetchResults();
+            }
+        });
+
+        input.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                hideResults();
+            }
+        });
+
+        results.addEventListener("mousedown", function (event) {
+            const option = event.target.closest(".autocomplete-option");
+
+            if (!option) {
+                return;
+            }
+
+            event.preventDefault();
+            input.value = option.dataset.value;
+            hideResults();
+            input.focus();
+        });
+
+        document.addEventListener("click", function (event) {
+            if (event.target === input || results.contains(event.target)) {
+                return;
+            }
+
+            hideResults();
+        });
+    });
+});
+</script>

@@ -1,0 +1,96 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Select mice{% endblock %}
+{% block page_title %}Select mice{% endblock %}
+{% block main_class %}container container-fluid{% endblock %}
+
+{% block page_subtitle %}
+    <p>
+        {{ project.name }} -
+        {{ experiment.name }}
+        {% if experiment.recording_type %}
+            | {{ experiment.recording_type }}
+        {% endif %}
+    </p>
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+
+            <a class="button" href="{{ return_url }}">
+                Back to recording form
+            </a>
+
+            <a class="button" href="{{ add_mouse_url }}">
+                Add mouse
+            </a>
+        </div>
+    </div>
+
+    {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+
+    <div class="table-summary">
+        <div class="record-count">
+            Showing {{ record_count.start }}&ndash;{{ record_count.end }}
+            of {{ record_count.count }}
+            {{ record_count.noun }}{{ record_count.count|pluralize }}
+        </div>
+
+        {% include "lab/components/page_size_select.html" with page_size_control=page_size_control %}
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% for mouse_id in hidden_selected_mouse_ids %}
+            <input
+                type="hidden"
+                name="selected_mouse"
+                value="{{ mouse_id }}"
+            >
+        {% endfor %}
+
+        <div class="selected-list">
+            <p class="selected-list-label">
+                Selected mice
+            </p>
+
+            {% if selected_mice %}
+                <ul class="selected-list-items">
+                    {% for mouse in selected_mice %}
+                        <li class="selected-list-item">
+                            {{ mouse.mouse_id }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="read-only-value">No mice selected</p>
+            {% endif %}
+        </div>
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Add selected mice
+            </button>
+        </div>
+
+        {% include "lab/components/table.html" with table=table %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Add selected mice
+            </button>
+        </div>
+    </form>
+
+    {% include "lab/components/pagination.html" with pagination=pagination %}
+{% endblock %}

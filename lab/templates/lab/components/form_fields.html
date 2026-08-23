@@ -1,0 +1,91 @@
+{% if form.non_field_errors %}
+    <ul class="error-list">
+        {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+{% for field in form.hidden_fields %}
+    {{ field }}
+
+    {% if field.errors %}
+        <ul class="error-list">
+            {% for error in field.errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endfor %}
+
+{% with visible_field_sections=form.visible_field_sections %}
+    {% if visible_field_sections %}
+        {% for section in visible_field_sections %}
+            {% if section.title %}
+                <fieldset
+                    class="form-subset {{ section.class }}"
+                    data-genotype-subset="true"
+                >
+                    <legend>{{ section.title }}</legend>
+
+                    {% for field in section.fields %}
+                        <div class="form-field">
+                            {{ field.label_tag }}
+                            {{ field }}
+
+                            {% if field.help_text %}
+                                <small>{{ field.help_text }}</small>
+                            {% endif %}
+
+                            {% if field.errors %}
+                                <ul class="error-list">
+                                    {% for error in field.errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </fieldset>
+            {% else %}
+                {% for field in section.fields %}
+                    <div class="form-field">
+                        {{ field.label_tag }}
+                        {{ field }}
+
+                        {% if field.help_text %}
+                            <small>{{ field.help_text }}</small>
+                        {% endif %}
+
+                        {% if field.errors %}
+                            <ul class="error-list">
+                                {% for error in field.errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        {% for field in form.visible_fields %}
+            <div class="form-field">
+                {{ field.label_tag }}
+                {{ field }}
+
+                {% if field.help_text %}
+                    <small>{{ field.help_text }}</small>
+                {% endif %}
+
+                {% if field.errors %}
+                    <ul class="error-list">
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}

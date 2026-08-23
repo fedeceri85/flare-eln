@@ -1,0 +1,123 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Procedures{% endblock %}
+{% block page_title %}Procedures{% endblock %}
+{% block main_class %}container container-fluid{% endblock %}
+
+{% block page_subtitle %}
+    {% if selected_licence_reference %}
+        <p>
+            Animals registered under
+            licence
+            <strong>{{ selected_licence_reference }}</strong>
+            {% if selected_protocol %}
+                and
+                <strong>{{ selected_protocol.name }}</strong>
+            {% endif %}
+        </p>
+    {% elif selected_protocol %}
+        <p>
+            Mice registered under
+            <strong>{{ selected_protocol.name }}</strong>
+        </p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="procedure-nav">
+            {% if licence_references %}
+                <nav class="protocol-tabs" aria-label="Licences">
+                    {% for licence_reference in licence_references %}
+                        <a
+                            href="{% url 'lab:procedure_page_licence' licence_reference %}"
+                            class="protocol-tab{% if selected_licence_reference == licence_reference %} active{% endif %}"
+                        >
+                            {{ licence_reference }}
+                        </a>
+                    {% endfor %}
+                </nav>
+            {% endif %}
+
+            {% if selected_licence_reference %}
+                <nav class="protocol-tabs" aria-label="Protocols">
+                    {% for protocol in protocols %}
+                        <a
+                            href="{% url 'lab:procedure_page_licence_protocol' protocol.licence_reference protocol.protocol_number %}"
+                            class="protocol-tab{% if selected_protocol.pk == protocol.pk %} active{% endif %}"
+                        >
+                             {{ protocol.name }}
+                        </a>
+                    {% endfor %}
+                </nav>
+            {% endif %}
+        </div>
+
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+
+            {% if selected_protocol %}
+                <button
+                    class="button"
+                    type="submit"
+                    form="selected-mice-form"
+                >
+                    Edit selected
+                </button>
+
+                <a
+                    class="button"
+                    href="{% url 'lab:add_mouse_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}"
+                >
+                    Add mouse
+                </a>
+
+                <a
+                    class="button button-primary"
+                    href="{% url 'lab:add_litter_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}?return_url={{ request.get_full_path|urlencode }}"
+                >
+                    Add litter
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if selected_protocol %}
+        {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+
+        <div class="table-summary">
+            <div class="record-count">
+                Showing {{ record_count.start }}&ndash;{{ record_count.end }}
+                of {{ record_count.count }}
+                {{ record_count.noun }}{{ record_count.count|pluralize }}
+            </div>
+
+            {% include "lab/components/page_size_select.html" with page_size_control=page_size_control %}
+        </div>
+
+        <form
+            id="selected-mice-form"
+            method="post"
+            action="{% url 'lab:edit_selected_mice_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}"
+        >
+            {% csrf_token %}
+            <input
+                type="hidden"
+                name="return_url"
+                value="{{ request.get_full_path }}"
+            >
+
+            {% include "lab/components/table.html" with table=table %}
+        </form>
+
+        {% include "lab/components/pagination.html" with pagination=pagination %}
+    {% else %}
+        <div class="table-card">
+            <div class="empty-message">
+                No protocols have been created.
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

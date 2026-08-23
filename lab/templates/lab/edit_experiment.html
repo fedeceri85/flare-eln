@@ -1,0 +1,42 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Edit experiment {{ experiment.name }}{% endblock %}
+{% block page_title %}Edit experiment{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    <p>{{ project.name }}</p>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% include "lab/components/form_fields.html" with form=form %}
+
+        {% if form.recording_type_options %}
+            <datalist id="recording-type-options">
+                {% for recording_type in form.recording_type_options %}
+                    <option value="{{ recording_type.name }}">
+                        {{ recording_type.slug }}
+                    </option>
+                {% endfor %}
+            </datalist>
+        {% endif %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Save changes
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}

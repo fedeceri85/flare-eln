@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${LABDB_PROD_DB_NAME:?Set LABDB_PROD_DB_NAME in .env}"
+      POSTGRES_USER: "${LABDB_PROD_DB_USER:?Set LABDB_PROD_DB_USER in .env}"
+      POSTGRES_PASSWORD: "${LABDB_PROD_DB_PASSWORD:?Set LABDB_PROD_DB_PASSWORD in .env}"
+    volumes:
+      - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/postgres-data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: >
+      gunicorn labdb.wsgi:application
+      --bind 0.0.0.0:8000
+      --workers ${GUNICORN_WORKERS:-3}
+      --timeout ${GUNICORN_TIMEOUT:-120}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${LABDB_WEB_PORT:-8000}:8000"
+    environment:
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-0}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:?Set DJANGO_ALLOWED_HOSTS in .env}"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "${LABDB_PROD_DB_NAME:?Set LABDB_PROD_DB_NAME in .env}"
+      DB_USER: "${LABDB_PROD_DB_USER:?Set LABDB_PROD_DB_USER in .env}"
+      DB_PASSWORD: "${LABDB_PROD_DB_PASSWORD:?Set LABDB_PROD_DB_PASSWORD in .env}"
+    volumes:
+      - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/external-imports:/external-imports:ro"

@@ -1,0 +1,43 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Rename mouse {{ mouse.mouse_id }}{% endblock %}
+{% block page_title %}Rename mouse{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    <p>
+        Mouse ID remains the primary key. Rename creates the new ID, moves
+        linked records to it, then removes the old ID.
+    </p>
+{% endblock %}
+
+{% block content %}
+    <div class="read-only-field">
+        <p class="read-only-label">Current mouse ID</p>
+        <p class="read-only-value">{{ mouse.mouse_id }}</p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% include "lab/components/form_fields.html" with form=form %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Rename mouse
+            </button>
+
+            <a
+                class="button"
+                href="{% url 'lab:edit_mouse' mouse.pk %}?return_url={{ return_url|urlencode }}"
+            >
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}

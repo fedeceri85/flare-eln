@@ -1,0 +1,204 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block page_subtitle %}
+    <p>Generate project licence returns and lab summaries.</p>
+{% endblock %}
+
+{% block content %}
+    <div class="toolbar">
+        <div class="actions">
+            <a class="button" href="{% url 'lab:home' %}">
+                Home
+            </a>
+        </div>
+    </div>
+
+    {% include "lab/components/card_grid.html" with cards=report_cards %}
+
+    {% if selected_report == home_office_report_key %}
+        <section class="section">
+            <h2 class="section-title">Home Office Return</h2>
+
+            <form class="form-card" method="get">
+                <input
+                    type="hidden"
+                    name="report"
+                    value="{{ home_office_report_key }}"
+                >
+
+                {% include "lab/components/form_fields.html" with form=home_office_form %}
+
+                <div class="actions">
+                    <button class="button button-primary" type="submit">
+                        Generate report
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        {% if home_office_report %}
+            <div class="warning-message">
+                <p>{{ home_office_report.warning }}</p>
+            </div>
+
+            {% if home_office_report.output_mode == "text" %}
+                <pre class="report-text">{{ home_office_report.text }}</pre>
+            {% else %}
+                <section class="section">
+                    <h2 class="section-title">Total numbers</h2>
+
+                    <div class="table-card">
+                        <div class="table-scroll">
+                            <table class="data-table report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mice under procedure</th>
+                                        <th>Mild</th>
+                                        <th>Moderate</th>
+                                        <th>Severe</th>
+                                        <th>Severity not set</th>
+                                        <th>Surpassed threshold</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    <tr>
+                                        <td>{{ home_office_report.total.total }}</td>
+                                        <td>{{ home_office_report.total.mild }}</td>
+                                        <td>{{ home_office_report.total.moderate }}</td>
+                                        <td>{{ home_office_report.total.severe }}</td>
+                                        <td>{{ home_office_report.total.not_set }}</td>
+                                        <td>{{ home_office_report.total.exceeded }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Total by crossing type</h2>
+
+                    <div class="table-card">
+                        <div class="table-scroll">
+                            <table class="data-table report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Crossing type</th>
+                                        <th>Mice under procedure</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for row in home_office_report.total_crossing_type_rows %}
+                                        <tr>
+                                            <td>{{ row.label }}</td>
+                                            <td>{{ row.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Breakdown by protocol</h2>
+
+                    <div class="table-card">
+                        <div class="table-scroll">
+                            <table class="data-table report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Protocol</th>
+                                        <th>Max severity</th>
+                                        <th>Mice under procedure</th>
+                                        <th>Mild</th>
+                                        <th>Moderate</th>
+                                        <th>Severe</th>
+                                        <th>Severity not set</th>
+                                        <th>Surpassed threshold</th>
+                                        {% for label in home_office_report.crossing_type_labels %}
+                                            <th>{{ label }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for row in home_office_report.protocol_rows %}
+                                        <tr>
+                                            <td>{{ row.protocol_label }}</td>
+                                            <td>
+                                                {% if row.max_severity %}
+                                                    {{ row.max_severity }}
+                                                {% else %}
+                                                    &mdash;
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ row.total }}</td>
+                                            <td>{{ row.mild }}</td>
+                                            <td>{{ row.moderate }}</td>
+                                            <td>{{ row.severe }}</td>
+                                            <td>{{ row.not_set }}</td>
+                                            <td>{{ row.exceeded }}</td>
+                                            {% for crossing_type_row in row.crossing_type_rows %}
+                                                <td>{{ crossing_type_row.count }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="12">No protocols are registered for this licence.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2 class="section-title">Breakdown by procedure</h2>
+
+                    <div class="table-card">
+                        <div class="table-scroll">
+                            <table class="data-table report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Procedure</th>
+                                        <th>Mice under procedure</th>
+                                        <th>Mild</th>
+                                        <th>Moderate</th>
+                                        <th>Severe</th>
+                                        <th>Severity not set</th>
+                                        <th>Surpassed threshold</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for row in home_office_report.procedure_rows %}
+                                        <tr>
+                                            <td>{{ row.procedure_label }}</td>
+                                            <td>{{ row.total }}</td>
+                                            <td>{{ row.mild }}</td>
+                                            <td>{{ row.moderate }}</td>
+                                            <td>{{ row.severe }}</td>
+                                            <td>{{ row.not_set }}</td>
+                                            <td>{{ row.exceeded }}</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="7">No procedures are recorded for mice in this return.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+{% endblock %}

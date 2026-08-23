@@ -1,0 +1,41 @@
+Supported Compose files:
+- compose.local-stack.yml: local laptop testing
+- compose.synology.yml: Synology production
+
+Local laptop test:
+1. cp .env.example .env
+2. Edit LABDB_STACK_DB_PASSWORD in .env
+3. docker compose -f compose.local-stack.yml up -d db
+4. docker compose -f compose.local-stack.yml run --rm web python manage.py migrate --noinput
+5. docker compose -f compose.local-stack.yml run --rm web python manage.py createsuperuser
+6. docker compose -f compose.local-stack.yml up web
+
+Local reset, only for disposable test data:
+docker compose -f compose.local-stack.yml down -v
+
+Synology first deploy:
+1. Put the project in /volume1/docker/flare-eln/project
+2. Create folders:
+   mkdir -p /volume1/docker/flare-eln/postgres-data
+   mkdir -p /volume1/docker/flare-eln/backups
+   mkdir -p /volume1/docker/flare-eln/external-imports
+3. cp .env.synology.example .env
+4. Edit .env with real NAS IP, secret key, DB user, and DB password
+5. docker compose -f compose.synology.yml build web
+6. docker compose -f compose.synology.yml up -d db
+7. docker compose -f compose.synology.yml run --rm web python manage.py migrate --noinput
+8. docker compose -f compose.synology.yml run --rm web python manage.py createsuperuser
+9. docker compose -f compose.synology.yml up -d web
+
+Private lab defaults:
+1. Copy private/seed_lab_defaults.py to:
+   /volume1/docker/flare-eln/external-imports/seed_lab_defaults.py
+2. Run:
+   docker compose -f compose.synology.yml run --rm web python /external-imports/seed_lab_defaults.py
+
+Synology update:
+bash scripts/update_synology_web.sh
+
+Manual Synology backup:
+bash scripts/backup_synology_db.sh
+

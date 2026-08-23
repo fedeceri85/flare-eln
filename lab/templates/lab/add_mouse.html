@@ -1,0 +1,140 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Add mouse{% endblock %}
+{% block page_title %}Add mouse{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    {% if selected_protocol %}
+        <p>Protocol {{ selected_protocol.protocol_number }}</p>
+    {% else %}
+        <p>Select a protocol before saving.</p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+        {% if return_with_mouse %}
+            <input
+                type="hidden"
+                name="return_with_mouse"
+                value="1"
+            >
+        {% endif %}
+
+        {% include "lab/components/form_fields.html" with form=form %}
+
+        <div id="mouse-id-preview" class="mouse-id-preview">
+            <p>
+                <strong>Base ID:</strong>
+                <span id="base-id-preview"></span>
+            </p>
+
+            <p>
+                <strong>Final ID:</strong>
+                <span id="final-id-preview"></span>
+            </p>
+        </div>
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Save mouse
+            </button>
+
+            <a class="button" href="{{ cancel_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const checkbox = document.getElementById("id_generate_mouse_id");
+        const mouseId = document.getElementById("id_mouse_id");
+        const dateOfBirth = document.getElementById("id_date_of_birth");
+        const breedingPair = document.getElementById("id_breeding_pair");
+        const tattoo = document.getElementById("id_tattoo");
+
+        const preview = document.getElementById("mouse-id-preview");
+        const basePreview = document.getElementById("base-id-preview");
+        const finalPreview = document.getElementById("final-id-preview");
+
+        let previewTimeout;
+
+        function updateMouseIdField() {
+            mouseId.disabled = checkbox.checked;
+
+            if (checkbox.checked) {
+                mouseId.placeholder = "Generated automatically";
+                updatePreview();
+            } else {
+                mouseId.placeholder = "";
+                preview.style.display = "none";
+            }
+        }
+
+        function updatePreview() {
+            clearTimeout(previewTimeout);
+
+            if (
+                !checkbox.checked ||
+                !dateOfBirth.value ||
+                !breedingPair.value.trim() ||
+                !tattoo.value.trim()
+            ) {
+                preview.style.display = "none";
+                return;
+            }
+
+            previewTimeout = setTimeout(async function () {
+                const params = new URLSearchParams({
+                    date_of_birth: dateOfBirth.value,
+                    breeding_pair: breedingPair.value,
+                    tattoo: tattoo.value,
+                });
+
+                try {
+                    const response = await fetch(
+                        "{% url 'lab:mouse_id_preview' %}?" + params.toString()
+                    );
+
+                    if (!response.ok) {
+                        preview.style.display = "none";
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (!data.base_id || !data.final_id) {
+                        preview.style.display = "none";
+                        return;
+                    }
+
+                    basePreview.textContent = data.base_id;
+                    finalPreview.textContent = data.final_id;
+                    preview.style.display = "block";
+                } catch (error) {
+                    preview.style.display = "none";
+                }
+            }, 250);
+        }
+
+        checkbox.addEventListener("change", updateMouseIdField);
+        dateOfBirth.addEventListener("input", updatePreview);
+        dateOfBirth.addEventListener("change", updatePreview);
+        breedingPair.addEventListener("input", updatePreview);
+        tattoo.addEventListener("input", updatePreview);
+
+        updateMouseIdField();
+    });
+    </script>
+    {% include "lab/components/crossing_selector_script.html" %}
+{% endblock %}

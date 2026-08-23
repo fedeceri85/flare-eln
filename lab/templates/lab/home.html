@@ -1,0 +1,12 @@
+{% extends "lab/base.html" %}
+
+{% block title %}FLARE-ELN{% endblock %}
+{% block page_title %}FLARE-ELN{% endblock %}
+
+{% block page_subtitle %}
+    <p>Animal procedures, research projects and experimental data.</p>
+{% endblock %}
+
+{% block content %}
+    {% include "lab/components/card_grid.html" with cards=cards %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Edit procedure for {{ mouse.mouse_id }}{% endblock %}
+{% block page_title %}Edit procedure{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    <p>{{ mouse.mouse_id }} - {{ procedure.procedure_type }}</p>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% include "lab/components/form_fields.html" with form=form %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Save procedure
+            </button>
+
+            <a class="button" href="{{ cancel_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}

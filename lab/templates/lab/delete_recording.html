@@ -1,0 +1,41 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Delete recording {{ recording.pk }}{% endblock %}
+{% block page_title %}Delete recording{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    <p>This action permanently deletes the recording.</p>
+{% endblock %}
+
+{% block content %}
+    <div class="read-only-field">
+        <p class="read-only-label">Recording</p>
+        <p class="read-only-value">{{ recording }}</p>
+    </div>
+
+    <div class="warning-message">
+        <p>
+            The recording and its type-specific values will be deleted.
+        </p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        <div class="actions">
+            <button class="button button-danger" type="submit">
+                Delete recording
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}

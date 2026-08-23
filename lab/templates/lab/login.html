@@ -1,0 +1,27 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Log in{% endblock %}
+{% block page_title %}Log in{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    <p>Use your FLARE-ELN account.</p>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+
+        {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+
+        {% include "lab/components/form_fields.html" with form=form %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Log in
+            </button>
+        </div>
+    </form>
+{% endblock %}

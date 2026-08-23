@@ -1,0 +1,79 @@
+<form method="get" class="filter-form">
+    {% for field in filter_form.hidden_fields %}
+        <input
+            type="hidden"
+            name="{{ field.name }}"
+            value="{{ field.value }}"
+        >
+    {% endfor %}
+
+    <div class="filter-grid">
+        {% for field in filter_form.fields %}
+            <div class="filter-field">
+                {% if field.type == "checkbox" %}
+                    <input
+                        type="hidden"
+                        name="{{ field.name }}"
+                        value="{{ field.unchecked_value }}"
+                    >
+                    <label class="checkbox-field" for="{{ field.id }}">
+                        <input
+                            id="{{ field.id }}"
+                            type="checkbox"
+                            name="{{ field.name }}"
+                            value="{{ field.checkbox_value }}"
+                            {% if field.checked %}checked{% endif %}
+                        >
+                        {{ field.label }}
+                    </label>
+                {% elif field.type == "select" %}
+                    <label for="{{ field.id }}">{{ field.label }}</label>
+                    <select id="{{ field.id }}" name="{{ field.name }}">
+                        {% for choice in field.choices %}
+                            <option
+                                value="{{ choice.value }}"
+                                {% if choice.selected %}selected{% endif %}
+                            >
+                                {{ choice.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <label for="{{ field.id }}">{{ field.label }}</label>
+                    <input
+                        id="{{ field.id }}"
+                        type="{{ field.type }}"
+                        name="{{ field.name }}"
+                        value="{{ field.value }}"
+                        {% if field.placeholder %}
+                            placeholder="{{ field.placeholder }}"
+                        {% endif %}
+                        {% if field.autocomplete %}
+                            autocomplete="off"
+                            data-filter-autocomplete-input="true"
+                            data-autocomplete-url="{{ field.autocomplete.url }}"
+                            data-autocomplete-value-key="{{ field.autocomplete.value_key }}"
+                            data-autocomplete-label-key="{{ field.autocomplete.label_key }}"
+                        {% endif %}
+                    >
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="filter-actions">
+        <button class="button button-primary" type="submit">
+            Apply filters
+        </button>
+
+        {% if filter_form.clear_url %}
+            <a class="button" href="{{ filter_form.clear_url }}">
+                Clear filters
+            </a>
+        {% endif %}
+    </div>
+</form>
+
+{% if filter_form.has_autocomplete %}
+    {% include "lab/components/filter_autocomplete_script.html" %}
+{% endif %}

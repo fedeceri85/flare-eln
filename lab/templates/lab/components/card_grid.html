@@ -1,0 +1,19 @@
+<div class="cards">
+    {% for card in cards %}
+        {% if card.url and not card.disabled %}
+            <a class="card" href="{{ card.url }}">
+                <h2>{{ card.title }}</h2>
+                <p>{{ card.description }}</p>
+            </a>
+        {% else %}
+            <div class="card card-disabled">
+                <h2>{{ card.title }}</h2>
+                <p>{{ card.description }}</p>
+
+                {% if card.badge %}
+                    <span class="coming-soon">{{ card.badge }}</span>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endfor %}
+</div>

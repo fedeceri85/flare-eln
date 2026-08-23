@@ -1,0 +1,38 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Add recording{% endblock %}
+{% block page_title %}Add recording{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+
+{% block page_subtitle %}
+    <p>
+        {{ project.name }} -
+        {{ experiment.name }}
+        {% if experiment.recording_type %}
+            | {{ experiment.recording_type }}
+        {% endif %}
+    </p>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+
+        {% include "lab/components/recording_form_fields.html" with form=form %}
+
+        <div class="actions">
+            <button class="button button-primary" type="submit">
+                Save recording
+            </button>
+
+            <a class="button" href="{{ return_url }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+{% endblock %}
