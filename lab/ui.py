@@ -604,7 +604,7 @@ def build_table_page_size_control(query_params, current_page_size):
 def build_home_cards(user=None):
     cards = [
         {
-            "title": "Experimental animals and annoying procedures",
+            "title": "Experimental animals and procedures",
             "description": "View mice by licence and protocol and manage animal procedures.",
             "url": reverse("lab:procedure_page"),
         },
