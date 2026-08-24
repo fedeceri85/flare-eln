@@ -220,6 +220,17 @@ class Mouse(models.Model):
     class Meta:
         verbose_name = "Mouse"
         verbose_name_plural = "Mice"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "date_of_birth",
+                    "breeding_pair",
+                    "crossing_definition",
+                    "tattoo",
+                ],
+                name="unique_mouse_birth_pair_crossing_identifier",
+            ),
+        ]
 
     def __str__(self):
             return self.mouse_id

@@ -113,6 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
             button.textContent = crossing.label;
             button.addEventListener("click", function () {
                 crossingIdInput.value = crossing.id;
+                crossingIdInput.dispatchEvent(new Event("change", {bubbles: true}));
                 crossingInput.value = crossing.label;
                 results.innerHTML = "";
                 loadGenotypeFields(crossing.id);
@@ -124,6 +125,7 @@ document.addEventListener("DOMContentLoaded", function () {
     crossingInput.addEventListener("input", function () {
         clearTimeout(lookupTimeout);
         crossingIdInput.value = "";
+        crossingIdInput.dispatchEvent(new Event("change", {bubbles: true}));
         removeGenotypeFields();
 
         const query = crossingInput.value.trim();

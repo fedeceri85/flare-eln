@@ -743,6 +743,39 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertNotContains(response, self.mouse_a1.mouse_id)
         self.assertNotContains(response, self.mouse_b1.mouse_id)
 
+    def test_protocol_page_hides_unused_procedure_columns(self):
+        unused_procedure_type = ProcedureType.objects.create(
+            name="Unused procedure",
+        )
+        Procedure.objects.create(
+            mouse=self.mouse_a1,
+            procedure_type=self.procedure_type,
+            date=date(self.current_year, 7, 1),
+        )
+        Procedure.objects.create(
+            mouse=self.mouse_b1,
+            procedure_type=unused_procedure_type,
+            date=date(self.current_year, 7, 1),
+        )
+
+        response = self.client.get(
+            reverse(
+                "lab:procedure_page_licence_protocol",
+                kwargs={
+                    "licence_reference": self.licence_a,
+                    "protocol_number": self.protocol_a1.protocol_number,
+                },
+            )
+        )
+        column_labels = [
+            column.get("label")
+            for column in response.context["table"]["columns"]
+        ]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Tattooing", column_labels)
+        self.assertNotIn("Unused procedure", column_labels)
+
     def test_protocol_page_renders_select_all_and_page_size_controls(self):
         response = self.client.get(
             reverse(
@@ -1373,8 +1406,8 @@ class MicePageTests(AuthenticatedTestCase):
             },
         )
 
-    def test_add_mouse_auto_id_uses_local_identifier_value(self):
-        crossing, lines = create_test_crossing(("Line A",))
+    def test_add_mouse_auto_id_uses_structured_crossing_without_species_or_cross_separator(self):
+        crossing, lines = create_test_crossing(("Mut1", "Mut2"))
         response = self.client.post(
             self.add_mouse_url,
             {
@@ -1401,7 +1434,29 @@ class MicePageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
-            Mouse.objects.filter(mouse_id="20260102_linea_7").exists()
+            Mouse.objects.filter(mouse_id="20260102_mut1mut2_linea_7").exists()
+        )
+
+    def test_mouse_id_preview_uses_structured_crossing_without_species_or_cross_separator(self):
+        crossing, _ = create_test_crossing(("Mut1", "Mut2"))
+
+        response = self.client.get(
+            reverse("lab:mouse_id_preview"),
+            {
+                "date_of_birth": "2026-01-02",
+                "breeding_pair": "Line A",
+                "tattoo": "7",
+                "crossing_definition": str(crossing.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "base_id": "20260102_mut1mut2_linea_7",
+                "final_id": "20260102_mut1mut2_linea_7",
+            },
         )
 
     def test_add_mouse_dynamic_genotype_subset_script_is_available(self):
@@ -4551,14 +4606,14 @@ class AddLitterTests(AuthenticatedTestCase):
         self.assertEqual(
             list(Mouse.objects.order_by("mouse_id").values_list("mouse_id", flat=True)),
             [
-                "20260102_linea_5",
-                "20260102_linea_6",
+                "20260102_gad2_linea_5",
+                "20260102_gad2_linea_6",
             ],
         )
 
     def test_add_litter_auto_ids_keep_existing_duplicate_suffix_rule(self):
         Mouse.objects.create(
-            mouse_id="20260102_linea_5",
+            mouse_id="20260102_gad2_linea_5",
             protocol=self.protocol,
         )
 
@@ -4572,7 +4627,7 @@ class AddLitterTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
-            Mouse.objects.filter(mouse_id="20260102_linea_5_1").exists()
+            Mouse.objects.filter(mouse_id="20260102_gad2_linea_5_1").exists()
         )
 
     def test_add_litter_rejects_duplicate_progressive_mouse_ids_atomically(self):

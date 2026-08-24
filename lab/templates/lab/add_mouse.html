@@ -28,6 +28,8 @@
             >
         {% endif %}
 
+        {% include "lab/components/possible_duplicate_warning.html" %}
+
         {% include "lab/components/form_fields.html" with form=form %}
 
         <div id="mouse-id-preview" class="mouse-id-preview">
@@ -44,7 +46,11 @@
 
         <div class="actions">
             <button class="button button-primary" type="submit">
-                Save mouse
+                {% if possible_duplicate_warning %}
+                    Save anyway
+                {% else %}
+                    Save mouse
+                {% endif %}
             </button>
 
             <a class="button" href="{{ cancel_url }}">
@@ -62,6 +68,7 @@
         const dateOfBirth = document.getElementById("id_date_of_birth");
         const breedingPair = document.getElementById("id_breeding_pair");
         const tattoo = document.getElementById("id_tattoo");
+        const crossingDefinition = document.getElementById("id_crossing_definition");
 
         const preview = document.getElementById("mouse-id-preview");
         const basePreview = document.getElementById("base-id-preview");
@@ -88,7 +95,8 @@
                 !checkbox.checked ||
                 !dateOfBirth.value ||
                 !breedingPair.value.trim() ||
-                !tattoo.value.trim()
+                !tattoo.value.trim() ||
+                !crossingDefinition.value
             ) {
                 preview.style.display = "none";
                 return;
@@ -99,6 +107,7 @@
                     date_of_birth: dateOfBirth.value,
                     breeding_pair: breedingPair.value,
                     tattoo: tattoo.value,
+                    crossing_definition: crossingDefinition.value,
                 });
 
                 try {
@@ -132,6 +141,7 @@
         dateOfBirth.addEventListener("change", updatePreview);
         breedingPair.addEventListener("input", updatePreview);
         tattoo.addEventListener("input", updatePreview);
+        crossingDefinition.addEventListener("change", updatePreview);
 
         updateMouseIdField();
     });

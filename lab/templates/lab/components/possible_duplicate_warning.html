@@ -1,0 +1,45 @@
+{% if possible_duplicate_warning %}
+    <input
+        type="hidden"
+        name="confirm_possible_duplicate"
+        value="1"
+    >
+    <input
+        type="hidden"
+        name="possible_duplicate_signature"
+        value="{{ possible_duplicate_warning.signature }}"
+    >
+
+    <div class="warning-message">
+        <p><strong>Possible duplicate mice found.</strong></p>
+        <p>
+            Existing mice have the same date of birth, breeding pair,
+            and crossing. Open and rename an existing record if this is the
+            same animal, or submit again to save anyway.
+        </p>
+        <ul>
+            {% for mouse in possible_duplicate_warning.mice %}
+                <li>
+                    <a href="{% url 'lab:mouse_record' mouse.pk %}">
+                        {{ mouse.mouse_id }}
+                    </a>
+                    {% if mouse.tattoo %}
+                        - {{ mouse.tattoo }}
+                    {% endif %}
+                    {% if mouse.protocol %}
+                        - Protocol {{ mouse.protocol.protocol_number }}
+                        {% if mouse.protocol.name %}
+                            {{ mouse.protocol.name }}
+                        {% endif %}
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+        {% if possible_duplicate_warning.more_count %}
+            <p>
+                {{ possible_duplicate_warning.more_count }} more matching mice
+                are not shown.
+            </p>
+        {% endif %}
+    </div>
+{% endif %}

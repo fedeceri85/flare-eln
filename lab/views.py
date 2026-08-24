@@ -358,6 +358,75 @@ def recording_count_for_mice(mice):
     )
 
 
+POSSIBLE_DUPLICATE_CONFIRM_FIELD = "confirm_possible_duplicate"
+POSSIBLE_DUPLICATE_SIGNATURE_FIELD = "possible_duplicate_signature"
+
+
+def possible_duplicate_signature(cleaned_data):
+    date_of_birth = cleaned_data.get("date_of_birth")
+    breeding_pair = (cleaned_data.get("breeding_pair") or "").strip()
+    crossing = cleaned_data.get("crossing_definition")
+
+    if not date_of_birth or not breeding_pair or crossing is None:
+        return ""
+
+    return "|".join(
+        [
+            date_of_birth.isoformat(),
+            breeding_pair.casefold(),
+            str(crossing.pk),
+        ]
+    )
+
+
+def possible_duplicate_mouse_warning(cleaned_data):
+    signature = possible_duplicate_signature(cleaned_data)
+
+    if not signature:
+        return None
+
+    date_of_birth = cleaned_data["date_of_birth"]
+    breeding_pair = (cleaned_data.get("breeding_pair") or "").strip()
+    crossing = cleaned_data["crossing_definition"]
+    possible_duplicates = (
+        Mouse.objects
+        .filter(
+            date_of_birth=date_of_birth,
+            breeding_pair__iexact=breeding_pair,
+            crossing_definition=crossing,
+        )
+        .select_related("protocol", "crossing_definition")
+        .order_by("mouse_id")
+    )
+    duplicate_count = possible_duplicates.count()
+
+    if duplicate_count == 0:
+        return None
+
+    shown_mice = list(possible_duplicates[:10])
+
+    return {
+        "signature": signature,
+        "date_of_birth": date_of_birth,
+        "breeding_pair": breeding_pair,
+        "crossing": crossing,
+        "mice": shown_mice,
+        "count": duplicate_count,
+        "more_count": max(duplicate_count - len(shown_mice), 0),
+    }
+
+
+def possible_duplicate_confirmed(request, warning):
+    if warning is None:
+        return False
+
+    return (
+        request.POST.get(POSSIBLE_DUPLICATE_CONFIRM_FIELD) == "1"
+        and request.POST.get(POSSIBLE_DUPLICATE_SIGNATURE_FIELD)
+        == warning["signature"]
+    )
+
+
 def create_litter_mice(selected_protocol, form):
     cleaned_data = form.cleaned_data
     litter_protocol = cleaned_data.get("protocol") or selected_protocol
@@ -387,6 +456,7 @@ def create_litter_mice(selected_protocol, form):
             mouse_id = generate_mouse_id(
                 cleaned_data["date_of_birth"],
                 cleaned_data["breeding_pair"],
+                cleaned_data["crossing_definition"].display_name,
                 tattoo,
             )
 
@@ -1119,7 +1189,6 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
 
     order_by_field = sort if direction == "asc" else f"-{sort}"
     filter_values = read_filter_values(request.GET, MOUSE_FILTER_SPECS)
-    procedure_types = ProcedureType.objects.all().order_by("name")
     current_year = timezone.localdate().year
 
     mice = (
@@ -1135,6 +1204,13 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
 
     if severity_exceeded_filter_enabled(filter_values):
         mice = apply_severity_exceeded_filter(mice)
+
+    procedure_types = (
+        ProcedureType.objects
+        .filter(procedures__mouse__in=mice)
+        .distinct()
+        .order_by("name")
+    )
 
     mice = mice.order_by(order_by_field)
 
@@ -3195,6 +3271,8 @@ def add_mouse(request, protocol_number=None, licence_reference=None):
         or request.GET.get("return_with_mouse")
     )
 
+    possible_duplicate_warning = None
+
     if request.method == "POST":
         form = MouseForm(
             request.POST,
@@ -3202,38 +3280,62 @@ def add_mouse(request, protocol_number=None, licence_reference=None):
         )
 
         if form.is_valid():
-            mouse = form.save(commit=False)
-
-            if form.cleaned_data["generate_mouse_id"]:
-                mouse.mouse_id = generate_mouse_id(
-                    mouse.date_of_birth,
-                    mouse.breeding_pair,
-                    mouse.tattoo,
-                )
-
-            mouse.save()
-            form.save_structured_genetics(mouse)
-
-            messages.success(
-                request,
-                f"Mouse {mouse.mouse_id} was added successfully.",
+            possible_duplicate_warning = possible_duplicate_mouse_warning(
+                form.cleaned_data,
             )
 
-            if return_with_mouse:
-                mouse_ids = selected_recording_mouse_ids_from_url(return_url)
-
-                if mouse.pk not in mouse_ids:
-                    mouse_ids.append(mouse.pk)
-
-                return redirect(
-                    url_with_query_params(
-                        return_url,
-                        mice=recording_mice_query_value(mouse_ids),
-                        mouse=None,
-                    )
+            if (
+                possible_duplicate_warning is None
+                or possible_duplicate_confirmed(
+                    request,
+                    possible_duplicate_warning,
                 )
+            ):
+                mouse = form.save(commit=False)
 
-            return redirect(return_url)
+                if form.cleaned_data["generate_mouse_id"]:
+                    mouse.mouse_id = generate_mouse_id(
+                        mouse.date_of_birth,
+                        mouse.breeding_pair,
+                        mouse.crossing_definition.display_name,
+                        mouse.tattoo,
+                    )
+
+                try:
+                    with transaction.atomic():
+                        mouse.save()
+                        form.save_structured_genetics(mouse)
+                except IntegrityError:
+                    possible_duplicate_warning = None
+                    form.add_error(
+                        None,
+                        (
+                            "A mouse with the same date of birth, breeding "
+                            "pair, crossing, and local identifier already "
+                            "exists."
+                        ),
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Mouse {mouse.mouse_id} was added successfully.",
+                    )
+
+                    if return_with_mouse:
+                        mouse_ids = selected_recording_mouse_ids_from_url(return_url)
+
+                        if mouse.pk not in mouse_ids:
+                            mouse_ids.append(mouse.pk)
+
+                        return redirect(
+                            url_with_query_params(
+                                return_url,
+                                mice=recording_mice_query_value(mouse_ids),
+                                mouse=None,
+                            )
+                        )
+
+                    return redirect(return_url)
     else:
         initial = {}
 
@@ -3251,6 +3353,7 @@ def add_mouse(request, protocol_number=None, licence_reference=None):
         "return_url": return_url,
         "cancel_url": return_url,
         "return_with_mouse": return_with_mouse,
+        "possible_duplicate_warning": possible_duplicate_warning,
         "crossing_lookup_url": reverse("lab:crossing_lookup"),
         "crossing_genotype_fields_url": reverse(
             "lab:crossing_genotype_fields"
@@ -3280,6 +3383,8 @@ def add_litter(request, protocol_number=None, licence_reference=None):
     )
     return_url = safe_return_url(request, fallback_url)
 
+    possible_duplicate_warning = None
+
     if request.method == "POST":
         form = LitterCreateForm(
             request.POST,
@@ -3287,24 +3392,46 @@ def add_litter(request, protocol_number=None, licence_reference=None):
         )
 
         if form.is_valid():
-            with transaction.atomic():
-                mice, litter_protocol = create_litter_mice(
-                    selected_protocol,
-                    form,
-                )
-
-            messages.success(
-                request,
-                protocol_assignment_message(len(mice), litter_protocol),
+            possible_duplicate_warning = possible_duplicate_mouse_warning(
+                form.cleaned_data,
             )
 
-            if selected_protocol is None:
-                return redirect(return_url)
+            if (
+                possible_duplicate_warning is None
+                or possible_duplicate_confirmed(
+                    request,
+                    possible_duplicate_warning,
+                )
+            ):
+                try:
+                    with transaction.atomic():
+                        mice, litter_protocol = create_litter_mice(
+                            selected_protocol,
+                            form,
+                        )
+                except IntegrityError:
+                    possible_duplicate_warning = None
+                    form.add_error(
+                        None,
+                        (
+                            "One or more mice with the same date of birth, "
+                            "breeding pair, crossing, and local identifier "
+                            "already exist."
+                        ),
+                    )
+                else:
+                    messages.success(
+                        request,
+                        protocol_assignment_message(len(mice), litter_protocol),
+                    )
 
-            if litter_protocol == selected_protocol:
-                return redirect(return_url)
+                    if selected_protocol is None:
+                        return redirect(return_url)
 
-            return redirect(procedure_protocol_url(litter_protocol))
+                    if litter_protocol == selected_protocol:
+                        return redirect(return_url)
+
+                    return redirect(procedure_protocol_url(litter_protocol))
     else:
         form = LitterCreateForm(selected_protocol=selected_protocol)
     can_add_litter_procedure = (
@@ -3325,6 +3452,7 @@ def add_litter(request, protocol_number=None, licence_reference=None):
         "return_url": return_url,
         "can_add_litter_procedure": can_add_litter_procedure,
         "protocol_procedure_permissions": protocol_procedure_permissions,
+        "possible_duplicate_warning": possible_duplicate_warning,
         "crossing_lookup_url": reverse("lab:crossing_lookup"),
         "crossing_genotype_fields_url": reverse(
             "lab:crossing_genotype_fields"
@@ -3342,8 +3470,9 @@ def mouse_id_preview(request):
     date_string = request.GET.get("date_of_birth")
     breeding_pair = request.GET.get("breeding_pair", "")
     tattoo = request.GET.get("tattoo", "")
+    crossing_id = request.GET.get("crossing_definition", "")
 
-    if not date_string or not breeding_pair or not tattoo:
+    if not date_string or not breeding_pair or not tattoo or not crossing_id:
         return JsonResponse({})
 
     try:
@@ -3354,18 +3483,29 @@ def mouse_id_preview(request):
     except ValueError:
         return JsonResponse({})
 
-    breeding_pair_clean = slugify(breeding_pair).replace("-", "")
-    tattoo_clean = tattoo.upper().replace(" ", "")
+    crossing = (
+        Crossing.objects
+        .filter(pk=crossing_id, active=True)
+        .prefetch_related("lines")
+        .first()
+    )
 
+    if crossing is None:
+        return JsonResponse({})
+
+    breeding_pair_clean = slugify(breeding_pair).replace("-", "")
+    crossing_clean = slugify(crossing.display_name).replace("-", "").replace("x", "")
+    tattoo_clean = tattoo.upper().replace(" ", "")
     base_id = (
         f"{date_of_birth:%Y%m%d}_"
+        f"{crossing_clean}_"
         f"{breeding_pair_clean}_"
         f"{tattoo_clean}"
     )
-
     final_id = generate_mouse_id(
         date_of_birth,
         breeding_pair,
+        crossing.display_name,
         tattoo,
     )
 
