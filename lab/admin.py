@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin.models import LogEntry
 from django.core.exceptions import PermissionDenied
 
 from .models import (
@@ -6,6 +7,7 @@ from .models import (
     CrossingLine,
     Experiment,
     Mouse,
+    LoginEvent,
     MouseGenotype,
     MouseLine,
     Procedure,
@@ -20,6 +22,73 @@ from .models import (
 )
 
 admin.site.register(Protocol)
+
+
+@admin.register(LoginEvent)
+class LoginEventAdmin(admin.ModelAdmin):
+    date_hierarchy = "created_at"
+    list_display = (
+        "created_at",
+        "event_type",
+        "username",
+        "user",
+        "ip_address",
+    )
+    list_filter = ("event_type", "created_at")
+    list_select_related = ("user",)
+    ordering = ("-created_at",)
+    readonly_fields = (
+        "event_type",
+        "user",
+        "username",
+        "ip_address",
+        "user_agent",
+        "created_at",
+    )
+    search_fields = (
+        "username",
+        "user__username",
+        "ip_address",
+        "user_agent",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LogEntry)
+class LogEntryAdmin(admin.ModelAdmin):
+    date_hierarchy = "action_time"
+    list_display = (
+        "action_time",
+        "user",
+        "content_type",
+        "object_repr",
+        "action_flag",
+    )
+    list_filter = ("action_flag", "content_type", "user")
+    list_select_related = ("user", "content_type")
+    ordering = ("-action_time",)
+    search_fields = (
+        "object_repr",
+        "change_message",
+        "user__username",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Species)

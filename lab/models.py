@@ -324,6 +324,52 @@ class CrossingLine(models.Model):
         return f"{self.crossing} - {self.line.name}"
 
 
+class LoginEvent(models.Model):
+    LOGIN = "login"
+    LOGOUT = "logout"
+    FAILED = "failed"
+
+    EVENT_CHOICES = [
+        (LOGIN, "Login"),
+        (LOGOUT, "Logout"),
+        (FAILED, "Failed login"),
+    ]
+
+    login_event_id = models.AutoField(primary_key=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="login_events",
+    )
+    username = models.CharField(max_length=150, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["-created_at"],
+                name="login_event_created_at_idx",
+            ),
+            models.Index(
+                fields=["event_type", "-created_at"],
+                name="login_event_type_created_idx",
+            ),
+            models.Index(
+                fields=["username"],
+                name="login_event_username_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} - {self.username or 'unknown'}"
+
+
 class MouseGenotype(models.Model):
     mouse_genotype_id = models.AutoField(primary_key=True)
     mouse = models.ForeignKey(
