@@ -54,6 +54,25 @@ LOCAL_IDENTIFIER_HELP_TEXT = (
 )
 
 
+def parse_recording_paths(value):
+    paths = []
+
+    for line in (value or "").splitlines():
+        path = line.strip()
+
+        if len(path) >= 2 and path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+
+        if len(path) >= 2 and path.startswith('\'') and path.endswith('\''):
+            path = path[1:-1]
+        if '\'' in path:
+            path = path.replace('\'', '')
+        if path:
+            paths.append(path)
+
+    return paths
+
+
 MOUSE_EDIT_FIELDS = [
     "date_of_birth",
     "tattoo",
@@ -322,9 +341,10 @@ class RecordingForm(forms.Form):
         initial=1,
         label="Sequence",
     )
-    data_path = forms.CharField(
+    data_paths = forms.CharField(
+        required=False,
         widget=forms.Textarea(attrs={"rows": 2}),
-        label="Recording path",
+        label="Recording paths",
     )
     notes = forms.CharField(
         required=False,
@@ -372,7 +392,9 @@ class RecordingForm(forms.Form):
             self.fields["sequence_number"].initial = (
                 initial_recording.sequence_number
             )
-            self.fields["data_path"].initial = initial_recording.data_path
+            self.fields["data_paths"].initial = "\n".join(
+                initial_recording.data_paths
+            )
             self.fields["notes"].initial = initial_recording.notes
 
         if self.selected_mice and not self.is_bound:
@@ -573,6 +595,9 @@ class RecordingForm(forms.Form):
 
         return mice
 
+    def clean_data_paths(self):
+        return parse_recording_paths(self.cleaned_data.get("data_paths"))
+
     def clean(self):
         cleaned_data = super().clean()
 
@@ -721,7 +746,7 @@ class RecordingForm(forms.Form):
         mice = self.cleaned_data.get("mice", [])
         recording.recording_date = self.cleaned_data["recording_date"]
         recording.sequence_number = self.cleaned_data["sequence_number"]
-        recording.data_path = self.cleaned_data["data_path"]
+        recording.data_paths = self.cleaned_data["data_paths"]
         recording.notes = self.cleaned_data.get("notes", "")
         recording.values = self.recording_values()
         recording.full_clean()

@@ -2289,7 +2289,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 25),
             sequence_number=2,
-            data_path="/data/imaging/newer",
+            data_paths=["/data/imaging/newer"],
             notes="responsive cell",
             values={
                 "objective": "20x",
@@ -2305,7 +2305,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 10),
             sequence_number=1,
-            data_path="/data/imaging/older",
+            data_paths=["/data/imaging/older"],
             notes="baseline run",
             values={
                 "objective": "40x",
@@ -2378,8 +2378,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertLess(
-            content.index(self.newer_recording.data_path),
-            content.index(self.older_recording.data_path),
+            content.index(self.newer_recording.data_paths[0]),
+            content.index(self.older_recording.data_paths[0]),
         )
 
         for label in (
@@ -2390,7 +2390,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
             "FPS",
             "Frames",
             "Discarded",
-            "Recording Path",
+            "Recording Paths",
             "Notes",
         ):
             self.assertContains(response, label)
@@ -2422,7 +2422,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 recording_type=self.imaging_type,
                 recording_date=date(2026, 7, 11),
                 sequence_number=index + 10,
-                data_path=f"/data/imaging/page-size-{index}",
+                data_paths=[f"/data/imaging/page-size-{index}"],
             )
 
         response = self.client.get(f"{self.recordings_url}?per_page=50")
@@ -2455,8 +2455,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 response = self.client.get(f"{self.recordings_url}?{query_string}")
 
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, expected.data_path)
-                self.assertNotContains(response, unexpected.data_path)
+                self.assertContains(response, expected.data_paths[0])
+                self.assertNotContains(response, unexpected.data_paths[0])
                 self.assertEqual(response.context["record_count"]["count"], 1)
 
     def test_recordings_page_filters_filterable_text_recording_fields(self):
@@ -2472,8 +2472,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'name="field_{self.objective_field.pk}"')
-        self.assertContains(response, self.newer_recording.data_path)
-        self.assertNotContains(response, self.older_recording.data_path)
+        self.assertContains(response, self.newer_recording.data_paths[0])
+        self.assertNotContains(response, self.older_recording.data_paths[0])
         self.assertEqual(response.context["record_count"]["count"], 1)
 
     def test_genotyping_crossing_filter_uses_crossing_autocomplete(self):
@@ -2517,8 +2517,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'name="field_{self.discarded_field.pk}"')
-        self.assertContains(response, self.older_recording.data_path)
-        self.assertNotContains(response, self.newer_recording.data_path)
+        self.assertContains(response, self.older_recording.data_paths[0])
+        self.assertNotContains(response, self.newer_recording.data_paths[0])
         self.assertEqual(response.context["record_count"]["count"], 1)
 
     def test_recordings_page_invalid_numeric_recording_field_filter_matches_none(
@@ -2535,8 +2535,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, self.newer_recording.data_path)
-        self.assertNotContains(response, self.older_recording.data_path)
+        self.assertNotContains(response, self.newer_recording.data_paths[0])
+        self.assertNotContains(response, self.older_recording.data_paths[0])
         self.assertEqual(response.context["record_count"]["count"], 0)
 
     def test_recordings_page_opens_page_containing_selected_recording(self):
@@ -2548,7 +2548,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 recording_type=self.imaging_type,
                 recording_date=date(2026, 7, 11),
                 sequence_number=index + 10,
-                data_path=f"/data/imaging/filler-{index}",
+                data_paths=[f"/data/imaging/filler-{index}"],
             )
 
         response = self.client.get(
@@ -2557,8 +2557,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["pagination"]["number"], 2)
-        self.assertContains(response, self.older_recording.data_path)
-        self.assertNotContains(response, self.newer_recording.data_path)
+        self.assertContains(response, self.older_recording.data_paths[0])
+        self.assertNotContains(response, self.newer_recording.data_paths[0])
         self.assertContains(
             response,
             f'id="recording-{self.older_recording.pk}"',
@@ -2574,6 +2574,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertContains(response, "Add mice")
         self.assertContains(response, self.select_mouse_url)
         self.assertContains(response, "No mice selected")
+        self.assertContains(response, "one path per line")
+        self.assertContains(response, 'name="data_paths"')
         self.assertContains(response, 'type="hidden" name="mice"')
         self.assertNotContains(response, reverse("lab:mouse_lookup"))
         self.assertNotContains(response, 'data-mouse-lookup-input="true"')
@@ -2723,14 +2725,14 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-02",
                 "sequence_number": "1",
-                "data_path": "/data/genotyping/inferred-crossing",
+                "data_paths": "/data/genotyping/inferred-crossing",
                 f"value_{crossing_field.pk}": "Wrong crossing",
             },
         )
 
         self.assertEqual(response.status_code, 302)
         recording = Recording.objects.get(
-            data_path="/data/genotyping/inferred-crossing"
+            data_paths=["/data/genotyping/inferred-crossing"]
         )
         self.assertEqual(recording.values["crossing"], crossing.display_name)
         self.assertEqual(
@@ -2757,7 +2759,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-02",
                 "sequence_number": "1",
-                "data_path": "/data/genotyping/mixed-crossing",
+                "data_paths": "/data/genotyping/mixed-crossing",
                 f"value_{crossing_field.pk}": crossing.display_name,
             },
         )
@@ -2769,7 +2771,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
         self.assertFalse(
             Recording.objects.filter(
-                data_path="/data/genotyping/mixed-crossing",
+                data_paths=["/data/genotyping/mixed-crossing"],
             ).exists()
         )
 
@@ -2783,7 +2785,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": self.mouse_1.pk,
                 "recording_date": "2026-08-02",
                 "sequence_number": "1",
-                "data_path": "/data/genotyping/missing-crossing",
+                "data_paths": "/data/genotyping/missing-crossing",
                 f"value_{crossing_field.pk}": "",
             },
         )
@@ -2795,7 +2797,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
         self.assertFalse(
             Recording.objects.filter(
-                data_path="/data/genotyping/missing-crossing",
+                data_paths=["/data/genotyping/missing-crossing"],
             ).exists()
         )
 
@@ -2839,7 +2841,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": "REC-PAGE-M1",
                 "recording_date": "2026-08-01",
                 "sequence_number": "3",
-                "data_path": "/data/imaging/added",
+                "data_paths": "/data/imaging/added",
                 "notes": "added note",
                 f"value_{self.objective_field.pk}": "60x",
                 f"value_{self.fps_field.pk}": "45.5",
@@ -2851,7 +2853,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], self.recordings_url)
 
-        recording = Recording.objects.get(data_path="/data/imaging/added")
+        recording = Recording.objects.get(data_paths=["/data/imaging/added"])
         self.assertEqual(recording.owner, self.user)
         self.assertEqual(recording.experiment, self.experiment)
         self.assertEqual(recording.recording_type, self.imaging_type)
@@ -2864,6 +2866,61 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(recording.values["frames"], 1200)
         self.assertTrue(recording.values["discarded"])
 
+    def test_add_recording_allows_empty_paths(self):
+        response = self.client.post(
+            self.add_recording_url,
+            {
+                "return_url": self.recordings_url,
+                "mice": self.mouse_1.pk,
+                "recording_date": "2026-08-03",
+                "sequence_number": "5",
+                "data_paths": "",
+                "notes": "no path yet",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        recording = Recording.objects.get(
+            experiment=self.experiment,
+            recording_date=date(2026, 8, 3),
+            sequence_number=5,
+        )
+        self.assertEqual(recording.data_paths, [])
+
+    def test_add_recording_parses_quoted_windows_paths(self):
+        pasted_paths = (
+            '  "C:\\recordings\\first folder"  \r\n'
+            '\r\n'
+            '"\\\\server\\share\\second"\r\n'
+            '"\\\\server\\share\\second"'
+        )
+        response = self.client.post(
+            self.add_recording_url,
+            {
+                "return_url": self.recordings_url,
+                "mice": self.mouse_1.pk,
+                "recording_date": "2026-08-04",
+                "sequence_number": "6",
+                "data_paths": pasted_paths,
+                "notes": "Windows paste",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        recording = Recording.objects.get(
+            experiment=self.experiment,
+            recording_date=date(2026, 8, 4),
+            sequence_number=6,
+        )
+        self.assertEqual(
+            recording.data_paths,
+            [
+                r"C:\recordings\first folder",
+                r"\\server\share\second",
+                r"\\server\share\second",
+            ],
+        )
+
     def test_add_recording_can_attach_multiple_mice(self):
         response = self.client.post(
             self.add_recording_url,
@@ -2872,7 +2929,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-01",
                 "sequence_number": "3",
-                "data_path": "/data/genotyping/group-gel",
+                "data_paths": "/data/genotyping/group-gel",
                 "notes": "group gel",
             },
         )
@@ -2880,7 +2937,9 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], self.recordings_url)
 
-        recording = Recording.objects.get(data_path="/data/genotyping/group-gel")
+        recording = Recording.objects.get(
+            data_paths=["/data/genotyping/group-gel"]
+        )
         self.assertEqual(
             list(
                 recording.mice.order_by("mouse_id").values_list(
@@ -2911,7 +2970,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": "REC-PAGE",
                 "recording_date": "2026-08-01",
                 "sequence_number": "3",
-                "data_path": "/data/imaging/ambiguous-mouse",
+                "data_paths": "/data/imaging/ambiguous-mouse",
             },
         )
 
@@ -2922,7 +2981,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
         self.assertFalse(
             Recording.objects.filter(
-                data_path="/data/imaging/ambiguous-mouse",
+                data_paths=["/data/imaging/ambiguous-mouse"],
             ).exists()
         )
 
@@ -2948,6 +3007,72 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertContains(response, "30.0")
         self.assertContains(response, "600")
 
+    def test_edit_and_duplicate_forms_join_multiple_paths_with_newlines(self):
+        self.newer_recording.data_paths = [
+            r"C:\recordings\first",
+            r"\\server\share\second",
+        ]
+        self.newer_recording.save(update_fields=["data_paths"])
+        expected_initial = (
+            "C:\\recordings\\first\n"
+            "\\\\server\\share\\second"
+        )
+
+        edit_response = self.client.get(self.edit_newer_recording_url)
+
+        duplicate_response = self.client.post(
+            self.duplicate_recording_url,
+            {
+                "return_url": self.recordings_url,
+                "selected_recording": [self.newer_recording.pk],
+            },
+        )
+        duplicate_response = self.client.get(duplicate_response["Location"])
+
+        self.assertEqual(
+            edit_response.context["form"].fields["data_paths"].initial,
+            expected_initial,
+        )
+        self.assertEqual(
+            duplicate_response.context["form"].fields["data_paths"].initial,
+            expected_initial,
+        )
+
+    def test_recordings_page_renders_paths_on_separate_escaped_lines(self):
+        self.newer_recording.data_paths = [
+            r"C:\recordings\first",
+            "<script>alert('path')</script>",
+        ]
+        self.newer_recording.save(update_fields=["data_paths"])
+
+        response = self.client.get(self.recordings_url)
+        content = response.content.decode()
+
+        self.assertIn(r"C:\recordings\first<br>", content)
+        self.assertIn(
+            "&lt;script&gt;alert(&#x27;path&#x27;)&lt;/script&gt;",
+            content,
+        )
+        self.assertNotIn("<script>alert('path')</script>", content)
+
+    def test_recordings_page_uses_empty_marker_when_paths_are_absent(self):
+        self.newer_recording.data_paths = []
+        self.newer_recording.save(update_fields=["data_paths"])
+
+        response = self.client.get(self.recordings_url)
+        row = next(
+            row
+            for row in response.context["table"]["rows"]
+            if row["id"] == f"recording-{self.newer_recording.pk}"
+        )
+        path_cell = next(
+            cell
+            for cell in row["cells"]
+            if cell["class"] == "path-cell"
+        )
+
+        self.assertEqual(str(path_cell["value"]), "&mdash;")
+
     def test_edit_recording_requires_owner_or_staff(self):
         response = self.client.post(
             self.edit_newer_recording_url,
@@ -2956,7 +3081,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": self.mouse_2.pk,
                 "recording_date": "2026-08-02",
                 "sequence_number": "4",
-                "data_path": "/data/imaging/edited",
+                "data_paths": "/data/imaging/edited",
                 "notes": "edited note",
                 f"value_{self.objective_field.pk}": "60x",
                 f"value_{self.fps_field.pk}": "50.0",
@@ -2970,7 +3095,10 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.newer_recording.refresh_from_db()
         self.assertEqual(self.newer_recording.owner, self.user)
         self.assertEqual(list(self.newer_recording.mice.all()), [self.mouse_2])
-        self.assertEqual(self.newer_recording.data_path, "/data/imaging/edited")
+        self.assertEqual(
+            self.newer_recording.data_paths,
+            ["/data/imaging/edited"],
+        )
         self.assertEqual(self.newer_recording.values["objective"], "60x")
 
         User = get_user_model()
@@ -3568,6 +3696,104 @@ class RecordingMiceMigrationTests(TransactionTestCase):
         self.assertEqual(restored_recording.mouse_id, mouse.pk)
 
 
+class RecordingPathsMigrationTests(TransactionTestCase):
+    migrate_from = [("lab", "0042_login_event")]
+    migrate_to = [("lab", "0043_recording_data_paths")]
+
+    def setUp(self):
+        super().setUp()
+        self.executor = MigrationExecutor(connection)
+        self.executor.migrate(self.migrate_from)
+        self.old_apps = self.executor.loader.project_state(
+            self.migrate_from
+        ).apps
+
+    def tearDown(self):
+        self.executor.loader.build_graph()
+        self.executor.migrate(self.migrate_to)
+        super().tearDown()
+
+    def test_recording_paths_are_structured_and_migration_is_reversible(self):
+        Project = self.old_apps.get_model("lab", "Project")
+        Experiment = self.old_apps.get_model("lab", "Experiment")
+        Recording = self.old_apps.get_model("lab", "Recording")
+        RecordingType = self.old_apps.get_model("lab", "RecordingType")
+
+        project = Project.objects.create(name="Paths migration project")
+        recording_type = RecordingType.objects.create(
+            name="Paths migration type",
+            slug="paths-migration",
+        )
+        experiment = Experiment.objects.create(
+            project=project,
+            name="Paths migration experiment",
+            recording_type=recording_type,
+        )
+        legacy_values = [
+            "",
+            "/data/single",
+            (
+                '  "C:\\recordings\\first folder"  \r\n'
+                '\r\n'
+                '"\\\\server\\share\\second"\r\n'
+                '"\\\\server\\share\\second"'
+            ),
+        ]
+        recording_ids = [
+            Recording.objects.create(
+                experiment=experiment,
+                recording_type=recording_type,
+                recording_date=date(2026, 9, index + 1),
+                data_path=value,
+            ).pk
+            for index, value in enumerate(legacy_values)
+        ]
+
+        self.executor.loader.build_graph()
+        self.executor.migrate(self.migrate_to)
+        new_apps = self.executor.loader.project_state(self.migrate_to).apps
+        Recording = new_apps.get_model("lab", "Recording")
+
+        migrated_values = [
+            Recording.objects.get(pk=recording_id).data_paths
+            for recording_id in recording_ids
+        ]
+        self.assertEqual(
+            migrated_values,
+            [
+                [],
+                ["/data/single"],
+                [
+                    r"C:\recordings\first folder",
+                    r"\\server\share\second",
+                    r"\\server\share\second",
+                ],
+            ],
+        )
+
+        self.executor.loader.build_graph()
+        self.executor.migrate(self.migrate_from)
+        restored_apps = self.executor.loader.project_state(self.migrate_from).apps
+        Recording = restored_apps.get_model("lab", "Recording")
+
+        restored_values = [
+            Recording.objects.get(pk=recording_id).data_path
+            for recording_id in recording_ids
+        ]
+        self.assertEqual(
+            restored_values,
+            [
+                "",
+                "/data/single",
+                (
+                    "C:\\recordings\\first folder\n"
+                    "\\\\server\\share\\second\n"
+                    "\\\\server\\share\\second"
+                ),
+            ],
+        )
+
+
 class ServicesSetupMigrationTests(TransactionTestCase):
     migrate_from = [("lab", "0036_recording_mice")]
     migrate_to = [("lab", "0037_services_project_and_genotyping")]
@@ -3823,7 +4049,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/session-1",
+            data_paths=["/data/imaging/session-1"],
             sequence_number=2,
             values={
                 "objective": "20x",
@@ -3837,7 +4063,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.abr_experiment,
             recording_type=self.abr_type,
             recording_date=date(2026, 7, 21),
-            data_path="/data/abr/session-1",
+            data_paths=["/data/abr/session-1"],
             sequence_number=3,
             values={
                 "click_threshold_db": 35,
@@ -3847,8 +4073,11 @@ class RecordingModelTests(AuthenticatedTestCase):
 
         self.assertEqual(imaging_recording.pk, imaging_recording.recording_id)
         self.assertEqual(abr_recording.pk, abr_recording.recording_id)
-        self.assertEqual(imaging_recording.data_path, "/data/imaging/session-1")
-        self.assertEqual(abr_recording.data_path, "/data/abr/session-1")
+        self.assertEqual(
+            imaging_recording.data_paths,
+            ["/data/imaging/session-1"],
+        )
+        self.assertEqual(abr_recording.data_paths, ["/data/abr/session-1"])
         self.assertEqual(imaging_recording.values["objective"], "20x")
         self.assertEqual(abr_recording.values["click_threshold_db"], 35)
 
@@ -3884,11 +4113,43 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/orphaned-session",
+            data_paths=["/data/imaging/orphaned-session"],
             sequence_number=1,
         )
 
         self.assertIn("No mice", str(recording))
+
+    def test_recording_paths_allow_an_empty_list(self):
+        recording = Recording(
+            experiment=self.experiment,
+            recording_type=self.imaging_type,
+            recording_date=date(2026, 7, 20),
+            data_paths=[],
+        )
+
+        recording.full_clean()
+
+    def test_recording_paths_reject_invalid_values(self):
+        invalid_values = [
+            "/data/not-a-list",
+            [""],
+            ["   "],
+            [123],
+        ]
+
+        for data_paths in invalid_values:
+            with self.subTest(data_paths=data_paths):
+                recording = Recording(
+                    experiment=self.experiment,
+                    recording_type=self.imaging_type,
+                    recording_date=date(2026, 7, 20),
+                    data_paths=data_paths,
+                )
+
+                with self.assertRaises(ValidationError) as context:
+                    recording.full_clean()
+
+                self.assertIn("data_paths", context.exception.message_dict)
 
     def test_recording_can_be_modified_by_owner_or_staff(self):
         User = get_user_model()
@@ -3911,7 +4172,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/owned-session",
+            data_paths=["/data/imaging/owned-session"],
             sequence_number=1,
         )
 
@@ -3924,7 +4185,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/valid",
+            data_paths=["/data/imaging/valid"],
             values={
                 "objective": "20x",
                 "fps": 30.0,
@@ -3939,7 +4200,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/invalid",
+            data_paths=["/data/imaging/invalid"],
             values={
                 "fps": "fast",
             },
@@ -3953,7 +4214,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/unknown",
+            data_paths=["/data/imaging/unknown"],
             values={
                 "unknown_field": "value",
             },
@@ -3967,7 +4228,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.abr_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/abr/wrong-experiment",
+            data_paths=["/data/abr/wrong-experiment"],
         )
 
         with self.assertRaises(ValidationError):
@@ -3979,7 +4240,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/key-lock",
+            data_paths=["/data/imaging/key-lock"],
             values={
                 "fps": 30.0,
             },
@@ -4015,7 +4276,7 @@ class RecordingAdminTests(TestCase):
             experiment=self.experiment,
             recording_type=self.recording_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/admin/recording",
+            data_paths=["/data/admin/recording"],
         )
 
     def test_admin_can_open_recording_type_add_page_with_field_inline(self):
@@ -4041,7 +4302,7 @@ class RecordingAdminTests(TestCase):
                 args=[self.recording.pk],
             ),
             {
-                "data_path": "/data/admin/changed",
+                "data_paths": "/data/admin/changed",
             },
         )
         self.assertEqual(response.status_code, 403)
@@ -4113,7 +4374,7 @@ class MouseIdentityAndDeletionTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
-            data_path="/data/imaging/session-1",
+            data_paths=["/data/imaging/session-1"],
             values={
                 "objective": "20x",
                 "fps": 30.0,
@@ -4124,7 +4385,7 @@ class MouseIdentityAndDeletionTests(AuthenticatedTestCase):
             experiment=self.abr_experiment,
             recording_type=self.abr_type,
             recording_date=date(2026, 7, 21),
-            data_path="/data/abr/session-1",
+            data_paths=["/data/abr/session-1"],
             values={
                 "click_threshold_db": 35,
             },

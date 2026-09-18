@@ -448,7 +448,12 @@ BASE_RECORDING_COLUMN_SPECS = [
 
 
 RECORDING_PATH_COLUMN_SPEC = [
-    {"key": "data_path", "label": "Path", "cell_class": "path-cell"},
+    {
+        "key": "data_paths",
+        "label": "Paths",
+        "format": "recording_paths",
+        "cell_class": "path-cell",
+    },
 ]
 
 
@@ -465,7 +470,12 @@ RECORDINGS_PAGE_BASE_COLUMN_SPECS = [
 
 
 RECORDINGS_PAGE_TRAILING_COLUMN_SPECS = [
-    {"key": "data_path", "label": "Recording Path", "cell_class": "path-cell"},
+    {
+        "key": "data_paths",
+        "label": "Recording Paths",
+        "format": "recording_paths",
+        "cell_class": "path-cell",
+    },
     {"key": "notes", "label": "Notes", "format": "linebreaks", "cell_class": "notes-cell"},
 ]
 
@@ -1429,7 +1439,7 @@ def resolve_attr(obj, path):
 
 
 def format_value(value, value_format=None):
-    if value is None or value == "":
+    if value is None or value == "" or value == []:
         return EMPTY_VALUE
 
     if value_format == "date":
@@ -1437,6 +1447,13 @@ def format_value(value, value_format=None):
 
     if value_format == "linebreaks":
         return linebreaksbr(value)
+
+    if value_format == "recording_paths":
+        return format_html_join(
+            format_html("<br>"),
+            "{}",
+            ((path,) for path in value),
+        )
 
     if value_format == "yesno":
         return "Yes" if value else "No"

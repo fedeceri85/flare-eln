@@ -766,7 +766,7 @@ class Recording(models.Model):
     )
     recording_date = models.DateField()
     sequence_number = models.PositiveIntegerField(default=1)
-    data_path = models.TextField()
+    data_paths = models.JSONField(default=list, blank=True)
     notes = models.TextField(blank=True)
     values = models.JSONField(default=dict, blank=True)
 
@@ -808,6 +808,23 @@ class Recording(models.Model):
 
     def clean(self):
         super().clean()
+
+        if not isinstance(self.data_paths, list):
+            raise ValidationError(
+                {"data_paths": "Recording paths must be a list."}
+            )
+
+        if any(
+            not isinstance(path, str) or not path.strip()
+            for path in self.data_paths
+        ):
+            raise ValidationError(
+                {
+                    "data_paths": (
+                        "Recording paths must contain only non-empty strings."
+                    ),
+                }
+            )
 
         if not isinstance(self.values, dict):
             raise ValidationError({"values": "Recording values must be an object."})
