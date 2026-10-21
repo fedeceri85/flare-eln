@@ -1064,3 +1064,24 @@ input[type="checkbox"] { accent-color: var(--blue); }
     .login-page .container { padding-top: 36px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
+
+.genotype-result-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+.genotype-result-controls > select {
+    flex: 1 1 160px;
+    min-width: 0;
+}
+.form-field .genotype-uncertainty {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+}
+.form-field .genotype-uncertainty input[type="checkbox"] {
+    align-self: center;
+    margin: 0;
+}

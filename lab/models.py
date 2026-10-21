@@ -49,13 +49,41 @@ class Protocol(models.Model):
 
 DEFAULT_SPECIES_NAME = "Mouse"
 MAX_CROSSING_LINES = 5
-ZYGOSITY_CHOICES = [
-    ("unknown", "Unknown"),
-    ("wt", "WT"),
-    ("het", "Het"),
-    ("hom", "Hom"),
-]
-ZYGOSITY_LABELS = dict(ZYGOSITY_CHOICES)
+
+
+class GenotypeCategory(models.Model):
+    code = models.SlugField(max_length=20, unique=True)
+    label = models.CharField(max_length=50, unique=True)
+    position = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["position", "label"]
+        verbose_name_plural = "Genotype categories"
+
+    def __str__(self):
+        return self.label
+
+    def clean(self):
+        super().clean()
+        if self.pk:
+            original = type(self).objects.get(pk=self.pk)
+            if self.code != original.code:
+                raise ValidationError({"code": "Stored category codes cannot be changed."})
+        if self.code == "unknown" and not self.active:
+            raise ValidationError({"active": "Unknown must remain available as the default."})
+
+
+def genotype_category_choices(include_codes=()):
+    return list(
+        GenotypeCategory.objects.filter(
+            models.Q(active=True) | models.Q(code__in=include_codes)
+        ).values_list("code", "label")
+    )
+
+
+def genotype_category_labels():
+    return dict(GenotypeCategory.objects.values_list("code", "label"))
 
 
 class Species(models.Model):
@@ -279,8 +307,10 @@ class Mouse(models.Model):
             if line.pk in calls_by_line
         ]
 
+        labels = genotype_category_labels()
         return "; ".join(
-            f"{call.mouse_line.name}: {call.get_zygosity_display()}"
+            f"{call.mouse_line.name}: {labels.get(call.zygosity, call.zygosity)}"
+            + (" (uncertain)" if call.is_uncertain else "")
             for call in genotype_calls
         )
 
@@ -398,9 +428,19 @@ class MouseGenotype(models.Model):
     )
     zygosity = models.CharField(
         max_length=20,
-        choices=ZYGOSITY_CHOICES,
         default="unknown",
     )
+
+    is_uncertain = models.BooleanField(default=False)
+
+    def get_zygosity_display(self):
+        label = genotype_category_labels().get(self.zygosity, self.zygosity)
+        return f"{label} (uncertain)" if self.is_uncertain else label
+
+    def clean(self):
+        super().clean()
+        if not GenotypeCategory.objects.filter(code=self.zygosity).exists():
+            raise ValidationError({"zygosity": "Select a valid genotype category."})
 
     class Meta:
         ordering = ["mouse", "mouse_line__name"]

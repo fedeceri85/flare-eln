@@ -22,8 +22,8 @@ from .models import (
     RecordingType,
     MAX_SEVERITY_CHOICES,
     Species,
-    ZYGOSITY_CHOICES,
-    ZYGOSITY_LABELS,
+    genotype_category_choices,
+    genotype_category_labels,
     resolve_crossing,
 )
 
@@ -813,9 +813,12 @@ def truncate_compat_text(value, max_length=100):
     return value[: max_length - 3].rstrip() + "..."
 
 
-def genotype_summary(genotype_calls):
+def genotype_summary(genotype_calls, uncertainty_values=None):
+    uncertainty_values = uncertainty_values or {}
+    labels = genotype_category_labels()
     return "; ".join(
-        f"{line.name}: {ZYGOSITY_LABELS.get(zygosity, zygosity)}"
+        f"{line.name}: {labels.get(zygosity, zygosity)}"
+        + (" (uncertain)" if uncertainty_values.get(line.pk) else "")
         for line, zygosity in genotype_calls
     )
 
@@ -875,6 +878,7 @@ def sync_mouse_structured_genetics(
     crossing,
     genotype_values,
     preserve_missing=False,
+    uncertainty_values=None,
 ):
     line_ids = set(crossing.lines.values_list("pk", flat=True))
 
@@ -891,6 +895,11 @@ def sync_mouse_structured_genetics(
             for genotype in mouse.genotype_calls.filter(mouse_line_id__in=line_ids)
         }
 
+    uncertainty_values = uncertainty_values or {}
+    existing_uncertainty = dict(mouse.genotype_calls.values_list(
+        "mouse_line_id", "is_uncertain",
+    ))
+    saved_uncertainty = {}
     summary_values = []
 
     for line in lines:
@@ -900,10 +909,14 @@ def sync_mouse_structured_genetics(
             zygosity = existing_calls.get(line.pk)
 
         zygosity = zygosity or "unknown"
+        is_uncertain = uncertainty_values.get(
+            line.pk, existing_uncertainty.get(line.pk, False),
+        )
+        saved_uncertainty[line.pk] = is_uncertain
         MouseGenotype.objects.update_or_create(
             mouse=mouse,
             mouse_line=line,
-            defaults={"zygosity": zygosity},
+            defaults={"zygosity": zygosity, "is_uncertain": is_uncertain},
         )
         summary_values.append((line, zygosity))
 
@@ -911,7 +924,7 @@ def sync_mouse_structured_genetics(
         mouse_line_id__in=line_ids,
     ).delete()
 
-    mouse.genotype = truncate_compat_text(genotype_summary(summary_values))
+    mouse.genotype = truncate_compat_text(genotype_summary(summary_values, saved_uncertainty))
     mouse.save(
         update_fields=[
             "crossing_definition",
@@ -1116,13 +1129,14 @@ class MouseStructuredGeneticsMixin:
             }
 
         genotype_form_fields = OrderedDict()
+        choices = genotype_category_choices(existing_calls.values())
 
         for line in self.selected_crossing.ordered_lines():
             field_name = genotype_field_name(line)
             self.genotype_fields.append(field_name)
             genotype_form_fields[field_name] = forms.ChoiceField(
                 required=False,
-                choices=ZYGOSITY_CHOICES,
+                choices=choices,
                 initial=existing_calls.get(line.pk, "unknown"),
                 label=line.name,
                 widget=forms.Select(
@@ -1133,7 +1147,20 @@ class MouseStructuredGeneticsMixin:
                 ),
             )
 
+        existing_uncertainty = dict(self.instance.genotype_calls.values_list(
+            "mouse_line_id", "is_uncertain",
+        )) if self.instance.pk else {}
+        for line in self.selected_crossing.ordered_lines():
+            genotype_form_fields[f"{genotype_field_name(line)}_uncertain"] = forms.BooleanField(
+                required=False, initial=existing_uncertainty.get(line.pk, False),
+                label="Uncertain", widget=forms.CheckboxInput(attrs={
+                    "data-genotype-uncertainty": "true",
+                    "aria-label": f"{line.name}: uncertain result",
+                }),
+            )
         self.insert_genotype_fields(genotype_form_fields)
+        for field_name in self.genotype_fields:
+            self[field_name].uncertainty_field = self[f"{field_name}_uncertain"]
 
     def selected_crossing_for_fields(self):
         if self.is_bound:
@@ -1224,6 +1251,8 @@ class MouseStructuredGeneticsMixin:
         genotype_field_names = set(self.genotype_fields)
 
         for field in self.visible_fields():
+            if field.field.widget.attrs.get("data-genotype-uncertainty"):
+                continue
             if field.name in genotype_field_names:
                 if regular_fields:
                     sections.append({"fields": regular_fields})
@@ -1310,6 +1339,10 @@ class MouseStructuredGeneticsMixin:
             genotype_values[line.pk] = zygosity
 
         cleaned_data["genotype_values"] = genotype_values
+        cleaned_data["uncertainty_values"] = {
+            line.pk: cleaned_data.get(f"{genotype_field_name(line)}_uncertain", False)
+            for line in crossing.ordered_lines()
+        }
         return cleaned_data
 
     def save_structured_genetics(self, mouse):
@@ -1325,6 +1358,7 @@ class MouseStructuredGeneticsMixin:
             mouse,
             crossing,
             self.cleaned_data.get("genotype_values", {}),
+            uncertainty_values=self.cleaned_data.get("uncertainty_values", {}),
         )
 
     @property
@@ -2156,13 +2190,17 @@ class BulkMouseUpdateForm(forms.Form):
 
         if self.selected_crossing is not None:
             genotype_form_fields = OrderedDict()
+            existing_codes = MouseGenotype.objects.filter(
+                mouse__in=self.selected_mice,
+            ).values_list("zygosity", flat=True)
+            choices = genotype_category_choices(existing_codes)
 
             for line in self.selected_crossing.ordered_lines():
                 field_name = genotype_field_name(line)
                 self.genotype_fields.append(field_name)
                 genotype_form_fields[field_name] = forms.ChoiceField(
                     required=False,
-                    choices=[("", "Leave unchanged"), *ZYGOSITY_CHOICES],
+                    choices=[("", "Leave unchanged"), *choices],
                     initial=self.shared_zygosity_initial(line),
                     label=line.name,
                     widget=forms.Select(
@@ -2173,7 +2211,19 @@ class BulkMouseUpdateForm(forms.Form):
                     ),
                 )
 
+            for line in self.selected_crossing.ordered_lines():
+                genotype_form_fields[f"{genotype_field_name(line)}_uncertain"] = forms.ChoiceField(
+                    required=False, label="Uncertainty", choices=[
+                        ("", "Leave uncertainty unchanged"),
+                        ("uncertain", "Mark uncertain"), ("certain", "Clear uncertainty"),
+                    ], widget=forms.Select(attrs={
+                        "data-genotype-uncertainty": "true",
+                        "aria-label": f"{line.name}: uncertainty",
+                    }),
+                )
             self.fields.update(genotype_form_fields)
+            for field_name in self.genotype_fields:
+                self[field_name].uncertainty_field = self[f"{field_name}_uncertain"]
 
     def shared_selected_crossing(self):
         crossing_ids = {
@@ -2325,6 +2375,11 @@ class BulkMouseUpdateForm(forms.Form):
                         genotype_values[line.pk] = zygosity
 
                 cleaned_data["genotype_values"] = genotype_values
+                cleaned_data["uncertainty_values"] = {
+                    line.pk: cleaned_data[f"{genotype_field_name(line)}_uncertain"] == "uncertain"
+                    for line in crossing.ordered_lines()
+                    if cleaned_data.get(f"{genotype_field_name(line)}_uncertain")
+                }
 
         target_protocol = None
         if cleaned_data.get("update_protocol") and cleaned_data.get("protocol"):

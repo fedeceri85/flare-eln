@@ -55,7 +55,7 @@ from .models import (
     SERVICES_PROJECT_DESCRIPTION,
     SERVICES_PROJECT_NAME,
     Species,
-    ZYGOSITY_CHOICES,
+    genotype_category_choices,
 )
 from .ui import (
     CROSSING_FILTER_AUTOCOMPLETE,
@@ -285,6 +285,7 @@ def apply_bulk_mouse_updates(mice, form):
                 crossing,
                 genotype_values,
                 preserve_missing=preserve_missing,
+                uncertainty_values=form.cleaned_data.get("uncertainty_values", {}),
             )
 
         if procedure_type is None:
@@ -483,6 +484,7 @@ def create_litter_mice(selected_protocol, form):
             mouse,
             cleaned_data["crossing_definition"],
             cleaned_data.get("genotype_values", {}),
+            uncertainty_values=cleaned_data.get("uncertainty_values", {}),
         )
         mice.append(mouse)
 
@@ -1898,6 +1900,11 @@ def crossing_genotype_fields(request):
                 for genotype in mouse.genotype_calls.all()
             }
 
+    existing_uncertainty = {}
+    if mouse_id and mouse is not None:
+        existing_uncertainty = dict(mouse.genotype_calls.values_list(
+            "mouse_line_id", "is_uncertain",
+        ))
     lines = crossing.ordered_lines()
 
     return JsonResponse(
@@ -1908,7 +1915,7 @@ def crossing_genotype_fields(request):
             },
             "choices": [
                 {"value": value, "label": label}
-                for value, label in ZYGOSITY_CHOICES
+                for value, label in genotype_category_choices(existing_calls.values())
             ],
             "lines": [
                 {
@@ -1916,6 +1923,8 @@ def crossing_genotype_fields(request):
                     "name": line.name,
                     "field_name": genotype_field_name(line),
                     "value": existing_calls.get(line.pk, "unknown"),
+                    "uncertainty_field_name": f"{genotype_field_name(line)}_uncertain",
+                    "is_uncertain": existing_uncertainty.get(line.pk, False),
                 }
                 for line in lines
             ],

@@ -107,22 +107,7 @@
                                 <legend>Genotype</legend>
 
                                 {% for genotype_field in item.genotype_fields %}
-                                    <div class="form-field">
-                                        {{ genotype_field.label_tag }}
-                                        {{ genotype_field }}
-
-                                        {% if genotype_field.help_text %}
-                                            <small>{{ genotype_field.help_text }}</small>
-                                        {% endif %}
-
-                                        {% if genotype_field.errors %}
-                                            <ul class="error-list">
-                                                {% for error in genotype_field.errors %}
-                                                    <li>{{ error }}</li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% endif %}
-                                    </div>
+                                    {% include "lab/components/genotype_field.html" with field=genotype_field %}
                                 {% endfor %}
                             </fieldset>
                         {% endif %}

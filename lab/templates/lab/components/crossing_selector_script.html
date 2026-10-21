@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const lookupUrl = "{{ crossing_lookup_url|escapejs }}";
     const genotypeFieldsUrl = "{{ crossing_genotype_fields_url|escapejs }}";
+    const bulkMode = Boolean(document.querySelector("[name=update_genotype]"));
     const mouseId = "{{ crossing_mouse_id|default:''|escapejs }}";
     const crossingField = crossingInput.closest(".form-field, .bulk-field");
     const results = document.createElement("div");
@@ -63,20 +64,54 @@ document.addEventListener("DOMContentLoaded", function () {
             select.dataset.genotypeField = "true";
             select.dataset.lineId = line.id;
 
-            choices.forEach(function (choice) {
+            const resultChoices = bulkMode
+                ? [{value: "", label: "Leave unchanged"}].concat(choices)
+                : choices;
+            resultChoices.forEach(function (choice) {
                 const option = document.createElement("option");
                 option.value = choice.value;
                 option.textContent = choice.label;
 
-                if (choice.value === line.value) {
+                if (choice.value === (bulkMode ? "" : line.value)) {
                     option.selected = true;
                 }
 
                 select.appendChild(option);
             });
 
+            const controls = document.createElement("div");
+            controls.className = "genotype-result-controls";
+            controls.appendChild(select);
+            const uncertaintyLabel = document.createElement("label");
+            uncertaintyLabel.className = "genotype-uncertainty";
+            const uncertainty = document.createElement(bulkMode ? "select" : "input");
+            uncertainty.name = line.uncertainty_field_name;
+            uncertainty.id = "id_" + uncertainty.name;
+            uncertainty.dataset.genotypeUncertainty = "true";
+            uncertainty.setAttribute("aria-label", line.name + ": uncertainty");
+            uncertaintyLabel.htmlFor = uncertainty.id;
+            if (bulkMode) {
+                [
+                    ["", "Leave uncertainty unchanged"],
+                    ["uncertain", "Mark uncertain"],
+                    ["certain", "Clear uncertainty"],
+                ].forEach(function (choice) {
+                    const option = document.createElement("option");
+                    option.value = choice[0];
+                    option.textContent = choice[1];
+                    uncertainty.appendChild(option);
+                });
+            } else {
+                uncertainty.type = "checkbox";
+                uncertainty.checked = Boolean(line.is_uncertain);
+            }
+            uncertaintyLabel.appendChild(uncertainty);
+            if (!bulkMode) {
+                uncertaintyLabel.appendChild(document.createTextNode("Uncertain"));
+            }
+            controls.appendChild(uncertaintyLabel);
             wrapper.appendChild(label);
-            wrapper.appendChild(select);
+            wrapper.appendChild(controls);
             subset.appendChild(wrapper);
         });
 

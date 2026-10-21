@@ -36,6 +36,26 @@ The scheduled updater checks for the latest stable release, downloads its image,
 
 For an existing deployment, follow the guide to install the image-based configuration under the existing Compose filename and retain the existing project name, database mount, and settings. After conversion, use the scheduled updater instead of the manual build-from-source update script. Database migrations still need to run when deploying a new image.
 
+## Genotype categories
+
+Manage genotype result choices in the Django admin under **Genotype categories**.
+Administrators can add categories, edit their labels, set their display order, and
+retire them by clearing **Active**. Stored codes cannot be edited and categories
+cannot be deleted in the admin; existing results keep their category when it is
+retired. **Unknown** remains active as the default. Changes apply to mouse forms,
+bulk updates, and genotype displays without a restart.
+
+Deployments must run `python manage.py migrate` to create and seed the category
+table. The defaults include WT, Het, Hom, Cre, Flx/Flx, Flx/Null, Null/Null,
+Flx/Y, Null/Y, Flx/WT, Null/WT, WT/Y, and Unknown.
+
+Genotype results also have a separate **Uncertain** checkbox for each gene on
+mouse and litter forms. Checked results display as, for example, `Het (uncertain)`.
+The flag is independent of the category, including Unknown. Existing results
+start unmarked. In bulk updates, check **Update genotype** and choose whether to
+leave uncertainty unchanged, mark it, or clear it for each gene. Changing a
+category alone preserves its existing uncertainty flag.
+
 ## License
 
 FLARE-ELN is released under the Apache License 2.0. See `LICENSE`.

@@ -2,6 +2,7 @@
 - Refreshed the lab interface and login with consistent navigation, breadcrumbs, and a light theme.
 - Added persistent Save and Cancel actions on long forms, clearer validation, and responsive tables.
 - Preserved list filters and workflow context when opening and returning from records.
+- User-determined zygozity choices through admin panel. Added "Uncertain" label to genotype result to mark not clear-cut results.
 
 21/10/2026
 NEW: switch to Docker images.
