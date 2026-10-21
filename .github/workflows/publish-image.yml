@@ -1,0 +1,110 @@
+name: Publish release image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build, for example v1.2.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-image-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Never publish an image from the private development repository or a fork.
+    if: >-
+      github.repository == 'fedeceri85/flare-eln' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (!github.event.release.prerelease && !github.event.release.draft))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      IMAGE: ghcr.io/fedeceri85/flare-eln
+    steps:
+      - name: Validate the version tag
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+            echo 'Use a simple version tag such as v1.2.0 (at most 128 characters).'
+            exit 1
+          }
+
+      - name: Check out the release tag
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Record the source commit
+        id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up ARM emulation
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up the image builder
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build a local image for application checks
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: flare-release-check:local
+
+      - name: Check Django and apply migrations to a disposable database
+        run: |
+          docker run --rm flare-release-check:local python -c '
+          import os
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "labdb.settings")
+          from django.conf import settings
+          settings.DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
+          import django
+          django.setup()
+          from django.core.management import call_command
+          call_command("check")
+          call_command("migrate", interactive=False, verbosity=0)
+          '
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the Intel and ARM64 release images
+        id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.RELEASE_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/fedeceri85/flare-eln
+            org.opencontainers.image.revision=${{ steps.source.outputs.commit }}
+            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Show the published image
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          echo "Published $IMAGE:$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Digest: $IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

@@ -9,7 +9,6 @@
 backups/
 staticfiles/
 media/
-private/
 *__pycache__/*
 *.DS_Store∂
 release/
