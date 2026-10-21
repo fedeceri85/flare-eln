@@ -1,4 +1,9 @@
 21/10/2026
+- Refreshed the lab interface and login with consistent navigation, breadcrumbs, and a light theme.
+- Added persistent Save and Cancel actions on long forms, clearer validation, and responsive tables.
+- Preserved list filters and workflow context when opening and returning from records.
+
+21/10/2026
 NEW: switch to Docker images.
 - Feature: allow easy import of mulitple paths at once.
 Solved bugs

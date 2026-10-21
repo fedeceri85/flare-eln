@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-    <form method="post" class="form-card">
+    <form id="primary-form" method="post" class="form-card">
         {% csrf_token %}
         <input
             type="hidden"
@@ -29,14 +29,6 @@
             </datalist>
         {% endif %}
 
-        <div class="actions">
-            <button class="button button-primary" type="submit">
-                Save experiment
-            </button>
-
-            <a class="button" href="{{ return_url }}">
-                Cancel
-            </a>
-        </div>
+        {% include "lab/components/form_actions.html" %}
     </form>
 {% endblock %}

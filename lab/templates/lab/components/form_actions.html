@@ -1,0 +1,6 @@
+<div class="actions form-actions">
+    <button class="button button-primary" type="submit"{% if external %} form="primary-form"{% endif %}{% if navigation.primary.name %} name="{{ navigation.primary.name }}" value="{{ navigation.primary.value }}"{% endif %}>
+        {{ navigation.primary.label }}
+    </button>
+    <a class="button" href="{{ navigation.back_url }}">Cancel</a>
+</div>

@@ -8,13 +8,6 @@
 {% endblock %}
 
 {% block content %}
-    <div class="toolbar">
-        <div class="actions">
-            <a class="button" href="{% url 'lab:home' %}">
-                Home
-            </a>
-        </div>
-    </div>
 
     {% include "lab/components/card_grid.html" with cards=report_cards %}
 
@@ -55,12 +48,12 @@
                             <table class="data-table report-table">
                                 <thead>
                                     <tr>
-                                        <th>Mice under procedure</th>
+                                        <th scope="col">Mice under procedure</th>
                                         {% for label in home_office_report.severity_labels %}
-                                            <th>{{ label }}</th>
+                                            <th scope="col">{{ label }}</th>
                                         {% endfor %}
-                                        <th>Severity not set</th>
-                                        <th>Surpassed threshold</th>
+                                        <th scope="col">Severity not set</th>
+                                        <th scope="col">Surpassed threshold</th>
                                     </tr>
                                 </thead>
 
@@ -87,8 +80,8 @@
                             <table class="data-table report-table">
                                 <thead>
                                     <tr>
-                                        <th>Crossing type</th>
-                                        <th>Mice under procedure</th>
+                                        <th scope="col">Crossing type</th>
+                                        <th scope="col">Mice under procedure</th>
                                     </tr>
                                 </thead>
 
@@ -113,16 +106,16 @@
                             <table class="data-table report-table">
                                 <thead>
                                     <tr>
-                                        <th>Protocol</th>
-                                        <th>Max severity</th>
-                                        <th>Mice under procedure</th>
+                                        <th scope="col">Protocol</th>
+                                        <th scope="col">Max severity</th>
+                                        <th scope="col">Mice under procedure</th>
                                         {% for label in home_office_report.severity_labels %}
-                                            <th>{{ label }}</th>
+                                            <th scope="col">{{ label }}</th>
                                         {% endfor %}
-                                        <th>Severity not set</th>
-                                        <th>Surpassed threshold</th>
+                                        <th scope="col">Severity not set</th>
+                                        <th scope="col">Surpassed threshold</th>
                                         {% for label in home_office_report.crossing_type_labels %}
-                                            <th>{{ label }}</th>
+                                            <th scope="col">{{ label }}</th>
                                         {% endfor %}
                                     </tr>
                                 </thead>
@@ -167,13 +160,13 @@
                             <table class="data-table report-table">
                                 <thead>
                                     <tr>
-                                        <th>Procedure</th>
-                                        <th>Mice under procedure</th>
+                                        <th scope="col">Procedure</th>
+                                        <th scope="col">Mice under procedure</th>
                                         {% for label in home_office_report.severity_labels %}
-                                            <th>{{ label }}</th>
+                                            <th scope="col">{{ label }}</th>
                                         {% endfor %}
-                                        <th>Severity not set</th>
-                                        <th>Surpassed threshold</th>
+                                        <th scope="col">Severity not set</th>
+                                        <th scope="col">Surpassed threshold</th>
                                     </tr>
                                 </thead>
 

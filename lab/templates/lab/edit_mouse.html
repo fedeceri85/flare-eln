@@ -5,7 +5,7 @@
 {% block main_class %}container container-wide{% endblock %}
 
 {% block page_subtitle %}
-    <p>Mouse ID remains the primary key. Use Rename to change it safely.</p>
+    <p>Update this mouse’s details or manage its procedures below.</p>
 {% endblock %}
 
 {% block content %}
@@ -25,7 +25,7 @@
         </div>
     </div>
 
-    <form method="post" class="form-card">
+    <form id="primary-form" method="post" class="form-card">
         {% csrf_token %}
         <input
             type="hidden"
@@ -51,28 +51,13 @@
 
         {% include "lab/components/form_fields.html" with form=mouse_form %}
 
-        <div class="actions">
-            <button
-                class="button button-primary"
-                type="submit"
-                name="save_mouse"
-                value="1"
-            >
-                Save changes
-            </button>
+        {% include "lab/components/form_actions.html" %}
 
-            <a class="button" href="{{ return_url }}">
-                Cancel
-            </a>
-
-            <a
-                class="button button-danger"
-                href="{% url 'lab:delete_mouse' mouse.pk %}?return_url={{ return_url|urlencode }}"
-            >
-                Delete
-            </a>
-        </div>
     </form>
+    <div class="record-danger">
+        <a class="button button-danger" href="{% url 'lab:delete_mouse' mouse.pk %}?return_url={{ return_url|urlencode }}">Delete mouse</a>
+    </div>
+
 
     <section class="section">
         <h2 class="section-title">Procedures</h2>
@@ -83,11 +68,11 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Procedure type</th>
-                                <th>Lab member</th>
-                                <th>Lab-book page</th>
-                                <th>Actions</th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Procedure type</th>
+                                <th scope="col">Lab member</th>
+                                <th scope="col">Lab-book page</th>
+                                <th scope="col">Actions</th>
                             </tr>
                         </thead>
 

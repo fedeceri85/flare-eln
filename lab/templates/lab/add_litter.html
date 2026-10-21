@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-    <form method="post">
+    <form id="primary-form" method="post">
         {% csrf_token %}
         <input
             type="hidden"
@@ -23,13 +23,7 @@
 
         {% include "lab/components/possible_duplicate_warning.html" %}
 
-        {% if form.non_field_errors %}
-            <ul class="error-list">
-                {% for error in form.non_field_errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
+        {% include "lab/components/error_summary.html" with form=form %}
 
         {% for hidden_field in form.hidden_fields %}
             {{ hidden_field }}
@@ -227,19 +221,7 @@
             </fieldset>
         </section>
 
-        <div class="actions">
-            <button class="button button-primary" type="submit">
-                {% if possible_duplicate_warning %}
-                    Add litter anyway
-                {% else %}
-                    Add litter
-                {% endif %}
-            </button>
-
-            <a class="button" href="{{ return_url }}">
-                Cancel
-            </a>
-        </div>
+        {% include "lab/components/form_actions.html" %}
     </form>
 {% endblock %}
 

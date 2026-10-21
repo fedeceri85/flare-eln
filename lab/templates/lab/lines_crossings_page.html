@@ -33,9 +33,6 @@
         </form>
 
         <div class="actions">
-            <a class="button" href="{% url 'lab:home' %}">
-                Home
-            </a>
         </div>
     </div>
 
@@ -61,13 +58,7 @@
 
             <h2 class="section-title">Create Crossing</h2>
 
-            {% if crossing_form.non_field_errors %}
-                <ul class="error-list">
-                    {% for error in crossing_form.non_field_errors %}
-                        <li>{{ error }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
+            {% include "lab/components/error_summary.html" with form=crossing_form %}
 
             <div class="form-field">
                 {{ crossing_form.species.label_tag }}
@@ -131,10 +122,10 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Wild type/reference</th>
-                            <th>Active</th>
-                            <th>Actions</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Wild type/reference</th>
+                            <th scope="col">Active</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -188,11 +179,11 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Lines</th>
-                            <th>Type</th>
-                            <th>Active</th>
-                            <th>Actions</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Lines</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Active</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -253,7 +244,7 @@
         const speciesSelect = crossingForm.querySelector('[name="species"]');
         const lineInput = document.querySelector("[data-line-lookup-input]");
         const lineResults = document.querySelector("[data-line-lookup-results]");
-        const selectedInput = document.getElementById("id_selected_lines");
+        const selectedInput = crossingForm.querySelector('[name="selected_lines"]');
         const selectedList = document.querySelector("[data-selected-lines]");
         const lookupUrl = "{{ line_lookup_url|escapejs }}";
         const selectedLines = new Map();

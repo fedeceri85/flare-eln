@@ -1791,6 +1791,9 @@ def lines_crossings_page(request):
         elif request.POST.get("action") == "delete_crossing":
             return delete_crossing_from_request(request)
 
+    # These independent forms both have a species field. Keep their labels and
+    # validation links unique without changing submitted field names.
+    crossing_form.auto_id = "crossing_%s"
     species_options = Species.objects.order_by("name")
     lines = (
         MouseLine.objects

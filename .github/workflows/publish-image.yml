@@ -64,16 +64,19 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: flare-release-check:local
+          build-args: |
+            FLARE_VERSION=${{ env.RELEASE_TAG }}
 
       - name: Check Django and apply migrations to a disposable database
         run: |
-          docker run --rm flare-release-check:local python -c '
+          docker run --rm -e EXPECTED_FLARE_VERSION="$RELEASE_TAG" flare-release-check:local python -c '
           import os
           os.environ.setdefault("DJANGO_SETTINGS_MODULE", "labdb.settings")
           from django.conf import settings
           settings.DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
           import django
           django.setup()
+          assert settings.FLARE_VERSION == os.environ["EXPECTED_FLARE_VERSION"], "Image version does not match the release tag"
           from django.core.management import call_command
           call_command("check")
           call_command("migrate", interactive=False, verbosity=0)
@@ -94,6 +97,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.IMAGE }}:${{ env.RELEASE_TAG }}
+          build-args: |
+            FLARE_VERSION=${{ env.RELEASE_TAG }}
           labels: |
             org.opencontainers.image.source=https://github.com/fedeceri85/flare-eln
             org.opencontainers.image.revision=${{ steps.source.outputs.commit }}

@@ -30,6 +30,8 @@ ghcr.io/fedeceri85/flare-eln:YOUR_RELEASE_TAG
 
 The image-based Compose file reads the image reference from `FLARE_IMAGE` in the NAS `.env`. Keep production passwords and other deployment settings in that local file. Make the container package public once so the NAS can download images without a GitHub login.
 
+The header displays the release tag baked into each published image. It updates automatically with the image; local development builds display `dev`.
+
 The scheduled updater checks for the latest stable release, downloads its image, checks it, briefly stops the website, backs up PostgreSQL, runs migrations, and restarts the application. After successful HTTP and database checks, it saves the exact image digest for subsequent restarts. The NAS does not need to pull Git or build the application.
 
 For an existing deployment, follow the guide to install the image-based configuration under the existing Compose filename and retain the existing project name, database mount, and settings. After conversion, use the scheduled updater instead of the manual build-from-source update script. Database migrations still need to run when deploying a new image.

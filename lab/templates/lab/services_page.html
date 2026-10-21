@@ -8,13 +8,6 @@
 {% endblock %}
 
 {% block content %}
-    <div class="toolbar">
-        <div class="actions">
-            <a class="button" href="{% url 'lab:home' %}">
-                Home
-            </a>
-        </div>
-    </div>
 
     {% if cards %}
         {% include "lab/components/card_grid.html" with cards=cards %}

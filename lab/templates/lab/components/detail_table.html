@@ -4,7 +4,7 @@
             <tbody>
                 {% for row in details.rows %}
                     <tr>
-                        <th>{{ row.label }}</th>
+                        <th scope="row">{{ row.label }}</th>
                         <td>{{ row.value }}</td>
                     </tr>
                 {% endfor %}

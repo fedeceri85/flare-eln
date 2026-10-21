@@ -9,6 +9,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 COPY . .
+ARG FLARE_VERSION=dev
+ENV FLARE_VERSION=${FLARE_VERSION}
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000

@@ -1,11 +1,6 @@
-{% if form.non_field_errors %}
-    <ul class="error-list">
-        {% for error in form.non_field_errors %}
-            <li>{{ error }}</li>
-        {% endfor %}
-    </ul>
-{% endif %}
+{% include "lab/components/error_summary.html" with form=form %}
 
+<div class="form-grid">
 {% for field in form %}
     {% if field.name == "mice" %}
         {{ field }}
@@ -64,3 +59,5 @@
         </div>
     {% endif %}
 {% endfor %}
+
+</div>

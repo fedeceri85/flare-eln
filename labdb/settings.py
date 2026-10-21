@@ -77,6 +77,8 @@ def env_list(name, default=None):
 
 load_local_env_file()
 
+FLARE_VERSION = env_first("FLARE_VERSION", default="dev")
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(

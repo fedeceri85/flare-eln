@@ -1,3 +1,4 @@
+{% load navigation %}
 <div class="table-card">
     {% if table.rows %}
         {% if table.has_selectable_rows %}
@@ -9,6 +10,7 @@
                 >
                     Select all
                 </button>
+                <span class="selection-count" data-selection-count aria-live="polite">No rows selected</span>
             </div>
         {% endif %}
 
@@ -17,7 +19,7 @@
                 <thead>
                     <tr>
                         {% for column in table.columns %}
-                            <th class="{{ column.class }}">
+                            <th scope="col" class="{{ column.class }}"{% if column.sort_state == "asc" %} aria-sort="ascending"{% elif column.sort_state == "desc" %} aria-sort="descending"{% endif %}>
                                 {% if column.header_checkbox %}
                                     <input
                                         type="checkbox"
@@ -59,7 +61,7 @@
                                     {% elif cell.url %}
                                         <a
                                             class="{{ cell.link_class }}"
-                                            href="{{ cell.url }}"
+                                            href="{% record_link cell.url request %}"
                                         >
                                             {{ cell.value }}
                                         </a>

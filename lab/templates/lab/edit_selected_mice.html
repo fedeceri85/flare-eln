@@ -30,7 +30,7 @@
         </ul>
     </div>
 
-    <form method="post">
+    <form id="primary-form" method="post">
         {% csrf_token %}
         <input
             type="hidden"
@@ -51,13 +51,7 @@
             >
         {% endfor %}
 
-        {% if form.non_field_errors %}
-            <ul class="error-list">
-                {% for error in form.non_field_errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
+        {% include "lab/components/error_summary.html" with form=form %}
 
         {% for hidden_field in form.hidden_fields %}
             {{ hidden_field }}
@@ -219,23 +213,9 @@
 
         {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 %}
 
-        <div class="actions">
-            <button class="button button-primary" type="submit">
-                Save bulk changes
-            </button>
-
-            <button
-                class="button button-danger"
-                type="submit"
-                formaction="{{ delete_selected_url }}"
-                formmethod="post"
-            >
-                Delete selected
-            </button>
-
-            <a class="button" href="{{ return_url }}">
-                Cancel
-            </a>
+        {% include "lab/components/form_actions.html" %}
+        <div class="record-danger">
+            <button class="button button-danger" type="submit" formaction="{{ delete_selected_url }}" formmethod="post">Delete selected</button>
         </div>
     </form>
 {% endblock %}
