@@ -1,0 +1,7 @@
+<div class="mouse-editor-tabs" role="tablist" aria-label="Mouse editor sections" data-mouse-tab-list hidden>
+    <button type="button" role="tab" id="mouse-tab-ids" aria-controls="mouse-panel-ids" data-mouse-tab="ids">Mouse IDs <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+    <button type="button" role="tab" id="mouse-tab-shared" aria-controls="mouse-panel-shared" data-mouse-tab="shared">Mouse details <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+    {% if form.dynamic_mouse_count or not form.single_mouse_mode %}<button type="button" role="tab" id="mouse-tab-individual" aria-controls="mouse-panel-individual" data-mouse-tab="individual" {% if form.single_mouse_mode %}hidden{% endif %}>Individual mice <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>{% endif %}
+    <button type="button" role="tab" id="mouse-tab-procedures" aria-controls="mouse-panel-procedures{% if editing_existing %} mouse-panel-existing-procedures{% endif %}" data-mouse-tab="procedures">Procedures <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+    <button type="button" role="tab" id="mouse-tab-services" aria-controls="mouse-panel-services" data-mouse-tab="services">Services <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+</div>

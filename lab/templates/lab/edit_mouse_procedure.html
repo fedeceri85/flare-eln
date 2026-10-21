@@ -8,6 +8,13 @@
     <p>{{ mouse.mouse_id }} - {{ procedure.procedure_type }}</p>
 {% endblock %}
 
+{% block page_actions %}
+    <div class="actions">
+        {% include "lab/components/form_actions.html" with external=True %}
+        <button class="button button-danger" type="submit" form="delete-procedure-form">Delete procedure</button>
+    </div>
+{% endblock %}
+
 {% block content %}
     <form id="primary-form" method="post" class="form-card">
         {% csrf_token %}
@@ -19,6 +26,9 @@
 
         {% include "lab/components/form_fields.html" with form=form %}
 
-        {% include "lab/components/form_actions.html" %}
+    </form>
+    <form id="delete-procedure-form" method="post" action="{% url 'lab:delete_mouse_procedure' mouse.pk procedure.pk %}" onsubmit="return confirm('Delete this procedure and its notes? This cannot be undone.');">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ return_url }}">
     </form>
 {% endblock %}

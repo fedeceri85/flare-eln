@@ -3,25 +3,7 @@
 {% elif form.mouse_rows %}
     <p>{{ form.mouse_rows|length }} mouse{{ form.mouse_rows|length|pluralize }}.</p>
     <div class="litter-rows-scroll">
-        <table class="data-table litter-mouse-table">
-            <thead><tr><th>Mouse ID</th><th>Local identifier</th><th>Sex</th><th>Genotype</th></tr></thead>
-            <tbody>
-                {% for row in form.mouse_rows %}
-                    <tr>
-                        <th scope="row">{{ row.mouse_id }}</th>
-                        <td>{{ row.marking }}{{ row.marking.errors }}</td>
-                        <td>{{ row.sex }}{{ row.sex.errors }}</td>
-                        <td>
-                            {% for field in row.genotype_fields %}
-                                {% include "lab/components/genotype_field.html" %}
-                            {% empty %}
-                                <small>Select a crossing to enter genotype results.</small>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% include "lab/components/individual_mouse_table.html" with rows=form.mouse_rows crossing=form.selected_crossing.display_name empty_genotype_message="Select a crossing to enter genotype results." %}
     </div>
 {% else %}
     <p>Enter mouse numbers above to build the individual rows.</p>

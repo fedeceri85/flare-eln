@@ -61,9 +61,11 @@
         <div class="page-heading-extra">{% block header_extra %}{% endblock %}</div>
     </div>
     {% if navigation.primary %}
-        <div class="page-action-bar" role="region" aria-label="{{ navigation.scope }} actions" data-page-actions>
-            <span class="action-scope">{{ navigation.scope }}</span>
-            {% include 'lab/components/form_actions.html' with external=True %}
+        <div class="page-action-bar{% block page_action_bar_class %}{% endblock %}" role="region" aria-label="{{ navigation.scope }} actions" data-page-actions>
+            {% block page_action_scope %}<span class="action-scope">{{ navigation.scope }}</span>{% endblock %}
+            {% block page_actions %}
+                {% include 'lab/components/form_actions.html' with external=True %}
+            {% endblock %}
         </div>
     {% endif %}
     {% if messages %}

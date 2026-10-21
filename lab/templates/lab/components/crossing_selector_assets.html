@@ -1,0 +1,3 @@
+{% load static %}
+<div hidden data-crossing-selector-config data-lookup-url="{{ crossing_lookup_url }}" data-genotype-fields-url="{{ crossing_genotype_fields_url }}" data-mouse-id="{{ crossing_mouse_id|default:'' }}"></div>
+<script src="{% static 'lab/crossing_selector.js' %}"></script>

@@ -1,0 +1,10 @@
+{% for section in form.mouse_bound_field_sections %}
+    {% if section.title %}
+        <fieldset class="form-subset {{ section.class }}" data-genotype-subset="true">
+            <legend>{{ section.title }}</legend>
+            {% for field in section.fields %}
+                {% include "lab/components/genotype_field.html" %}
+            {% endfor %}
+        </fieldset>
+    {% endif %}
+{% endfor %}

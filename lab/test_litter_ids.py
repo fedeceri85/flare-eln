@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from importlib import import_module
 
@@ -137,7 +138,7 @@ class LitterIdentityTests(TestCase):
 
     def test_save_creates_batch_and_optional_procedures(self):
         procedure_type = ProcedureType.objects.create(name="Litter procedure")
-        response = self.client.post(self.url, self.payload(procedure_type=procedure_type.pk))
+        response = self.client.post(self.url, self.payload(procedure_drafts=json.dumps([{"procedure_type": procedure_type.pk}])))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Mouse.objects.count(), 2)
         self.assertTrue(all(mouse.procedures.count() == 1 for mouse in Mouse.objects.all()))
@@ -180,7 +181,7 @@ class LitterIdentityTests(TestCase):
         response = self.client.post(self.url, self.payload(preview_mice="1", marking_type="other"))
         html = response.content.decode()
         self.assertEqual(html.count('name="marking_type"'), 1)
-        self.assertLess(html.index('name="marking_type"'), html.index('Individual mice'))
+        self.assertLess(html.index('name="marking_type"'), html.index('id="mouse-panel-individual"'))
         self.assertIn("Local ID type", html)
         self.assertIn("Local identifier", html)
         self.assertNotIn('name="pup_1_marking_type"', html)

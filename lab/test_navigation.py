@@ -153,7 +153,7 @@ class NavigationTests(TestCase):
         html = Markup(response.content.decode())
         edit = next(node for node in html.find("a") if node.text.strip() == "Edit mouse")
         self.assertEqual(parse_qs(urlsplit(edit.attrs["href"]).query)["return_url"], [record_url])
-        response = self.client.get(edit.attrs["href"])
+        response = self.client.get(edit.attrs["href"], follow=True)
         html = Markup(response.content.decode())
         self.assertEqual(html.find("a", **{"class": "back-link"})[0].attrs["href"], record_url)
         crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Mice")
@@ -187,9 +187,10 @@ class NavigationTests(TestCase):
         _, html = self.page("edit_mouse", (self.mouse.pk,))
         self.assertEqual(len(html.find("form", id="primary-form")), 1)
         sticky_save = html.find("button", form="primary-form")[0]
-        self.assertEqual(sticky_save.attrs.get("name"), "save_mouse")
-        self.assertEqual(sticky_save.attrs.get("value"), "1")
-        secondary = html.find("button", name="save_procedure")
+        self.assertIsNone(sticky_save.attrs.get("name"))
+        self.assertTrue(html.find("input", name="apply_bulk_edit", value="1"))
+        
+        secondary = [button for button in html.find("button") if button.text.strip() == "Add procedure"]
         self.assertEqual(len(secondary), 1)
         self.assertFalse(secondary[0].within("form", id="primary-form"))
 

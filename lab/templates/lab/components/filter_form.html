@@ -1,4 +1,5 @@
-<form method="get" class="filter-form">
+{% load static %}
+<form method="get" class="filter-form{% if compact_filters %} filter-form--compact{% endif %}" aria-label="Filter records">
     {% for field in filter_form.hidden_fields %}
         <input
             type="hidden"
@@ -9,23 +10,10 @@
 
     <div class="filter-grid">
         {% for field in filter_form.fields %}
+            {% if field.type != "checkbox" or not compact_filters %}
             <div class="filter-field">
                 {% if field.type == "checkbox" %}
-                    <input
-                        type="hidden"
-                        name="{{ field.name }}"
-                        value="{{ field.unchecked_value }}"
-                    >
-                    <label class="checkbox-field" for="{{ field.id }}">
-                        <input
-                            id="{{ field.id }}"
-                            type="checkbox"
-                            name="{{ field.name }}"
-                            value="{{ field.checkbox_value }}"
-                            {% if field.checked %}checked{% endif %}
-                        >
-                        {{ field.label }}
-                    </label>
+                    {% include "lab/components/filter_checkbox.html" %}
                 {% elif field.type == "select" %}
                     <label for="{{ field.id }}">{{ field.label }}</label>
                     <select id="{{ field.id }}" name="{{ field.name }}">
@@ -58,9 +46,20 @@
                     >
                 {% endif %}
             </div>
+            {% endif %}
         {% endfor %}
     </div>
 
+    {% if compact_filters %}
+    <div class="filter-footer">
+        <div class="filter-options">
+            {% for field in filter_form.fields %}
+                {% if field.type == "checkbox" %}
+                    <div class="filter-field filter-option">{% include "lab/components/filter_checkbox.html" %}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
     <div class="filter-actions">
         <button class="button button-primary" type="submit">
             Apply filters
@@ -72,8 +71,9 @@
             </a>
         {% endif %}
     </div>
+    {% if compact_filters %}</div>{% endif %}
 </form>
 
 {% if filter_form.has_autocomplete %}
-    {% include "lab/components/filter_autocomplete_script.html" %}
+    <script src="{% static 'lab/filter_autocomplete.js' %}"></script>
 {% endif %}

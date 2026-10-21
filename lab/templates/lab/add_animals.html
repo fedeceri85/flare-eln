@@ -1,0 +1,126 @@
+{% extends "lab/base.html" %}
+{% load static %}
+
+{% block title %}Add animals{% endblock %}
+{% block page_title %}Add animals{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
+
+{% block page_subtitle %}
+    {% if selected_protocol %}
+        <p>Protocol {{ selected_protocol.protocol_number }}</p>
+    {% else %}
+        <p>Select a protocol before saving.</p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div data-mouse-editor data-dynamic-mouse-layout data-mouse-count="{{ form.numbers|length }}">
+    {% include "lab/components/mouse_editor_tabs.html" %}
+    <form id="primary-form" method="post" data-litter-form>
+        {% csrf_token %}
+        <input type="hidden" name="mouse_editor_tab" value="{{ request.POST.mouse_editor_tab|default:'ids' }}" data-mouse-active-tab>
+        <input
+            type="hidden"
+            name="return_url"
+            value="{{ return_url }}"
+        >
+        <input type="hidden" name="return_with_mouse" value="{{ return_with_mouse|yesno:'1,' }}">
+
+        {% include "lab/components/possible_duplicate_warning.html" %}
+
+        {% include "lab/components/error_summary.html" with form=form %}
+
+        {% for hidden_field in form.hidden_fields %}
+            {{ hidden_field }}
+
+            {% if hidden_field.errors %}
+                <ul class="error-list">
+                    {% for error in hidden_field.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endfor %}
+
+        <section class="bulk-section" id="mouse-panel-ids" data-mouse-tab-panel="ids">
+            <h2 class="visually-hidden">Mouse IDs</h2>
+            <div class="form-grid">
+                {% for field in form.id_bound_fields %}
+                    <div class="form-field">
+                        {% if field.field.widget.input_type == "checkbox" %}
+                            <label class="checkbox-field">{{ field }} {{ field.label }}</label>
+                        {% else %}
+                            {{ field.label_tag }}{{ field }}
+                        {% endif %}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <div id="mouse-panel-shared" data-mouse-tab-panel="shared">
+        <div data-single-mouse-slot>
+            {% if form.single_mouse_mode %}{% include "lab/components/litter_individual_editor.html" %}{% endif %}
+        </div>
+        <section class="bulk-section shared-mouse-details">
+            <h2 class="visually-hidden">Shared litter details</h2>
+            <p class="bulk-help">These details apply to every mouse. Choose one Local ID type for the litter. Set each mouse’s local identifier, sex and genotype below.</p>
+
+            <div class="shared-detail-groups">
+                {% for group in form.shared_mouse_field_groups %}
+                    <fieldset class="shared-detail-group">
+                        <legend>{{ group.title }}</legend>
+                        {% for field in group.fields %}
+                            <div class="bulk-field">
+                                {% include "lab/components/shared_mouse_input.html" %}
+                            </div>
+                        {% endfor %}
+                    </fieldset>
+                {% endfor %}
+            </div>
+            <div class="shared-genetics">
+                <div class="bulk-field shared-crossing-column">
+                    {% include "lab/components/shared_mouse_input.html" with field=form.crossing_search %}
+                </div>
+                <div class="shared-genotype-column" data-multiple-mice-only {% if form.single_mouse_mode %}hidden{% endif %}>
+                    <div data-litter-shared-genotypes>{% include "lab/components/litter_shared_genotypes.html" %}</div>
+                    <p role="status" aria-live="polite" data-litter-genotype-status></p>
+                    <noscript><button class="button" type="submit" name="apply_shared_genotype" value="1" formnovalidate>Apply shared genotype to mouse rows</button></noscript>
+                </div>
+            </div>
+            <details class="shared-notes" {% if form.notes.value or form.notes.errors %}open{% endif %}>
+                <summary>Notes (optional)</summary>
+                {% include "lab/components/shared_mouse_input.html" with field=form.notes %}
+            </details>
+        </section>
+
+        </div>
+
+        <section id="mouse-panel-individual" data-mouse-tab-panel="individual" {% if form.single_mouse_mode %}hidden{% endif %}>
+            <div data-multiple-mice-slot>{% if not form.single_mouse_mode %}{% include "lab/components/litter_individual_editor.html" %}{% endif %}</div>
+        </section>
+
+    </form>
+        <section class="bulk-section procedure-editor" id="mouse-panel-procedures" data-mouse-tab-panel="procedures">
+            {% include "lab/components/litter_procedure_editor.html" %}
+        </section>
+
+    <section class="bulk-section" id="mouse-panel-services" data-mouse-tab-panel="services">
+        <h2 class="visually-hidden">Services</h2>
+        <p>Save the mice before adding service records.</p>
+    </section>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
+    {{ protocol_procedure_permissions|json_script:"protocol-procedure-permissions" }}
+    <script src="{% static 'lab/litter_protocol_permissions.js' %}"></script>
+    {% include "lab/components/crossing_selector_assets.html" %}
+    <script src="{% static 'lab/mouse_row_editor.js' %}"></script>
+    <script src="{% static 'lab/litter_mouse_rows.js' %}"></script>
+    <script src="{% static 'lab/mouse_genotype_editor.js' %}"></script>
+    <script src="{% static 'lab/litter_genotypes.js' %}"></script>
+    <script src="{% static 'lab/litter_procedures.js' %}"></script>
+{% endblock %}

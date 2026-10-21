@@ -1,0 +1,6 @@
+<fieldset class="procedure-fields procedure-create-grid procedure-create-with-action" disabled {% if draft %}data-procedure-fieldset{% else %}data-new-procedure-inputs{% endif %}>
+    {% for field in procedure_form %}
+        <div class="bulk-field">{% include "lab/components/shared_mouse_input.html" with hide_help=True %}</div>
+    {% endfor %}
+    <button class="button button-primary procedure-add-button" type="submit" {% if draft %}data-litter-procedure-add{% endif %}>Add procedure</button>
+</fieldset>

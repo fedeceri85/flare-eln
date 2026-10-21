@@ -70,15 +70,18 @@ document.addEventListener("DOMContentLoaded", function () {
 document.addEventListener("DOMContentLoaded", function () {
     const header = document.querySelector("[data-app-header]");
     const actions = document.querySelector("[data-page-actions]");
+    const tabs = document.querySelector("[data-mouse-tab-list]");
     function measureChrome() {
         if (header) document.documentElement.style.setProperty("--header-height", header.offsetHeight + "px");
         document.documentElement.style.setProperty("--action-height", (actions ? actions.offsetHeight : 0) + "px");
+        document.documentElement.style.setProperty("--tabs-height", (tabs ? tabs.offsetHeight : 0) + "px");
     }
     measureChrome();
     if (window.ResizeObserver) {
         const observer = new ResizeObserver(measureChrome);
         if (header) observer.observe(header);
         if (actions) observer.observe(actions);
+        if (tabs) observer.observe(tabs);
     } else {
         window.addEventListener("resize", measureChrome);
     }

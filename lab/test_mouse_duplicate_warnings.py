@@ -6,7 +6,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .forms import LitterCreateForm, MouseEditForm, MouseForm, genotype_field_name, sync_mouse_structured_genetics
+from .forms import LitterCreateForm, MouseEditForm, MouseForm, genotype_field_name, sync_mouse_structured_genetics, individual_mouse_field_prefix
 from .models import Experiment, Mouse, MouseLine, Procedure, ProcedureType, Project, Protocol, Recording, RecordingType, Species, resolve_crossing
 from .views import create_litter_mice, possible_duplicate_mouse_warning, rename_mouse_identity
 
@@ -22,16 +22,23 @@ class MouseDuplicateWarningTests(TestCase):
         self.dob = date(2026, 6, 10)
         self.user = get_user_model().objects.create_user(username="duplicate-test")
         self.client.force_login(self.user)
-        self.add_url = reverse("lab:add_mouse_all")
+        self.add_url = reverse("lab:add_litter_all")
         self.litter_url = reverse("lab:add_litter_all")
 
     def payload(self, **extra):
-        return {
+        data = {
             "mouse_id": "NEW-ASSIGNED", "date_of_birth": self.dob.isoformat(), "breeding_pair": "",
             "crossing_definition": self.crossing.pk, "protocol": self.protocol.pk, "status": "Alive",
             "marking_type": "other", "sex": "F", "custom_metadata": "{}",
             genotype_field_name(self.line): "het", **extra,
         }
+        data.setdefault("mouse_id_prefix", data["mouse_id"])
+        data.setdefault("pup__sex", data["sex"])
+        if "tattoo" in data:
+            data.setdefault("pup__marking", data["tattoo"])
+        if data.get("generate_mouse_id"):
+            data.update(no_id_available="on", mouse_numbers="1", pup_1_marking=data.get("tattoo", ""), pup_1_sex=data["sex"])
+        return data
 
     def candidate(self, mouse_id="EXISTING-PUP", **extra):
         return Mouse.objects.create(
@@ -130,7 +137,7 @@ class MouseDuplicateWarningTests(TestCase):
         original = self.payload()
         response = self.client.post(self.add_url, original)
         confirmed = self.confirm_payload(response, original)
-        for change in ({"mouse_id": "DIFFERENT-ID"}, {"breeding_pair": "New pair"}, {"sex": "M"}, {"notes": "Changed"}):
+        for change in ({"mouse_id_prefix": "DIFFERENT-ID"}, {"breeding_pair": "New pair"}, {"pup__sex": "M"}, {"notes": "Changed"}):
             updated = self.client.post(self.add_url, {**confirmed, **change})
             self.assertEqual(updated.status_code, 200)
             self.assertEqual(Mouse.objects.count(), 1)
@@ -197,7 +204,7 @@ class MouseDuplicateWarningTests(TestCase):
         self.candidate("NEW-ASSIGNED", id_status=Mouse.ID_ASSIGNED)
         response = self.client.post(self.add_url, self.payload())
         self.assertEqual(response.status_code, 200)
-        self.assertIn("mouse_id", response.context["form"].errors)
+        self.assertIn("mouse_numbers", response.context["form"].errors)
         self.assertIsNone(response.context["possible_duplicate_warning"])
         self.assertEqual(Mouse.objects.count(), 1)
 
@@ -214,9 +221,9 @@ class MouseDuplicateWarningTests(TestCase):
         link = response.context["possible_duplicate_warning"]["rows"][0]["rename_url"]
         self.assertEqual(urlsplit(link).path, reverse("lab:rename_mouse", args=[mouse.pk]))
         self.assertEqual(parse_qs(urlsplit(link).query)["new_mouse_id"], ["12345"])
-        rename_page = self.client.get(link)
-        self.assertEqual(rename_page.context["form"]["new_mouse_id"].value(), "12345")
-        self.assertFalse(rename_page.context["form"]["confirm_new_mouse_id"].value())
+        rename_page = self.client.get(link, follow=True)
+        self.assertEqual(rename_page.context["form"][f"{individual_mouse_field_prefix(mouse)}_mouse_id"].value(), "12345")
+        self.assertFalse(rename_page.context["form"]["confirm_mouse_ids"].value())
 
     def test_assigning_permanent_id_preserves_marking_and_all_linked_records(self):
         mouse = self.candidate(tattoo="07", marking_type="tattoo", breeding_pair="Pair 1", notes="Original history")
@@ -227,8 +234,9 @@ class MouseDuplicateWarningTests(TestCase):
         experiment = Experiment.objects.create(project=Project.objects.create(name="Test project"), name="Test", recording_type=kind)
         recording = Recording.objects.create(experiment=experiment, recording_type=kind, owner=self.user, recording_date=self.dob)
         recording.mice.add(mouse)
-        response = self.client.post(reverse("lab:rename_mouse", args=[mouse.pk]), {
-            "new_mouse_id": "12345", "confirm_new_mouse_id": "12345",
+        response = self.client.post(reverse("lab:edit_selected_mice_all"), {
+            "selected_mouse": [mouse.pk], "apply_bulk_edit": "1",
+            f"{individual_mouse_field_prefix(mouse)}_mouse_id": "12345", "confirm_mouse_ids": "on",
         })
         self.assertEqual(response.status_code, 302)
         renamed = Mouse.objects.get(pk="12345")

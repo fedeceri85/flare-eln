@@ -28,7 +28,7 @@ PAGE_TITLES = {
     "delete_mouse": "Delete mouse", "edit_mouse_procedure": "Edit procedure",
 }
 PRIMARY_ACTIONS = {
-    "add_mouse": "Save mouse", "add_litter": "Add litter",
+    "add_mouse": "Save mouse", "add_litter": "Add animals",
     "edit_mouse": "Save changes", "rename_mouse": "Rename mouse",
     "edit_mouse_procedure": "Save procedure", "edit_selected_mice": "Save bulk changes",
     "add_project": "Save project", "edit_project": "Save changes",
@@ -38,6 +38,7 @@ PRIMARY_ACTIONS = {
 }
 CONTEXTUAL_ROUTES = {
     "mouse_record", "edit_mouse", "rename_mouse", "delete_mouse",
+    "edit_selected_mice_all", "edit_selected_mice_licence_protocol", "edit_selected_mice",
     "edit_mouse_procedure", "experiments_page", "recordings_page",
     "edit_project", "edit_experiment", "edit_recording", "delete_recording",
 }
@@ -98,7 +99,7 @@ def build_navigation(context):
         # Mouse editing views select_related this relation; never fetch it here.
         protocol = mouse._state.fields_cache.get("protocol")
     title = PAGE_TITLES.get(action, {
-        "add_mouse": "Add mouse", "add_litter": "Add litter",
+        "add_mouse": "Add animals", "add_litter": "Add animals",
         "edit_selected_mice": "Edit selected mice", "delete_selected_mice": "Delete selected mice",
     }.get(action, "FLARE-ELN"))
 
@@ -165,7 +166,7 @@ def build_navigation(context):
     back_url = return_url or (parent["url"] if parent else "")
     back_name = action_route(route_name(back_url)) if back_url else ""
     back_label = PAGE_TITLES.get(back_name, {
-        "add_mouse": "Add mouse", "add_litter": "Add litter",
+        "add_mouse": "Add animals", "add_litter": "Add animals",
         "edit_selected_mice": "selected mice", "procedure_page": "Procedures",
     }.get(back_name, parent["label"] if parent else "previous page"))
     if name in {"rename_mouse", "delete_mouse"} and mouse:
@@ -182,7 +183,7 @@ def build_navigation(context):
     if action in PRIMARY_ACTIONS:
         label = PRIMARY_ACTIONS[action]
         if context.get("possible_duplicate_warning"):
-            label = "Add litter anyway" if action == "add_litter" else "Save anyway"
+            label = "Add animals anyway" if action == "add_litter" else "Save anyway"
         primary = {"label": label, "name": "save_mouse" if action == "edit_mouse" else "", "value": "1"}
     return {
         "links": links, "breadcrumbs": breadcrumbs, "section": section,

@@ -1,0 +1,62 @@
+<section class="procedure-editor" data-existing-procedure-section>
+    <p class="bulk-help">Select the exact records to edit or delete. These changes are saved separately.</p>
+    <noscript><p>This table is read-only without JavaScript. Use an Edit link to change an individual procedure.</p></noscript>
+    <form method="post" data-existing-procedure-editor>
+        {% csrf_token %}
+        {% for mouse in procedure_selected_mice %}<input type="hidden" name="selected_mouse" value="{{ mouse.pk }}">{% endfor %}
+        <input type="hidden" name="return_url" value="{{ procedure_return_url }}">
+        {{ existing_procedure_form.snapshot }}
+        {% include "lab/components/error_summary.html" with form=existing_procedure_form %}
+        <p role="status" aria-live="polite" data-procedure-status>{{ procedure_message }}</p>
+        {% if existing_procedure_rows %}
+            <div class="procedure-selection" hidden data-procedure-js-only>
+                <label><input type="checkbox" data-procedure-select-all> Select all</label>
+                <span data-procedure-selection-count>0 records selected</span>
+            </div>
+            <div class="table-card"><div class="table-scroll"><table class="data-table">
+                <thead><tr><th hidden data-procedure-js-only>Select</th><th>Mouse ID</th><th>Procedure type</th><th>Date</th><th>Lab member</th><th>Lab-book page</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for row in existing_procedure_rows %}
+                        {% ifchanged row.record.mouse_id %}<tr><th colspan="7">Mouse {{ row.record.mouse_id }}</th></tr>{% endifchanged %}
+                        <tr>
+                            <td hidden data-procedure-js-only>
+                                <input type="hidden" name="existing_procedures-delete_snapshot_{{ row.record.pk }}" value="{{ row.delete_snapshot }}">
+                                <input type="checkbox" data-procedure-row-checkbox name="{{ existing_procedure_form.selected_procedures.html_name }}" value="{{ row.record.pk }}" aria-label="Select {{ row.record.procedure_type }} ({{ row.record.date|date:'d/m/Y'|default:'undated' }}) for mouse {{ row.record.mouse_id }}" {% if row.selected %}checked{% endif %}></td>
+                            <td>{{ row.record.mouse_id }}</td><td>{{ row.record.procedure_type }}</td>
+                            <td>{{ row.record.date|date:"d/m/Y"|default:"—" }}</td><td>{{ row.record.lab_member|default:"—" }}</td><td>{{ row.record.lab_book_page|default:"—" }}</td>
+                            <td><a href="{{ row.edit_url }}">Edit</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table></div></div>
+            <fieldset class="procedure-fields" hidden data-procedure-js-only data-procedure-controls>
+                <legend>Changes to selected records</legend>
+                <p>Unchecked fields stay unchanged. Check a field and leave it blank to clear its date, lab member or lab-book page.</p>
+                <div class="procedure-create-grid">
+                    {% for item in existing_procedure_form.update_fields %}
+                        <div class="bulk-field" data-procedure-update-field>
+                            <div class="bulk-toggle">{{ item.checkbox }} <label for="{{ item.checkbox.id_for_label }}">{{ item.field.label }}</label></div>
+                            <div class="bulk-input"><span class="shared-input-label">{{ item.field.label_tag }}</span> {{ item.field }} {{ item.field.errors }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="actions procedure-actions">
+                    <button class="button" type="submit" name="existing_procedure_action" value="preview">Preview procedure changes</button>
+                    <button class="button button-primary" type="submit" name="existing_procedure_action" value="save" data-procedure-save {% if not procedure_preview %}disabled hidden{% endif %}>Save procedure changes</button>
+                    <button class="button button-danger" type="submit" name="existing_procedure_action" value="delete" formnovalidate data-procedure-delete>Delete selected procedures</button>
+                </div>
+            </fieldset>
+        {% else %}<p>No existing procedures belong to the selected mice.</p>{% endif %}
+        <div data-procedure-preview>
+            {% if procedure_preview %}
+                <h3>Review procedure changes</h3>
+                <div class="table-scroll"><table class="data-table"><thead><tr><th>Mouse ID</th><th>Procedure type</th><th>Date</th><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>
+                {% for row in procedure_preview %}{% for change in row.changes %}
+                    <tr><td>{{ row.record.mouse_id }}</td><td>{{ row.record.procedure_type }}</td><td>{{ row.record.date|date:"d/m/Y"|default:"—" }}</td><td>{{ change.label }}</td><td>{{ change.before|default_if_none:"—"|default:"—" }}</td><td>{{ change.after|default_if_none:"—"|default:"—" }}</td></tr>
+                {% endfor %}{% endfor %}
+                </tbody></table></div>
+                <p>This preview expires after one hour. Saving changes only these selected procedure records.</p>
+            {% endif %}
+        </div>
+    </form>
+</section>

@@ -1,8 +1,10 @@
+from datetime import date
 from importlib import import_module
+from unittest.mock import patch
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -50,6 +52,109 @@ class BulkIndividualMouseTests(TestCase):
         for mouse in self.mice:
             mouse.refresh_from_db()
         return form
+
+    def set_local_identifiers(self, values=("001", "left-right")):
+        for mouse, value in zip(self.mice, values):
+            mouse.tattoo = value
+            mouse.marking_type = "tattoo"
+            mouse.date_of_birth = date(2026, 10, 1)
+            mouse.breeding_pair = "BP-ID"
+            mouse.save()
+
+    def test_individual_local_identifiers_render_and_accept_numbers_or_strings(self):
+        self.set_local_identifiers()
+        response = self.client.get(self.url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
+        self.assertContains(response, f'name="{self.name(0, "local_identifier")}"')
+        rows = response.context["form"].individual_rows
+        self.assertEqual([row["local_identifier"].value() for row in rows], ["001", "left-right"])
+        data = self.row_data()
+        data[self.name(0, "local_identifier")] = "007"
+        data[self.name(1, "local_identifier")] = "ear L/R"
+        self.apply(data)
+        self.assertEqual([mouse.tattoo for mouse in self.mice], ["007", "ear L/R"])
+        self.assertEqual([mouse.marking_type for mouse in self.mice], ["tattoo", "tattoo"])
+        self.assertTrue(all(Mouse.objects.filter(pk=mouse.pk).exists() for mouse in self.mice))
+
+    def test_blank_identifier_clears_only_that_mouse_and_omitted_identifier_is_preserved(self):
+        self.set_local_identifiers()
+        self.apply({self.name(0, "local_identifier"): ""})
+        self.assertEqual([mouse.tattoo for mouse in self.mice], ["", "left-right"])
+
+    def test_local_identifier_length_and_final_batch_duplicates_are_validated(self):
+        self.set_local_identifiers()
+        data = self.row_data()
+        data[self.name(0, "local_identifier")] = "x" * 101
+        form = BulkMouseUpdateForm(data, selected_mice=self.mice)
+        self.assertFalse(form.is_valid())
+        self.assertIn(self.name(0, "local_identifier"), form.errors)
+        data.update({self.name(index, "local_identifier"): "same" for index in range(2)})
+        form = BulkMouseUpdateForm(data, selected_mice=self.mice)
+        self.assertFalse(form.is_valid())
+        self.assertIn(self.name(1, "local_identifier"), form.errors)
+        self.assertEqual(list(Mouse.objects.order_by("mouse_id").values_list("tattoo", flat=True)), ["001", "left-right"])
+
+    def test_local_identifier_conflict_with_unselected_mouse_is_rejected(self):
+        self.set_local_identifiers()
+        Mouse.objects.create(mouse_id="Unselected", protocol=self.protocol, tattoo="outside", marking_type="tattoo",
+                             date_of_birth=date(2026, 10, 1), breeding_pair="BP-ID", crossing_definition=self.crossing)
+        data = self.row_data()
+        data[self.name(0, "local_identifier")] = "outside"
+        form = BulkMouseUpdateForm(data, selected_mice=self.mice)
+        self.assertFalse(form.is_valid())
+        self.assertIn(self.name(0, "local_identifier"), form.errors)
+
+    def test_identifiers_can_be_swapped_atomically(self):
+        self.set_local_identifiers()
+        data = self.row_data()
+        data[self.name(0, "local_identifier")] = "left-right"
+        data[self.name(1, "local_identifier")] = "001"
+        self.apply(data)
+        self.assertEqual([mouse.tattoo for mouse in self.mice], ["left-right", "001"])
+
+    def test_identifier_release_and_mouse_changes_roll_back_if_later_update_fails(self):
+        self.set_local_identifiers()
+        data = self.row_data()
+        data[self.name(0, "local_identifier")] = "replacement"
+        data[self.name(0, genotype_field_name(self.lines[0]))] = "wt"
+        form = BulkMouseUpdateForm(data, selected_mice=self.mice)
+        self.assertTrue(form.is_valid(), form.errors)
+        with patch("lab.views.mice.sync_mouse_structured_genetics", side_effect=IntegrityError("simulated")):
+            with self.assertRaises(IntegrityError):
+                apply_bulk_mouse_updates(self.mice, form)
+        for mouse in self.mice:
+            mouse.refresh_from_db()
+        self.assertEqual([mouse.tattoo for mouse in self.mice], ["001", "left-right"])
+        self.assertEqual(self.mice[0].genotype_calls.get(mouse_line=self.lines[0]).zygosity, "het")
+
+    def test_assigned_mouse_identifiers_follow_existing_uniqueness_rule(self):
+        self.set_local_identifiers()
+        for mouse in self.mice:
+            mouse.id_status = Mouse.ID_ASSIGNED
+            mouse.save(update_fields=["id_status"])
+        self.apply({self.name(index, "local_identifier"): "same" for index in range(2)})
+        self.assertEqual([mouse.tattoo for mouse in self.mice], ["same", "same"])
+
+    def test_identifier_changes_save_on_both_bulk_routes(self):
+        urls = [self.url, reverse("lab:edit_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])]
+        for index, url in enumerate(urls):
+            data = self.row_data()
+            data.update({"selected_mouse": [mouse.pk for mouse in self.mice], "apply_bulk_edit": "1",
+                         self.name(0, "local_identifier"): f"changed-{index}", "mouse_editor_tab": "individual"})
+            response = self.client.post(url, data)
+            self.assertEqual(response.status_code, 302)
+            self.mice[0].refresh_from_db()
+            self.assertEqual(self.mice[0].tattoo, f"changed-{index}")
+
+    def test_ajax_refresh_preserves_unsaved_identifier_without_writing(self):
+        self.set_local_identifiers()
+        data = self.row_data()
+        data.update({"selected_mouse": [mouse.pk for mouse in self.mice], "preview_individual_mice": "1", "apply_bulk_edit": "1",
+                     self.name(0, "local_identifier"): "pending-id"})
+        response = self.client.post(self.url, data, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('value="pending-id"', response.json()["html"])
+        self.mice[0].refresh_from_db()
+        self.assertEqual(self.mice[0].tattoo, "001")
 
     def test_rows_render_current_values_for_each_mouse(self):
         response = self.client.get(self.url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
@@ -193,7 +298,7 @@ class BulkIndividualMouseTests(TestCase):
 
     def test_removed_shared_controls_are_absent_and_old_post_values_are_ignored(self):
         response = self.client.get(self.url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
-        for field in ("update_sex", "sex", "update_tattoo", "tattoo", "marking_type"):
+        for field in ("update_sex", "sex", "update_tattoo", "tattoo"):
             self.assertNotContains(response, f'name="{field}"')
         self.assertNotContains(response, "Leave uncertainty unchanged")
         self.assertNotContains(response, 'name="genotype_line_1_uncertain"')

@@ -3,6 +3,7 @@
     {% if table.rows %}
         {% if table.has_selectable_rows %}
             <div class="table-controls">
+                {% if not hide_select_all_button %}
                 <button
                     class="button"
                     type="button"
@@ -10,6 +11,7 @@
                 >
                     Select all
                 </button>
+                {% endif %}
                 <span class="selection-count" data-selection-count aria-live="polite">No rows selected</span>
             </div>
         {% endif %}

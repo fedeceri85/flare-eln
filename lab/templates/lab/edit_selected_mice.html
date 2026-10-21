@@ -1,4 +1,5 @@
 {% extends "lab/base.html" %}
+{% load static %}
 
 {% block title %}Edit selected mice{% endblock %}
 {% block page_title %}Edit selected mice{% endblock %}
@@ -15,21 +16,29 @@
     </p>
 {% endblock %}
 
-{% block content %}
-    <div class="selected-list">
-        <p class="selected-list-label">
-            Selected mice
-        </p>
+{% block page_action_bar_class %} bulk-mouse-action-bar{% endblock %}
 
-        <ul class="selected-list-items">
+{% block page_action_scope %}
+    <div class="bulk-selected-mice" data-sticky-selected-mice>
+        <p class="selected-list-label">Selected mice ({{ selected_mice|length }})</p>
+        <ul class="selected-list-items" tabindex="0" role="region" aria-label="Selected Mouse IDs">
             {% for mouse in selected_mice %}
-                <li class="selected-list-item">
-                    {{ mouse.mouse_id }}
-                </li>
+                <li class="selected-list-item">{{ mouse.mouse_id }}</li>
             {% endfor %}
         </ul>
     </div>
+{% endblock %}
 
+{% block page_actions %}
+    <div class="actions">
+        {% include "lab/components/form_actions.html" with external=True %}
+        <button class="button button-danger" type="submit" form="primary-form" formaction="{{ delete_selected_url }}" formmethod="post">Delete selected</button>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div data-mouse-editor>
+    {% include "lab/components/mouse_editor_tabs.html" with editing_existing=True %}
     <form id="primary-form" method="post" data-bulk-individual-form>
         {% csrf_token %}
         <input
@@ -37,6 +46,7 @@
             name="return_url"
             value="{{ return_url }}"
         >
+        <input type="hidden" name="mouse_editor_tab" value="{% firstof request.POST.mouse_editor_tab request.GET.mouse_editor_tab 'ids' %}" data-mouse-active-tab>
         <input
             type="hidden"
             name="apply_bulk_edit"
@@ -65,158 +75,94 @@
             {% endif %}
         {% endfor %}
 
-        <section class="bulk-section">
-            <h2 class="bulk-title">Shared mouse details</h2>
-            <p class="bulk-help">
-                Checked blank fields are cleared. Unchecked fields are left unchanged.
-            </p>
+        {% include "lab/components/mouse_ids_editor.html" %}
 
-            <div class="bulk-fields">
-                {% for item in form.mouse_update_bound_fields %}
-                    <div class="bulk-field">
+        <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared" data-shared-bulk-editor>
+            {% if form.single_mouse_mode %}
+                {% include "lab/components/individual_mouse_editor.html" with embedded=True %}
+            {% endif %}
+            <h2 class="visually-hidden">Mouse details</h2>
+            <p class="bulk-help">Check the fields you want to change. Checked blank values will be cleared.</p>
+            <div class="shared-detail-groups">
+                {% for group in form.mouse_update_groups %}
+                    <fieldset class="shared-detail-group">
+                        <legend>{{ group.title }}</legend>
+                        {% for item in group.fields %}
+                            {% include "lab/components/shared_bulk_update_field.html" %}
+                        {% endfor %}
+                    </fieldset>
+                {% endfor %}
+            </div>
+            {% with item=form.shared_genetics_update %}
+                <div class="shared-genetics{% if form.single_mouse_mode %} shared-genetics-single{% endif %}">
+                    {% include "lab/components/shared_bulk_update_field.html" with field_class="shared-crossing-column" %}
+                    <div class="shared-genotype-column" {% if form.single_mouse_mode %}hidden{% endif %}>
+                        {% if not form.single_mouse_mode %}
                         <div class="bulk-toggle">
-                            {{ item.checkbox }}
-                            {{ item.checkbox.label_tag }}
+                            {{ item.secondary_checkbox }}
+                            <label for="{{ item.secondary_checkbox.id_for_label }}">Genotype</label>
                         </div>
-
-                        {% if item.secondary_checkbox %}
-                            <div class="bulk-toggle">
-                                {{ item.secondary_checkbox }}
-                                {{ item.secondary_checkbox.label_tag }}
-                            </div>
-                        {% endif %}
-
-                        <div class="bulk-input">
-                            {{ item.field.label_tag }}
-                            {{ item.field }}
-
-                            {% if item.field.errors %}
-                                <ul class="error-list">
-                                    {% for error in item.field.errors %}
-                                        <li>{{ error }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
-                        </div>
-
                         {% if item.genotype_fields %}
-                            <fieldset
-                                class="form-subset genotype-subset"
-                                data-genotype-subset="true"
-                            >
+                            <fieldset class="form-subset genotype-subset" data-genotype-subset="true">
                                 <legend>Genotype</legend>
-
                                 {% for genotype_field in item.genotype_fields %}
                                     {% include "lab/components/genotype_field.html" with field=genotype_field %}
                                 {% endfor %}
                             </fieldset>
                         {% endif %}
-                    </div>
-                {% endfor %}
-
-                <div class="bulk-field">
-                    <div class="bulk-toggle">
-                        {{ form.notes_action.label_tag }}
-                        {{ form.notes_action }}
-                        {{ form.notes_action.errors }}
-                    </div>
-
-                    <div class="bulk-input">
-                        {{ form.notes.label_tag }}
-                        {{ form.notes }}
-
-                        {% if form.notes.help_text %}
-                            <small>{{ form.notes.help_text }}</small>
-                        {% endif %}
-
-                        {% if form.notes.errors %}
-                            <ul class="error-list">
-                                {% for error in form.notes.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
                         {% endif %}
                     </div>
+                </div>
+            {% endwith %}
+            <div class="bulk-field shared-notes">
+                <div class="bulk-toggle">
+                    <label for="{{ form.notes_action.id_for_label }}">Notes</label>
+                    {{ form.notes_action }}
+                    {{ form.notes_action.errors }}
+                </div>
+                <div class="bulk-input" data-shared-notes-content>
+                    <span class="shared-input-label">{{ form.notes.label_tag }}</span>
+                    {{ form.notes }}
+                    {% if form.notes.help_text %}<small>{{ form.notes.help_text }}</small>{% endif %}
+                    {% if form.notes.errors %}
+                        <ul class="error-list">{% for error in form.notes.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                    {% endif %}
                 </div>
             </div>
         </section>
 
-        <section class="bulk-section">
-            <h2 class="bulk-title">Individual mice</h2>
-            <p class="bulk-help">Change sex, genotype or uncertainty for individual mice. With Update genotype checked, shared genotype changes immediately fill matching rows below. The values shown in these rows are saved; you can adjust any mouse afterward.</p>
-            <button type="submit" name="preview_individual_mice" value="1" class="button" formnovalidate data-preview-individual-mice>Refresh mouse rows</button>
-            <p role="status" aria-live="polite" data-bulk-rows-status></p>
-            <noscript><p>After changing a shared genotype, use Refresh mouse rows to apply it before saving.</p></noscript>
-            <div id="bulk-individual-mouse-rows">
-                {% include "lab/components/bulk_individual_rows.html" %}
-            </div>
-        </section>
+        {% if not form.single_mouse_mode %}
+            {% include "lab/components/individual_mouse_editor.html" %}
+        {% endif %}
 
-        <section class="bulk-section">
-            <h2 class="bulk-title">Procedure</h2>
-            <p class="bulk-help">
-                {% if can_add_bulk_procedure %}
-                    This adds one new procedure record for each selected mouse.
-                    Checked procedure fields are set on the new rows.
-                {% else %}
-                    Regulated procedure creation is disabled for one or more selected mice.
-                {% endif %}
-            </p>
-
-            <fieldset {% if not can_add_bulk_procedure %}disabled{% endif %}>
-                <div class="form-field">
-                    {{ form.procedure_type.label_tag }}
-                    {{ form.procedure_type }}
-
-                    {% if form.procedure_type.help_text %}
-                        <small>{{ form.procedure_type.help_text }}</small>
-                    {% endif %}
-
-                    {% if form.procedure_type.errors %}
-                        <ul class="error-list">
-                            {% for error in form.procedure_type.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
-
-                <div class="bulk-fields">
-                    {% for item in form.procedure_update_bound_fields %}
-                        <div class="bulk-field">
-                            <div class="bulk-toggle">
-                                {{ item.checkbox }}
-                                {{ item.checkbox.label_tag }}
-                            </div>
-
-                            <div class="bulk-input">
-                                {{ item.field.label_tag }}
-                                {{ item.field }}
-
-                                {% if item.field.errors %}
-                                    <ul class="error-list">
-                                        {% for error in item.field.errors %}
-                                            <li>{{ error }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </fieldset>
-        </section>
-
-        {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 %}
-
-        {% include "lab/components/form_actions.html" %}
-        <div class="record-danger">
-            <button class="button button-danger" type="submit" formaction="{{ delete_selected_url }}" formmethod="post">Delete selected</button>
-        </div>
     </form>
+
+    <section class="bulk-section procedure-editor" id="mouse-panel-procedures" data-mouse-tab-panel="procedures">
+        {% include "lab/components/new_procedure_editor.html" %}
+    </section>
+
+    <section class="bulk-section procedure-editor" id="mouse-panel-existing-procedures" data-mouse-tab-panel="procedures">
+        <h2 class="bulk-title">Existing procedures</h2>
+        {% include "lab/components/existing_procedure_editor.html" %}
+    </section>
+
+    <section id="mouse-panel-services" data-mouse-tab-panel="services">
+        {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 hide_service_title=True %}
+        {% if not service_recording_actions %}
+            <div class="bulk-section"><h2 class="visually-hidden">Services</h2><p>No services are available for the selected mice.</p></div>
+        {% endif %}
+    </section>
+    </div>
+
 {% endblock %}
 
 {% block scripts %}
-    {% include "lab/components/crossing_selector_script.html" %}
-    {% include "lab/components/bulk_individual_rows_script.html" %}
+    <script src="{% static 'lab/shared_mouse_details.js' %}"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
+    <script src="{% static 'lab/existing_procedures.js' %}"></script>
+    <script src="{% static 'lab/new_procedures.js' %}"></script>
+    {% include "lab/components/crossing_selector_assets.html" %}
+    <script src="{% static 'lab/mouse_row_editor.js' %}"></script>
+    <script src="{% static 'lab/mouse_genotype_editor.js' %}"></script>
+    <script src="{% static 'lab/bulk_mouse_rows.js' %}"></script>
 {% endblock %}

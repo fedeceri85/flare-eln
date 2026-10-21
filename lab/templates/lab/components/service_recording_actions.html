@@ -1,6 +1,6 @@
 {% if service_recording_actions %}
     <section class="{% if service_recording_actions_bulk_layout %}bulk-section{% else %}section{% endif %}">
-        <h2 class="{% if service_recording_actions_bulk_layout %}bulk-title{% else %}section-title{% endif %}">Services</h2>
+        <h2 class="{% if hide_service_title %}visually-hidden{% elif service_recording_actions_bulk_layout %}bulk-title{% else %}section-title{% endif %}">Services</h2>
         {% if service_recording_actions_bulk_layout %}
             <p class="bulk-help">
                 Add a service record for the selected mice.

@@ -132,7 +132,7 @@ class GenotypeUncertaintyTests(TestCase):
             **{f"pup_{number}_{self.uncertain_field}": "on" for number in (1, 2)},
         ))
         self.assertTrue(form.is_valid(), form.errors)
-        html = render_to_string("lab/add_litter.html", {"form": form})
+        html = render_to_string("lab/add_animals.html", {"form": form})
         self.assertEqual(html.count(f'name="pup_1_{self.uncertain_field}"'), 1)
         mice, _ = create_litter_mice(self.protocol, form)
         self.assertEqual(len(mice), 2)

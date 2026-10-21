@@ -1,0 +1,10 @@
+<div class="bulk-field {{ field_class }}" data-shared-update>
+    <div class="bulk-toggle">
+        {{ item.checkbox }}
+        <label for="{{ item.checkbox.id_for_label }}">{{ item.field.label }}</label>
+    </div>
+    <div class="bulk-input">
+        <span class="shared-input-label">{{ item.field.label_tag }}</span>
+        {% include "lab/components/field_control.html" with field=item.field hide_help=True only %}
+    </div>
+</div>

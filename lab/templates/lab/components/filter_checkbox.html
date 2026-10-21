@@ -1,0 +1,5 @@
+<input type="hidden" name="{{ field.name }}" value="{{ field.unchecked_value }}">
+<label class="checkbox-field" for="{{ field.id }}">
+    <input id="{{ field.id }}" type="checkbox" name="{{ field.name }}" value="{{ field.checkbox_value }}" {% if field.checked %}checked{% endif %}>
+    <span>{{ field.label }}</span>
+</label>

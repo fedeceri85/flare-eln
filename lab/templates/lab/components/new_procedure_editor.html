@@ -1,0 +1,15 @@
+<div data-new-procedure-section>
+    <h2 class="bulk-title">Add new procedure</h2>
+    <p class="bulk-help">Add one procedure record per selected mouse. This does not save mouse changes.</p>
+    {% if not can_add_new_procedure %}<p class="bulk-help">Regulated procedure creation is disabled for one or more selected mice.</p>{% endif %}
+    <noscript><p>Enable JavaScript to add procedures without leaving the mouse editor.</p></noscript>
+    <form id="new-procedure-form" method="post" data-new-procedure-form data-can-add="{{ can_add_new_procedure|yesno:'true,false' }}">
+        {% csrf_token %}
+        <input type="hidden" name="create_procedures" value="1">
+        <input type="hidden" name="return_url" value="{{ new_procedure_return_url }}">
+        {% for mouse in new_procedure_mice %}<input type="hidden" name="selected_mouse" value="{{ mouse.pk }}">{% endfor %}
+        {% include "lab/components/error_summary.html" with form=new_procedure_form %}
+        {% include "lab/components/procedure_entry_fields.html" with procedure_form=new_procedure_form draft=False %}
+        <p role="status" aria-live="polite" data-new-procedure-status>{{ new_procedure_message }}</p>
+    </form>
+</div>

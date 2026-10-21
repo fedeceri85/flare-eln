@@ -1,3 +1,7 @@
+22/10/2026
+- Visual overhaul and code cleanup.
+- Unification of the add one mouse/litter and edit interfaces.
+
 21/10/2026
 - Refreshed the lab interface and login with consistent navigation, breadcrumbs, and a light theme.
 - Added persistent Save and Cancel actions on long forms, clearer validation, and responsive tables.

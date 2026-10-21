@@ -1,0 +1,35 @@
+<table class="data-table litter-mouse-table individual-mouse-table">
+    {% if crossing %}<caption class="individual-crossing-label"><span>Crossing</span> {{ crossing }}</caption>{% endif %}
+    <colgroup>
+        <col class="individual-mouse-id-column">
+        <col class="individual-local-id-column">
+        <col class="individual-sex-column">
+        <col class="individual-genotype-column">
+    </colgroup>
+    <thead><tr><th scope="col">Mouse ID</th><th scope="col">Local identifier</th><th scope="col">Sex</th><th scope="col">Genotype</th></tr></thead>
+    <tbody>
+        {% for row in rows %}
+            <tr>
+                <th scope="row">{{ row.mouse_id }}</th>
+                <td>
+                    <label class="visually-hidden" for="{{ row.local_identifier.id_for_label }}">{{ row.mouse_id }}: local identifier</label>
+                    {{ row.local_identifier }}{{ row.local_identifier.errors }}
+                </td>
+                <td>
+                    <label class="visually-hidden" for="{{ row.sex.id_for_label }}">{{ row.mouse_id }}: sex</label>
+                    {{ row.sex }}{{ row.sex.errors }}
+                </td>
+                <td>
+                    <div class="individual-genotype-grid">
+                        {% for field in row.genotype_fields %}
+                            {% include "lab/components/individual_genotype_field.html" %}
+                        {% empty %}
+                            {% if row.legacy_genotype %}<small>Existing free-text genotype: {{ row.legacy_genotype }}</small>{% endif %}
+                            <small>{{ empty_genotype_message }}</small>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

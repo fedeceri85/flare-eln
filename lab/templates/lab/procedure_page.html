@@ -24,7 +24,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="toolbar">
+    <div class="toolbar page-action-bar" role="region" aria-label="Procedure navigation and actions" data-page-actions>
         <div class="procedure-nav">
             {% if licence_references %}
                 <nav class="protocol-tabs" aria-label="Licences">
@@ -56,6 +56,12 @@
         <div class="actions">
 
             {% if selected_protocol %}
+                <a
+                    class="button button-primary"
+                    href="{% url 'lab:add_litter_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}?return_url={{ request.get_full_path|urlencode }}"
+                >
+                    Add animals
+                </a>
                 <button
                     class="button"
                     type="submit"
@@ -64,25 +70,13 @@
                     Edit selected
                 </button>
 
-                <a
-                    class="button"
-                    href="{% url 'lab:add_mouse_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}"
-                >
-                    Add mouse
-                </a>
-
-                <a
-                    class="button button-primary"
-                    href="{% url 'lab:add_litter_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}?return_url={{ request.get_full_path|urlencode }}"
-                >
-                    Add litter
-                </a>
+ 
             {% endif %}
         </div>
     </div>
 
     {% if selected_protocol %}
-        {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+        {% include "lab/components/filter_form.html" with filter_form=filter_form compact_filters=True %}
 
         <div class="table-summary">
             <div class="record-count">
@@ -106,7 +100,7 @@
                 value="{{ request.get_full_path }}"
             >
 
-            {% include "lab/components/table.html" with table=table %}
+            {% include "lab/components/table.html" with table=table hide_select_all_button=True %}
         </form>
 
         {% include "lab/components/pagination.html" with pagination=pagination %}
