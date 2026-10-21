@@ -1,0 +1,22 @@
+<div class="litter-rows-scroll">
+    <table class="data-table litter-mouse-table">
+        <thead><tr><th>Mouse ID</th><th>Local identifier</th><th>Sex</th><th>Genotype</th></tr></thead>
+        <tbody>
+            {% for row in form.individual_rows %}
+                <tr>
+                    <th scope="row">{{ row.mouse_id }}</th>
+                    <td>{{ row.local_identifier|default:"—" }}</td>
+                    <td>{{ row.sex }}{{ row.sex.errors }}</td>
+                    <td>
+                        {% if row.crossing %}<p class="bulk-help">{{ row.crossing }}</p>{% endif %}
+                        {% for field in row.genotype_fields %}
+                            {% include "lab/components/genotype_field.html" %}
+                        {% empty %}
+                            <small>Choose a shared crossing above and check Update crossing to enter structured genotypes.</small>
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

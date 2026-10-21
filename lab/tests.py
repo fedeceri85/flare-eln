@@ -14,6 +14,7 @@ from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_
 from django.urls import reverse
 from django.utils import timezone
 
+from .utils import parse_mouse_numbers
 from .admin import ProjectAdmin
 from .management.commands.import_mice import Command as ImportMiceCommand
 from .models import (
@@ -1417,6 +1418,7 @@ class MicePageTests(AuthenticatedTestCase):
                 "mouse_id": "",
                 "date_of_birth": "2026-01-02",
                 "tattoo": "7",
+                "marking_type": "tattoo",
                 "breeding_pair": "Line A",
                 "genotype": "Added",
                 "crossing": "",
@@ -1489,11 +1491,9 @@ class MicePageTests(AuthenticatedTestCase):
             self.add_litter_url,
             {
                 "return_url": self.mice_url,
-                "mouse_count": "2",
-                "tattoo_start": "20",
-                "use_progressive_mouse_ids": "on",
+                "mouse_numbers": "30-31",
                 "mouse_id_prefix": "LITTER-",
-                "mouse_id_start": "30",
+                **{f"pup_{number}_genotype_line_{line.pk}": "het" for number in (30, 31) for line in lines},
                 "date_of_birth": "",
                 "sex": "",
                 "status": "Alive",
@@ -4715,8 +4715,7 @@ class AddLitterTests(AuthenticatedTestCase):
     def litter_payload(self, **overrides):
         payload = {
             "return_url": self.protocol_url,
-            "mouse_count": "2",
-            "tattoo_start": "10",
+            "mouse_numbers": "10-11",
             "date_of_birth": "2026-01-02",
             "breeding_pair": "Line A",
             "sex": "F",
@@ -4733,6 +4732,10 @@ class AddLitterTests(AuthenticatedTestCase):
             **crossing_post_data(self.crossing, self.crossing_lines),
         }
         payload.update(overrides)
+        for number in parse_mouse_numbers(payload["mouse_numbers"]):
+            payload[f"pup_{number}_sex"] = "F"
+            for line in self.crossing_lines:
+                payload[f"pup_{number}_genotype_line_{line.pk}"] = "het"
         return payload
 
     def test_add_litter_form_renders_litter_and_procedure_fields(self):
@@ -4740,10 +4743,9 @@ class AddLitterTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Add litter")
-        self.assertContains(response, 'name="mouse_count"')
-        self.assertContains(response, 'name="tattoo_start"')
-        self.assertContains(response, "Local identifier starting number")
-        self.assertContains(response, 'name="use_progressive_mouse_ids"')
+        self.assertContains(response, 'name="mouse_numbers"')
+        self.assertContains(response, 'name="mouse_id_prefix"')
+        self.assertContains(response, 'name="no_id_available"')
         self.assertContains(response, 'name="protocol"')
         self.assertContains(response, 'name="crossing_definition"')
         self.assertContains(response, 'name="crossing_search"')
@@ -4795,11 +4797,8 @@ class AddLitterTests(AuthenticatedTestCase):
         response = self.client.post(
             self.add_litter_url,
             self.litter_payload(
-                mouse_count="3",
-                tattoo_start="10",
-                use_progressive_mouse_ids="on",
+                mouse_numbers="100-102",
                 mouse_id_prefix="L-",
-                mouse_id_start="100",
                 procedure_type=str(self.procedure_type.pk),
                 procedure_date="2026-07-25",
                 procedure_lab_member="AB",
@@ -4823,7 +4822,7 @@ class AddLitterTests(AuthenticatedTestCase):
                 mouse.tattoo
                 for mouse in mice
             ],
-            ["10", "11", "12"],
+            ["", "", ""],
         )
         self.assertTrue(
             all(mouse.crossing_definition == self.crossing for mouse in mice)
@@ -4871,9 +4870,7 @@ class AddLitterTests(AuthenticatedTestCase):
         response = self.client.post(
             self.add_litter_url,
             self.litter_payload(
-                mouse_count="1",
-                tattoo_start="10",
-                use_progressive_mouse_ids="on",
+                mouse_numbers="10",
                 mouse_id_prefix="P104-",
                 protocol=str(self.other_protocol.pk),
                 procedure_type=str(self.procedure_type.pk),
@@ -4889,12 +4886,12 @@ class AddLitterTests(AuthenticatedTestCase):
         procedure = Procedure.objects.get(mouse=mouse)
         self.assertEqual(procedure.procedure_type, self.procedure_type)
 
-    def test_add_litter_without_progressive_ids_uses_existing_mouse_id_rule(self):
+    def test_add_litter_generates_visible_prefix_when_no_id_available(self):
         response = self.client.post(
             self.add_litter_url,
             self.litter_payload(
-                mouse_count="2",
-                tattoo_start="5",
+                mouse_numbers="5-6",
+                no_id_available="on",
             ),
         )
 
@@ -4902,29 +4899,19 @@ class AddLitterTests(AuthenticatedTestCase):
         self.assertEqual(
             list(Mouse.objects.order_by("mouse_id").values_list("mouse_id", flat=True)),
             [
-                "20260102_gad2_linea_5",
-                "20260102_gad2_linea_6",
+                "20260102_line-a_gad2_5",
+                "20260102_line-a_gad2_6",
             ],
         )
 
-    def test_add_litter_auto_ids_keep_existing_duplicate_suffix_rule(self):
-        Mouse.objects.create(
-            mouse_id="20260102_gad2_linea_5",
-            protocol=self.protocol,
-        )
-
-        response = self.client.post(
-            self.add_litter_url,
-            self.litter_payload(
-                mouse_count="1",
-                tattoo_start="5",
-            ),
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(
-            Mouse.objects.filter(mouse_id="20260102_gad2_linea_5_1").exists()
-        )
+    def test_add_litter_rejects_duplicate_generated_ids(self):
+        Mouse.objects.create(mouse_id="20260102_line-a_gad2_5", protocol=self.protocol)
+        response = self.client.post(self.add_litter_url, self.litter_payload(
+            mouse_numbers="5", no_id_available="on",
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("mouse_numbers", response.context["form"].errors)
+        self.assertEqual(Mouse.objects.count(), 1)
 
     def test_add_litter_rejects_duplicate_progressive_mouse_ids_atomically(self):
         Mouse.objects.create(
@@ -4935,18 +4922,15 @@ class AddLitterTests(AuthenticatedTestCase):
         response = self.client.post(
             self.add_litter_url,
             self.litter_payload(
-                mouse_count="2",
-                tattoo_start="10",
-                use_progressive_mouse_ids="on",
+                mouse_numbers="100-101",
                 mouse_id_prefix="L-",
-                mouse_id_start="100",
             ),
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(
-            "Generated mouse IDs already exist: L-100.",
-            response.context["form"].errors["mouse_id_prefix"],
+            "Mouse IDs already exist: L-100.",
+            response.context["form"].errors["mouse_numbers"],
         )
         self.assertFalse(Mouse.objects.filter(mouse_id="L-101").exists())
         self.assertEqual(Mouse.objects.count(), 1)

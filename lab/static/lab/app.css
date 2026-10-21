@@ -1085,3 +1085,24 @@ input[type="checkbox"] { accent-color: var(--blue); }
     align-self: center;
     margin: 0;
 }
+
+.litter-rows-scroll { overflow-x: auto; margin-top: 12px; }
+.litter-mouse-table { min-width: 760px; }
+.litter-mouse-table th[scope="row"] { overflow-wrap: anywhere; max-width: 250px; }
+.litter-mouse-table td { vertical-align: top; }
+.litter-mouse-table input:not([type="checkbox"]), .litter-mouse-table select {
+    min-height: 39px; max-width: 100%; border: 1px solid #cbd6e2;
+    border-radius: 6px; padding: 9px 11px; background: #fff; color: var(--ink);
+}
+.litter-mouse-table td > input { width: 130px; }
+.litter-mouse-table td:last-child { min-width: 245px; }
+.litter-mouse-table .form-field + .form-field { margin-top: 12px; }
+
+.duplicate-candidates { list-style: none; padding: 0; }
+.duplicate-candidate { border-top: 1px solid currentColor; padding: 12px 0; overflow-wrap: anywhere; }
+.duplicate-candidate-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.duplicate-candidate-details dt { font-size: 12px; }
+.duplicate-candidate-details dd { margin: 2px 0 0; }
+@media (max-width: 560px) {
+    .duplicate-candidate-details { grid-template-columns: 1fr; }
+}

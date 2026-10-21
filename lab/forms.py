@@ -1,10 +1,13 @@
 import re
 from collections import OrderedDict
 from datetime import date
+from hashlib import sha256
 
 from django import forms
 from django.db.models import Q
 from django.utils import timezone
+
+from .utils import litter_id_prefix, parse_mouse_numbers
 
 from .models import (
     Crossing,
@@ -50,7 +53,7 @@ HOME_OFFICE_DATE_INPUT_FORMATS = [
 ]
 LOCAL_IDENTIFIER_LABEL = "Local identifier"
 LOCAL_IDENTIFIER_HELP_TEXT = (
-    "Tattoo, ear clip, experiment mouse number, or other local ID."
+    "Optional tattoo, ear clip or other local identifier. Leave blank for unmarked mice."
 )
 
 
@@ -75,6 +78,7 @@ def parse_recording_paths(value):
 
 MOUSE_EDIT_FIELDS = [
     "date_of_birth",
+    "marking_type",
     "tattoo",
     "breeding_pair",
     "crossing_definition",
@@ -801,6 +805,10 @@ def crossing_choice_label(crossing):
     return f"{crossing.species.name} - {crossing.display_name}"
 
 
+def individual_mouse_field_prefix(mouse):
+    return f"individual_{sha256(str(mouse.pk).encode()).hexdigest()}"
+
+
 def genotype_field_name(mouse_line):
     line_id = mouse_line.pk if hasattr(mouse_line, "pk") else mouse_line
     return f"genotype_line_{line_id}"
@@ -1097,7 +1105,13 @@ class CrossingCreateForm(forms.Form):
 
 
 class MouseStructuredGeneticsMixin:
+    def clean_marking_type(self):
+        return self.cleaned_data.get("marking_type") or "other"
+
     def configure_genetics_fields(self):
+        if "marking_type" in self.fields:
+            self.fields["marking_type"].required = False
+            self.fields["marking_type"].initial = self.instance.marking_type or "other"
         self.insert_crossing_search_field()
         self.fields["crossing_definition"].required = False
         self.fields["crossing_definition"].queryset = active_crossings_queryset()
@@ -1117,7 +1131,7 @@ class MouseStructuredGeneticsMixin:
                 self.fields["crossing_search"].initial = ""
                 self.preserve_legacy_genetics = True
 
-        if self.selected_crossing is None:
+        if self.selected_crossing is None or getattr(self, "individual_genotypes", False):
             return
 
         existing_calls = {}
@@ -1394,6 +1408,7 @@ class MouseForm(MouseStructuredGeneticsMixin, forms.ModelForm):
             "generate_mouse_id",
             "mouse_id",
             "date_of_birth",
+            "marking_type",
             "tattoo",
             "breeding_pair",
             "crossing_definition",
@@ -1457,6 +1472,7 @@ class MouseForm(MouseStructuredGeneticsMixin, forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         generate_mouse_id = cleaned_data.get("generate_mouse_id")
+        self.instance.id_status = Mouse.ID_TEMPORARY if generate_mouse_id else Mouse.ID_ASSIGNED
 
         if generate_mouse_id:
             for field_name in ("date_of_birth", "breeding_pair", "tattoo"):
@@ -1473,20 +1489,21 @@ class MouseForm(MouseStructuredGeneticsMixin, forms.ModelForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        self.instance.id_status = (
+            Mouse.ID_TEMPORARY if self.cleaned_data.get("generate_mouse_id") else Mouse.ID_ASSIGNED
+        )
+        return super().save(commit=commit)
+
 
 class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
-    ID_FIELDS = [
-        "mouse_count",
-        "tattoo_start",
-        "use_progressive_mouse_ids",
-        "mouse_id_prefix",
-        "mouse_id_start",
-    ]
+    individual_genotypes = True
+    ID_FIELDS = ["no_id_available", "mouse_id_prefix", "mouse_numbers"]
     MOUSE_FIELDS = [
         "date_of_birth",
         "breeding_pair",
         "crossing_search",
-        "sex",
+        "marking_type",
         "status",
         "protocol",
         "protocol_start_date",
@@ -1501,55 +1518,38 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         "procedure_lab_book_page",
     ]
 
-    mouse_count = forms.IntegerField(
-        min_value=1,
-        max_value=500,
-        initial=1,
-        label="Number of mice",
+    marking_type = forms.ChoiceField(
+        required=False, choices=Mouse.MARKING_CHOICES, initial="other", label="Local ID type",
+        help_text="Applies to every mouse in this litter. Other is the default; local identifiers can be left blank.",
     )
-    tattoo_start = forms.IntegerField(
-        min_value=1,
-        label="Local identifier starting number",
-        help_text="Used as the local identifier for each mouse.",
-    )
-    breeding_pair = forms.CharField(
-        required=False,
-        max_length=100,
-        label="Breeding pair",
-        help_text="Required when mouse IDs are generated automatically.",
-    )
-    use_progressive_mouse_ids = forms.BooleanField(
-        required=False,
-        label="Use progressive mouse IDs",
+    no_id_available = forms.BooleanField(
+        required=False, label="No ID available — generate IDs",
+        help_text="Fill the prefix from date of birth, breeding pair and crossing. Uncheck to use your own prefix or leave it blank.",
     )
     mouse_id_prefix = forms.CharField(
-        required=False,
-        max_length=80,
-        label="Mouse ID prefix",
-        help_text="When progressive IDs are used, IDs are prefix plus number.",
+        required=False, max_length=99, label="Prefix",
+        help_text="Optional. Mouse IDs are this prefix followed by each number, including any separator you enter.",
     )
-    mouse_id_start = forms.IntegerField(
-        required=False,
-        min_value=1,
-        label="Mouse ID starting number",
-        help_text="Leave blank to start from the local identifier number.",
+    mouse_numbers = forms.CharField(
+        max_length=5000, label="Numbers",
+        help_text="Enter numbers, ranges or both: 1,3,5-7 creates five mice. Leading zeros are preserved.",
+        widget=forms.TextInput(attrs={"placeholder": "1,3,5-7"}),
+    )
+    breeding_pair = forms.CharField(
+        required=False, max_length=100, label="Breeding pair",
+        help_text="Required when No ID available is checked.",
     )
 
     date_of_birth = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={"type": "date"}),
         label="Date of birth",
-        help_text="Required when mouse IDs are generated automatically.",
+        help_text="Required when No ID available is checked.",
     )
     crossing_definition = forms.ModelChoiceField(
         required=False,
         queryset=Crossing.objects.none(),
         label="Crossing",
-    )
-    sex = forms.ChoiceField(
-        required=False,
-        choices=[("", "---------"), *Mouse.SEX_CHOICES],
-        label="Sex",
     )
     status = forms.CharField(
         required=False,
@@ -1629,49 +1629,79 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             self.fields["protocol"].disabled = True
 
         self.configure_genetics_fields()
+        self.crossing_lines = self.selected_crossing.ordered_lines() if self.selected_crossing else []
+        if self.is_bound:
+            self.data = self.data.copy()
+            self.data[self.add_prefix("mouse_id_prefix")] = self.data.get(self.add_prefix("mouse_id_prefix"), "").strip()
+        self.numbers_error = None
+        self.numbers = []
+        if self.is_bound:
+            try:
+                self.numbers = parse_mouse_numbers(self.data.get(self.add_prefix("mouse_numbers"), ""))
+            except ValueError as exc:
+                self.numbers_error = str(exc)
+        if self.is_bound and self.data.get(self.add_prefix("no_id_available")):
+            try:
+                dob = self.fields["date_of_birth"].clean(self.data.get(self.add_prefix("date_of_birth")))
+                pair = self.data.get(self.add_prefix("breeding_pair"), "").strip()
+                prefix = litter_id_prefix(dob, pair, self.selected_crossing.display_name) if dob and pair and self.selected_crossing else ""
+            except forms.ValidationError:
+                prefix = ""
+            self.data = self.data.copy()
+            self.data[self.add_prefix("mouse_id_prefix")] = prefix
+            self.fields["mouse_id_prefix"].widget.attrs["readonly"] = True
+        self.mouse_rows = []
+        choices = genotype_category_choices()
+        for number in self.numbers:
+            stem = f"pup_{number}"
+            for suffix, field in {
+                "marking": forms.CharField(required=False, max_length=100, label="Local identifier"),
+                "sex": forms.ChoiceField(required=False, choices=[("", "Unknown"), *Mouse.SEX_CHOICES], label="Sex"),
+            }.items():
+                field.widget.attrs["aria-label"] = f"Mouse {number}: {field.label}"
+                self.fields[f"{stem}_{suffix}"] = field
+            genotype_fields = []
+            for line in self.crossing_lines:
+                name = f"{stem}_{genotype_field_name(line)}"
+                self.fields[name] = forms.ChoiceField(required=False, choices=choices, initial="unknown", label=line.name)
+                self.fields[name].widget.attrs["aria-label"] = f"Mouse {number}: {line.name} genotype"
+                self.fields[f"{name}_uncertain"] = forms.BooleanField(
+                    required=False, label="Uncertain", widget=forms.CheckboxInput(attrs={
+                        "aria-label": f"Mouse {number}: {line.name} uncertain result",
+                    }),
+                )
+                self[name].uncertainty_field = self[f"{name}_uncertain"]
+                genotype_fields.append(self[name])
+            self.mouse_rows.append({
+                "number": number,
+                "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{number}',
+                "marking": self[f"{stem}_marking"],
+                "sex": self[f"{stem}_sex"], "genotype_fields": genotype_fields,
+            })
 
     def clean(self):
         cleaned_data = super().clean()
-        use_progressive_mouse_ids = self.uses_progressive_mouse_ids()
-
-        if use_progressive_mouse_ids:
-            generated_mouse_ids = self.progressive_mouse_ids()
-            too_long = [
-                mouse_id
-                for mouse_id in generated_mouse_ids
-                if len(mouse_id) > 100
-            ]
-
-            if too_long:
-                self.add_error(
-                    "mouse_id_prefix",
-                    "Generated mouse IDs must be 100 characters or fewer.",
-                )
-
-            existing_mouse_ids = list(
-                Mouse.objects
-                .filter(pk__in=generated_mouse_ids)
-                .order_by("mouse_id")
-                .values_list("mouse_id", flat=True)
-            )
-
-            if existing_mouse_ids:
-                shown_mouse_ids = ", ".join(existing_mouse_ids[:5])
-
-                if len(existing_mouse_ids) > 5:
-                    shown_mouse_ids = f"{shown_mouse_ids}, ..."
-
-                self.add_error(
-                    "mouse_id_prefix",
-                    f"Generated mouse IDs already exist: {shown_mouse_ids}.",
-                )
-        else:
+        if self.numbers_error:
+            self.add_error("mouse_numbers", self.numbers_error)
+        if cleaned_data.get("no_id_available"):
             for field_name in ("date_of_birth", "breeding_pair"):
                 if not cleaned_data.get(field_name):
-                    self.add_error(
-                        field_name,
-                        "Required when mouse IDs are generated automatically.",
-                    )
+                    self.add_error(field_name, "Required when No ID available is checked.")
+        prefix = cleaned_data.get("mouse_id_prefix", "")
+        mouse_ids = [f"{prefix}{number}" for number in self.numbers]
+        if any(len(mouse_id) > 100 for mouse_id in mouse_ids):
+            self.add_error("mouse_id_prefix", "Mouse IDs must be 100 characters or fewer.")
+        existing_ids = list(Mouse.objects.filter(pk__in=mouse_ids).values_list("pk", flat=True)[:5])
+        if existing_ids:
+            self.add_error("mouse_numbers", f"Mouse IDs already exist: {', '.join(existing_ids)}.")
+        markings = set()
+        for number in self.numbers:
+            name = f"pup_{number}_marking"
+            marking = cleaned_data.get(name, "")
+            if marking and cleaned_data.get("no_id_available"):
+                if marking in markings:
+                    self.add_error(name, "This local identifier is already used by another mouse in this litter.")
+                markings.add(marking)
 
         has_procedure_fields = any(
             cleaned_data.get(field_name)
@@ -1735,52 +1765,24 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             for field_name in self.PROCEDURE_FIELDS
         ]
 
-    def uses_progressive_mouse_ids(self):
-        if not hasattr(self, "cleaned_data"):
-            return False
-
-        return bool(
-            self.cleaned_data.get("use_progressive_mouse_ids")
-            or self.cleaned_data.get("mouse_id_prefix")
-            or self.cleaned_data.get("mouse_id_start") is not None
-        )
-
-    def progressive_mouse_ids(self):
-        if not hasattr(self, "cleaned_data"):
-            return []
-
-        mouse_count = self.cleaned_data.get("mouse_count")
-        tattoo_start = self.cleaned_data.get("tattoo_start")
-
-        if mouse_count is None or tattoo_start is None:
-            return []
-
-        mouse_id_start = self.cleaned_data.get("mouse_id_start")
-
-        if mouse_id_start is None:
-            mouse_id_start = tattoo_start
-
-        prefix = self.cleaned_data.get("mouse_id_prefix") or ""
-
-        return [
-            f"{prefix}{mouse_id_start + offset}"
-            for offset in range(mouse_count)
-        ]
-
-    def tattoos(self):
-        if not hasattr(self, "cleaned_data"):
-            return []
-
-        mouse_count = self.cleaned_data.get("mouse_count")
-        tattoo_start = self.cleaned_data.get("tattoo_start")
-
-        if mouse_count is None or tattoo_start is None:
-            return []
-
-        return [
-            str(tattoo_start + offset)
-            for offset in range(mouse_count)
-        ]
+    def mouse_creation_rows(self):
+        prefix = self.cleaned_data.get("mouse_id_prefix", "")
+        for number in self.numbers:
+            stem = f"pup_{number}"
+            yield {
+                "mouse_id": f"{prefix}{number}",
+                "tattoo": self.cleaned_data.get(f"{stem}_marking", ""),
+                "marking_type": self.cleaned_data.get("marking_type", ""),
+                "sex": self.cleaned_data.get(f"{stem}_sex", ""),
+                "genotype_values": {
+                    line.pk: self.cleaned_data.get(f"{stem}_{genotype_field_name(line)}") or "unknown"
+                    for line in self.crossing_lines
+                },
+                "uncertainty_values": {
+                    line.pk: self.cleaned_data.get(f"{stem}_{genotype_field_name(line)}_uncertain", False)
+                    for line in self.crossing_lines
+                },
+            }
 
 
 class MouseEditForm(MouseStructuredGeneticsMixin, forms.ModelForm):
@@ -1986,9 +1988,7 @@ class BulkMouseUpdateForm(forms.Form):
         ("update_protocol", "protocol"),
         ("update_protocol_start_date", "protocol_start_date"),
         ("update_cull_date", "cull_date"),
-        ("update_sex", "sex"),
         ("update_crossing", "crossing_search"),
-        ("update_tattoo", "tattoo"),
         ("update_date_of_birth", "date_of_birth"),
         ("update_breeding_pair", "breeding_pair"),
     ]
@@ -2052,16 +2052,6 @@ class BulkMouseUpdateForm(forms.Form):
         label="Cull date",
     )
 
-    update_sex = forms.BooleanField(
-        required=False,
-        label="Update sex",
-    )
-    sex = forms.ChoiceField(
-        required=False,
-        choices=[("", "---------"), *Mouse.SEX_CHOICES],
-        label="Sex",
-    )
-
     update_crossing = forms.BooleanField(
         required=False,
         label="Update crossing",
@@ -2086,17 +2076,6 @@ class BulkMouseUpdateForm(forms.Form):
                 "placeholder": "Type to search crossings",
             }
         ),
-    )
-
-    update_tattoo = forms.BooleanField(
-        required=False,
-        label="Update local identifier",
-    )
-    tattoo = forms.CharField(
-        required=False,
-        max_length=100,
-        label=LOCAL_IDENTIFIER_LABEL,
-        help_text=LOCAL_IDENTIFIER_HELP_TEXT,
     )
 
     update_date_of_birth = forms.BooleanField(
@@ -2211,19 +2190,93 @@ class BulkMouseUpdateForm(forms.Form):
                     ),
                 )
 
-            for line in self.selected_crossing.ordered_lines():
-                genotype_form_fields[f"{genotype_field_name(line)}_uncertain"] = forms.ChoiceField(
-                    required=False, label="Uncertainty", choices=[
-                        ("", "Leave uncertainty unchanged"),
-                        ("uncertain", "Mark uncertain"), ("certain", "Clear uncertainty"),
-                    ], widget=forms.Select(attrs={
-                        "data-genotype-uncertainty": "true",
-                        "aria-label": f"{line.name}: uncertainty",
+            self.fields.update(genotype_form_fields)
+
+        self.configure_individual_rows()
+
+    def configure_individual_rows(self):
+        self.individual_rows = []
+        self.individual_row_details = []
+        calls = {}
+        for call in MouseGenotype.objects.filter(mouse__in=self.selected_mice):
+            calls.setdefault(call.mouse_id, {})[call.mouse_line_id] = call
+        choices = genotype_category_choices(
+            call.zygosity for mouse_calls in calls.values() for call in mouse_calls.values()
+        )
+        lines_by_crossing = {}
+        crossings = {crossing.pk: crossing for crossing in Crossing.objects.filter(
+            pk__in={mouse.crossing_definition_id for mouse in self.selected_mice if mouse.crossing_definition_id},
+        )}
+        change_crossing = self.is_bound and self.data.get(self.add_prefix("update_crossing"))
+        for mouse in self.selected_mice:
+            stem = individual_mouse_field_prefix(mouse)
+            crossing = self.selected_crossing if change_crossing and self.selected_crossing else crossings.get(mouse.crossing_definition_id)
+            if crossing and crossing.pk not in lines_by_crossing:
+                lines_by_crossing[crossing.pk] = crossing.ordered_lines()
+            lines = lines_by_crossing.get(crossing.pk, []) if crossing else []
+            self.fields[f"{stem}_present"] = forms.BooleanField(
+                required=False, initial=True, widget=forms.HiddenInput,
+            )
+            self.fields[f"{stem}_sex"] = forms.ChoiceField(
+                required=False, choices=[("", "Unknown"), *Mouse.SEX_CHOICES], initial=mouse.sex,
+                label=f"{mouse.pk}: sex", widget=forms.Select(attrs={"aria-label": f"{mouse.pk}: sex"}),
+            )
+            genotype_fields = []
+            row_calls = calls.get(mouse.pk, {})
+            for line in lines:
+                name = f"{stem}_{genotype_field_name(line)}"
+                call = row_calls.get(line.pk)
+                self.fields[name] = forms.ChoiceField(
+                    required=False, choices=choices, initial=call.zygosity if call else "unknown",
+                    label=line.name, widget=forms.Select(attrs={
+                        "aria-label": f"{mouse.pk}: {line.name} genotype",
+                        "data-individual-genotype-field": "true", "data-line-id": line.pk,
                     }),
                 )
-            self.fields.update(genotype_form_fields)
-            for field_name in self.genotype_fields:
-                self[field_name].uncertainty_field = self[f"{field_name}_uncertain"]
+                self.fields[f"{name}_uncertain"] = forms.BooleanField(
+                    required=False, initial=call.is_uncertain if call else False, label="Uncertain",
+                    widget=forms.CheckboxInput(attrs={"aria-label": f"{mouse.pk}: {line.name} uncertain result"}),
+                )
+                self[name].uncertainty_field = self[f"{name}_uncertain"]
+                genotype_fields.append(self[name])
+            self.individual_rows.append({
+                "mouse_id": mouse.pk, "local_identifier": mouse.tattoo,
+                "crossing": crossing.display_name if crossing else mouse.crossing,
+                "sex": self[f"{stem}_sex"], "genotype_fields": genotype_fields,
+            })
+            self.individual_row_details.append((mouse, stem, crossing, lines, row_calls))
+
+    def clean_individual_updates(self, cleaned_data):
+        updates = {}
+        for mouse, stem, crossing, lines, calls in self.individual_row_details:
+            fields = {}
+            sex_name = f"{stem}_sex"
+            if self.add_prefix(sex_name) in self.data and sex_name in cleaned_data:
+                if cleaned_data[sex_name] != mouse.sex:
+                    fields["sex"] = cleaned_data[sex_name]
+            genotype_values = {}
+            uncertainty_values = {}
+            for line in lines:
+                name = f"{stem}_{genotype_field_name(line)}"
+                call = calls.get(line.pk)
+                if self.add_prefix(name) in self.data and name in cleaned_data:
+                    value = cleaned_data[name] or "unknown"
+                    if (
+                        cleaned_data.get("update_genotype") or cleaned_data.get("update_crossing")
+                        or value != (call.zygosity if call else "unknown")
+                    ):
+                        genotype_values[line.pk] = value
+                uncertainty_name = f"{name}_uncertain"
+                if cleaned_data.get(f"{stem}_present") or self.add_prefix(uncertainty_name) in self.data:
+                    value = cleaned_data.get(uncertainty_name, False)
+                    if value != (call.is_uncertain if call else False):
+                        uncertainty_values[line.pk] = value
+            if fields or genotype_values or uncertainty_values:
+                updates[mouse.pk] = {
+                    "fields": fields, "crossing": crossing,
+                    "genotype_values": genotype_values, "uncertainty_values": uncertainty_values,
+                }
+        return updates
 
     def shared_selected_crossing(self):
         crossing_ids = {
@@ -2318,6 +2371,8 @@ class BulkMouseUpdateForm(forms.Form):
             cleaned_data.get("procedure_type") is not None
             or has_procedure_field_update
         )
+        cleaned_data["individual_updates"] = self.clean_individual_updates(cleaned_data)
+        has_mouse_update = has_mouse_update or bool(cleaned_data["individual_updates"])
         update_crossing = cleaned_data.get("update_crossing")
         update_genotype = cleaned_data.get("update_genotype")
         has_mouse_update = has_mouse_update or bool(update_genotype)
@@ -2355,8 +2410,7 @@ class BulkMouseUpdateForm(forms.Form):
             elif (
                 update_genotype
                 and not update_crossing
-                and self.current_crossing is not None
-                and crossing.pk != self.current_crossing.pk
+                and any(mouse.crossing_definition_id != crossing.pk for mouse in self.selected_mice)
             ):
                 self.add_error(
                     "crossing_search",
@@ -2375,11 +2429,7 @@ class BulkMouseUpdateForm(forms.Form):
                         genotype_values[line.pk] = zygosity
 
                 cleaned_data["genotype_values"] = genotype_values
-                cleaned_data["uncertainty_values"] = {
-                    line.pk: cleaned_data[f"{genotype_field_name(line)}_uncertain"] == "uncertain"
-                    for line in crossing.ordered_lines()
-                    if cleaned_data.get(f"{genotype_field_name(line)}_uncertain")
-                }
+
 
         target_protocol = None
         if cleaned_data.get("update_protocol") and cleaned_data.get("protocol"):
@@ -2472,7 +2522,7 @@ class BulkMouseUpdateForm(forms.Form):
         ]
 
     def selected_mouse_updates(self):
-        return {
+        updates = {
             value_field: self.cleaned_data[value_field]
             for update_field, value_field in self.MOUSE_UPDATE_FIELDS
             if (
@@ -2480,6 +2530,8 @@ class BulkMouseUpdateForm(forms.Form):
                 and update_field != "update_crossing"
             )
         }
+
+        return updates
 
     def selected_structured_genetics_update(self):
         update_crossing = self.cleaned_data.get("update_crossing")

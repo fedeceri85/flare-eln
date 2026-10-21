@@ -1,13 +1,17 @@
+import json
+from hashlib import sha256
 from uuid import uuid4
 from copy import deepcopy
 from datetime import datetime
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from django.contrib import messages
+from django.core import signing
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import F, Q
+from django.db.models import F, Model, Q
 from django.db.models.deletion import ProtectedError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -259,9 +263,11 @@ def apply_bulk_mouse_updates(mice, form):
     procedure_updates = form.selected_procedure_updates()
 
     for mouse in mice:
+        individual = form.cleaned_data.get("individual_updates", {}).get(mouse.pk, {})
         changed_mouse_fields = []
+        combined_updates = {**mouse_updates, **individual.get("fields", {})}
 
-        for field_name, value in mouse_updates.items():
+        for field_name, value in combined_updates.items():
             setattr(mouse, field_name, value)
             changed_mouse_fields.append(field_name)
 
@@ -276,16 +282,19 @@ def apply_bulk_mouse_updates(mice, form):
         if changed_mouse_fields:
             mouse.save(update_fields=changed_mouse_fields)
 
-        if structured_genetics_update is not None:
-            crossing, genotype_values, preserve_missing = (
-                structured_genetics_update
-            )
+        individual_genotypes = individual.get("genotype_values", {})
+        individual_uncertainty = individual.get("uncertainty_values", {})
+        if structured_genetics_update is not None or individual_genotypes or individual_uncertainty:
+            if structured_genetics_update is not None:
+                crossing, genotype_values, preserve_missing = structured_genetics_update
+                uncertainty_values = form.cleaned_data.get("uncertainty_values", {})
+            else:
+                crossing = individual["crossing"]
+                genotype_values, uncertainty_values, preserve_missing = {}, {}, True
             sync_mouse_structured_genetics(
-                mouse,
-                crossing,
-                genotype_values,
+                mouse, crossing, {**genotype_values, **individual_genotypes},
                 preserve_missing=preserve_missing,
-                uncertainty_values=form.cleaned_data.get("uncertainty_values", {}),
+                uncertainty_values={**uncertainty_values, **individual_uncertainty},
             )
 
         if procedure_type is None:
@@ -309,6 +318,7 @@ def create_mouse_procedure(mouse, form):
     return procedure
 
 
+@transaction.atomic
 def rename_mouse_identity(mouse_pk, new_mouse_id):
     mouse = Mouse.objects.select_for_update().get(pk=mouse_pk)
     renamed_mouse = Mouse(mouse_id=new_mouse_id)
@@ -323,6 +333,11 @@ def rename_mouse_identity(mouse_pk, new_mouse_id):
             deepcopy(getattr(mouse, field.attname)),
         )
 
+    renamed_mouse.id_status = Mouse.ID_ASSIGNED
+    # Release the old record's identifier inside this transaction before cloning.
+    # The uniqueness rule excludes blank identifiers; rollback restores it on failure.
+    if mouse.tattoo:
+        Mouse.objects.filter(pk=mouse.pk).update(tattoo="")
     renamed_mouse.save(force_insert=True)
 
     for relation in Mouse._meta.related_objects:
@@ -369,80 +384,108 @@ POSSIBLE_DUPLICATE_CONFIRM_FIELD = "confirm_possible_duplicate"
 POSSIBLE_DUPLICATE_SIGNATURE_FIELD = "possible_duplicate_signature"
 
 
+def duplicate_warning_value(value):
+    if isinstance(value, Model):
+        return {"model": value._meta.label_lower, "pk": str(value.pk)}
+    if isinstance(value, dict):
+        return {str(key): duplicate_warning_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [duplicate_warning_value(item) for item in value]
+    return value
+
+
 def possible_duplicate_signature(cleaned_data):
-    date_of_birth = cleaned_data.get("date_of_birth")
-    breeding_pair = (cleaned_data.get("breeding_pair") or "").strip()
-    crossing = cleaned_data.get("crossing_definition")
-
-    if not date_of_birth or not breeding_pair or crossing is None:
+    if not cleaned_data.get("date_of_birth") or cleaned_data.get("crossing_definition") is None:
         return ""
-
-    return "|".join(
-        [
-            date_of_birth.isoformat(),
-            breeding_pair.casefold(),
-            str(crossing.pk),
-        ]
+    payload = json.dumps(
+        duplicate_warning_value(cleaned_data), cls=DjangoJSONEncoder,
+        sort_keys=True, separators=(",", ":"),
     )
+    return sha256(payload.encode()).hexdigest()
 
 
 def possible_duplicate_mouse_warning(cleaned_data):
-    signature = possible_duplicate_signature(cleaned_data)
-
-    if not signature:
+    fingerprint = possible_duplicate_signature(cleaned_data)
+    if not fingerprint:
         return None
 
     date_of_birth = cleaned_data["date_of_birth"]
     breeding_pair = (cleaned_data.get("breeding_pair") or "").strip()
     crossing = cleaned_data["crossing_definition"]
-    possible_duplicates = (
-        Mouse.objects
-        .filter(
-            date_of_birth=date_of_birth,
-            breeding_pair__iexact=breeding_pair,
-            crossing_definition=crossing,
-        )
-        .select_related("protocol", "crossing_definition")
-        .order_by("mouse_id")
+    identifiers = {
+        (value or "").strip() for name, value in cleaned_data.items()
+        if name == "tattoo" or (name.startswith("pup_") and name.endswith("_marking"))
+    } - {""}
+    sexes = {
+        value for name, value in cleaned_data.items()
+        if name == "sex" or (name.startswith("pup_") and name.endswith("_sex"))
+    } - {"", None}
+    marking_type = cleaned_data.get("marking_type") or "other"
+    possible_duplicates = list(
+        Mouse.objects.filter(
+            id_status__in=[Mouse.ID_TEMPORARY, Mouse.ID_UNKNOWN],
+            date_of_birth=date_of_birth, crossing_definition=crossing,
+        ).select_related("protocol", "crossing_definition")
     )
-    duplicate_count = possible_duplicates.count()
-
-    if duplicate_count == 0:
+    if not possible_duplicates:
         return None
 
-    shown_mice = list(possible_duplicates[:10])
-
+    normalized_identifiers = {identifier.casefold() for identifier in identifiers}
+    priority = {Mouse.ID_TEMPORARY: 0, Mouse.ID_UNKNOWN: 1}
+    rows = []
+    for mouse in possible_duplicates:
+        rows.append({
+            "mouse": mouse,
+            "breeding_pair_matches": bool(breeding_pair) and mouse.breeding_pair.strip().casefold() == breeding_pair.casefold(),
+            "local_identifier_matches": bool(mouse.tattoo) and mouse.tattoo.strip().casefold() in normalized_identifiers and mouse.marking_type == marking_type,
+            "sex_matches": bool(mouse.sex) and mouse.sex in sexes,
+        })
+    rows.sort(key=lambda row: (
+        -row["local_identifier_matches"], -row["breeding_pair_matches"], -row["sex_matches"],
+        priority.get(row["mouse"].id_status, 1), row["mouse"].pk,
+    ))
+    # Bind confirmation to the current form and candidate records. Changed input
+    # or newly discovered matches require the user to review a fresh warning.
+    confirmation_context = {
+        "form": fingerprint,
+        "matches": sorted([
+            [mouse.pk, mouse.id_status, mouse.breeding_pair, mouse.marking_type,
+             mouse.tattoo, mouse.sex, mouse.protocol_id]
+            for mouse in possible_duplicates
+        ]),
+    }
+    shown_rows = rows[:10]
+    proposed_id = cleaned_data.get("mouse_id") if not cleaned_data.get("generate_mouse_id") else ""
+    for row in shown_rows:
+        rename_url = reverse("lab:rename_mouse", args=[row["mouse"].pk])
+        if proposed_id:
+            rename_url += "?" + urlencode({"new_mouse_id": proposed_id})
+        row["rename_url"] = rename_url
     return {
-        "signature": signature,
-        "date_of_birth": date_of_birth,
-        "breeding_pair": breeding_pair,
-        "crossing": crossing,
-        "mice": shown_mice,
-        "count": duplicate_count,
-        "more_count": max(duplicate_count - len(shown_mice), 0),
+        "signature": signing.dumps(confirmation_context, salt="lab.possible-duplicate"),
+        "confirmation_context": confirmation_context,
+        "date_of_birth": date_of_birth, "breeding_pair": breeding_pair, "crossing": crossing,
+        "mice": [row["mouse"] for row in shown_rows], "rows": shown_rows,
+        "count": len(rows), "more_count": max(len(rows) - 10, 0),
     }
 
 
 def possible_duplicate_confirmed(request, warning):
-    if warning is None:
+    if warning is None or request.POST.get(POSSIBLE_DUPLICATE_CONFIRM_FIELD) != "1":
         return False
-
-    return (
-        request.POST.get(POSSIBLE_DUPLICATE_CONFIRM_FIELD) == "1"
-        and request.POST.get(POSSIBLE_DUPLICATE_SIGNATURE_FIELD)
-        == warning["signature"]
-    )
+    try:
+        context = signing.loads(
+            request.POST.get(POSSIBLE_DUPLICATE_SIGNATURE_FIELD, ""),
+            salt="lab.possible-duplicate", max_age=3600,
+        )
+    except signing.BadSignature:
+        return False
+    return context == warning["confirmation_context"]
 
 
 def create_litter_mice(selected_protocol, form):
     cleaned_data = form.cleaned_data
     litter_protocol = cleaned_data.get("protocol") or selected_protocol
-    use_progressive_mouse_ids = form.uses_progressive_mouse_ids()
-    progressive_mouse_ids = (
-        form.progressive_mouse_ids()
-        if use_progressive_mouse_ids
-        else []
-    )
     mice = []
     procedure_type = cleaned_data.get("procedure_type")
 
@@ -456,22 +499,14 @@ def create_litter_mice(selected_protocol, form):
             "lab_book_page": cleaned_data.get("procedure_lab_book_page", ""),
         }
 
-    for offset, tattoo in enumerate(form.tattoos()):
-        if use_progressive_mouse_ids:
-            mouse_id = progressive_mouse_ids[offset]
-        else:
-            mouse_id = generate_mouse_id(
-                cleaned_data["date_of_birth"],
-                cleaned_data["breeding_pair"],
-                cleaned_data["crossing_definition"].display_name,
-                tattoo,
-            )
-
+    for row in form.mouse_creation_rows():
         mouse = Mouse.objects.create(
-            mouse_id=mouse_id,
+            mouse_id=row["mouse_id"],
+            id_status=Mouse.ID_TEMPORARY if cleaned_data.get("no_id_available") else Mouse.ID_ASSIGNED,
             date_of_birth=cleaned_data.get("date_of_birth"),
-            tattoo=tattoo,
-            sex=cleaned_data.get("sex", ""),
+            tattoo=row["tattoo"],
+            marking_type=row["marking_type"],
+            sex=row["sex"],
             status=cleaned_data.get("status", ""),
             protocol_start_date=cleaned_data.get("protocol_start_date"),
             cull_date=cleaned_data.get("cull_date"),
@@ -483,8 +518,8 @@ def create_litter_mice(selected_protocol, form):
         sync_mouse_structured_genetics(
             mouse,
             cleaned_data["crossing_definition"],
-            cleaned_data.get("genotype_values", {}),
-            uncertainty_values=cleaned_data.get("uncertainty_values", {}),
+            row["genotype_values"],
+            uncertainty_values=row["uncertainty_values"],
         )
         mice.append(mouse)
 
@@ -2739,7 +2774,9 @@ def rename_mouse(request, mouse_pk):
                     f"{edit_url}?{urlencode({'return_url': return_url})}"
                 )
     else:
-        form = MouseRenameForm(mouse=mouse)
+        form = MouseRenameForm(
+            mouse=mouse, initial={"new_mouse_id": request.GET.get("new_mouse_id", "")},
+        )
 
     return render(
         request,
@@ -2890,6 +2927,27 @@ def delete_mouse_procedure(request, mouse_pk, procedure_pk):
     )
 
 
+def bulk_individual_rows_preview(request, form):
+    from django.forms.utils import ErrorDict
+    from django.template.loader import render_to_string
+
+    form._errors = ErrorDict()
+    form.cleaned_data = {}
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        if form.data.get(form.add_prefix("update_genotype")):
+            form.data = form.data.copy()
+            for mouse, stem, crossing, lines, calls in form.individual_row_details:
+                for line in lines:
+                    shared_name = genotype_field_name(line)
+                    value = form.data.get(form.add_prefix(shared_name))
+                    if value:
+                        form.data[form.add_prefix(f"{stem}_{shared_name}")] = value
+        return None
+    return JsonResponse({
+        "html": render_to_string("lab/components/bulk_individual_rows.html", {"form": form}, request=request),
+    })
+
+
 def edit_selected_mice(request, protocol_number, licence_reference=None):
     selected_protocol = protocol_by_number_or_404(
         protocol_number=protocol_number,
@@ -2946,7 +3004,11 @@ def edit_selected_mice(request, protocol_number, licence_reference=None):
     if request.method == "POST":
         form = BulkMouseUpdateForm(request.POST, selected_mice=selected_mice)
 
-        if form.is_valid():
+        if "preview_individual_mice" in request.POST:
+            preview_response = bulk_individual_rows_preview(request, form)
+            if preview_response is not None:
+                return preview_response
+        elif form.is_valid():
             with transaction.atomic():
                 apply_bulk_mouse_updates(
                     selected_mice,
@@ -3039,7 +3101,11 @@ def edit_selected_mice_all(request):
     if request.method == "POST":
         form = BulkMouseUpdateForm(request.POST, selected_mice=selected_mice)
 
-        if form.is_valid():
+        if "preview_individual_mice" in request.POST:
+            preview_response = bulk_individual_rows_preview(request, form)
+            if preview_response is not None:
+                return preview_response
+        elif form.is_valid():
             with transaction.atomic():
                 apply_bulk_mouse_updates(
                     selected_mice,
@@ -3360,11 +3426,9 @@ def add_mouse(request, protocol_number=None, licence_reference=None):
             selected_protocol=selected_protocol,
         )
 
-        if form.is_valid():
-            possible_duplicate_warning = possible_duplicate_mouse_warning(
-                form.cleaned_data,
-            )
-
+        valid = form.is_valid()
+        possible_duplicate_warning = possible_duplicate_mouse_warning(form.cleaned_data)
+        if valid:
             if (
                 possible_duplicate_warning is None
                 or possible_duplicate_confirmed(
@@ -3472,11 +3536,27 @@ def add_litter(request, protocol_number=None, licence_reference=None):
             selected_protocol=selected_protocol,
         )
 
-        if form.is_valid():
-            possible_duplicate_warning = possible_duplicate_mouse_warning(
-                form.cleaned_data,
-            )
+        if "preview_mice" in request.POST and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            from django.forms.utils import ErrorDict
+            from django.template.loader import render_to_string
 
+            form._errors = ErrorDict()
+            form.cleaned_data = {}
+            if form.numbers_error:
+                form.add_error("mouse_numbers", form.numbers_error)
+            errors = list(form.errors.get("mouse_numbers", []))
+            if form.data.get("no_id_available") and not form.data.get("mouse_id_prefix"):
+                errors.append("Enter a birth date and breeding pair, and select a crossing to generate the prefix.")
+            return JsonResponse({
+                "html": render_to_string("lab/components/litter_mouse_rows.html", {"form": form}, request=request),
+                "prefix": form.data.get("mouse_id_prefix", ""),
+                "errors": errors,
+            })
+
+        valid = form.is_valid()
+        if "preview_mice" not in request.POST:
+            possible_duplicate_warning = possible_duplicate_mouse_warning(form.cleaned_data)
+        if valid and "preview_mice" not in request.POST:
             if (
                 possible_duplicate_warning is None
                 or possible_duplicate_confirmed(
@@ -3495,9 +3575,8 @@ def add_litter(request, protocol_number=None, licence_reference=None):
                     form.add_error(
                         None,
                         (
-                            "One or more mice with the same date of birth, "
-                            "breeding pair, crossing, and local identifier "
-                            "already exist."
+                            "One or more Mouse IDs or local identifiers already exist. "
+                            "Review the individual mouse rows."
                         ),
                     )
                 else:

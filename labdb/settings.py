@@ -213,3 +213,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Up to 500 litter rows, each with markings, sex and five genotype calls.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000

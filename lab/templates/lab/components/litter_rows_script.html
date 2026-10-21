@@ -1,0 +1,82 @@
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.querySelector("[data-litter-form]");
+    if (!form) return;
+    const rows = document.getElementById("litter-mouse-rows");
+    const button = form.querySelector("[data-preview-mice]");
+    const status = form.querySelector("[data-litter-preview-status]");
+    const prefix = form.elements.mouse_id_prefix;
+    const generated = form.elements.no_id_available;
+    let requestNumber = 0;
+    let timer;
+    let pending = false;
+    let dirty = false;
+
+    async function updateRows() {
+        const currentRequest = ++requestNumber;
+        const data = new FormData(form);
+        data.set("preview_mice", "1");
+        prefix.readOnly = generated.checked;
+        pending = true;
+        dirty = false;
+        status.textContent = "Updating mouse rows…";
+        try {
+            const response = await fetch(form.action || window.location.href, {
+                method: "POST", body: data, headers: {"X-Requested-With": "XMLHttpRequest"},
+            });
+            if (!response.ok) throw new Error("Preview failed");
+            const result = await response.json();
+            if (currentRequest !== requestNumber) return;
+            // Keep changes made to row fields while the request was in flight.
+            const live = new Map();
+            rows.querySelectorAll("input, select").forEach(function (field) {
+                live.set(field.name, field.type === "checkbox" ? field.checked : field.value);
+            });
+            rows.innerHTML = result.html;
+            rows.querySelectorAll("input, select").forEach(function (field) {
+                if (!live.has(field.name)) return;
+                if (field.type === "checkbox") field.checked = live.get(field.name);
+                else field.value = live.get(field.name);
+            });
+            prefix.value = result.prefix;
+            status.textContent = result.errors.length ? result.errors.join(" ") : "Mouse rows updated.";
+        } catch (error) {
+            if (currentRequest !== requestNumber) return;
+            dirty = true;
+            status.textContent = "Could not update the rows. Use Update mouse rows to try again.";
+        } finally {
+            if (currentRequest === requestNumber) pending = false;
+        }
+    }
+
+    function scheduleUpdate() {
+        dirty = true;
+        clearTimeout(timer);
+        // Invalidate older previews as soon as their inputs change.
+        requestNumber++;
+        timer = setTimeout(updateRows, 350);
+    }
+    ["mouse_numbers", "mouse_id_prefix", "no_id_available", "date_of_birth", "breeding_pair", "crossing_definition"].forEach(function (name) {
+        const field = form.elements[name];
+        if (!field) return;
+        field.addEventListener("change", scheduleUpdate);
+        if (field.type !== "checkbox" && field.type !== "hidden") field.addEventListener("input", scheduleUpdate);
+    });
+    button.addEventListener("click", function (event) {
+        // Full submission also provides a fallback when a request has failed.
+        if (dirty && status.textContent.startsWith("Could not")) return;
+        event.preventDefault();
+        clearTimeout(timer);
+        updateRows();
+    });
+    form.addEventListener("submit", function (event) {
+        if (event.submitter === button) return;
+        if (pending || dirty) {
+            event.preventDefault();
+            status.textContent = "Update and review the mouse rows before saving.";
+            if (!pending) updateRows();
+        }
+    });
+    prefix.readOnly = generated.checked;
+});
+</script>

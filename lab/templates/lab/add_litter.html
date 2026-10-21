@@ -2,7 +2,7 @@
 
 {% block title %}Add litter{% endblock %}
 {% block page_title %}Add litter{% endblock %}
-{% block main_class %}container{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
 
 {% block page_subtitle %}
     {% if selected_protocol %}
@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-    <form id="primary-form" method="post">
+    <form id="primary-form" method="post" data-litter-form>
         {% csrf_token %}
         <input
             type="hidden"
@@ -38,96 +38,26 @@
         {% endfor %}
 
         <section class="bulk-section">
-            <h2 class="bulk-title">Litter IDs</h2>
-
-            <div class="bulk-fields">
-                <div class="bulk-field">
-                    <div class="bulk-input">
-                        {{ form.mouse_count.label_tag }}
-                        {{ form.mouse_count }}
-
-                        {% if form.mouse_count.errors %}
-                            <ul class="error-list">
-                                {% for error in form.mouse_count.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
+            <h2 class="bulk-title">Mouse IDs</h2>
+            <div class="form-grid">
+                {% for field in form.id_bound_fields %}
+                    <div class="form-field">
+                        {% if field.field.widget.input_type == "checkbox" %}
+                            <label class="checkbox-field">{{ field }} {{ field.label }}</label>
+                        {% else %}
+                            {{ field.label_tag }}{{ field }}
                         {% endif %}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {{ field.errors }}
                     </div>
-                </div>
-
-                <div class="bulk-field">
-                    <div class="bulk-input">
-                        {{ form.tattoo_start.label_tag }}
-                        {{ form.tattoo_start }}
-
-                        {% if form.tattoo_start.errors %}
-                            <ul class="error-list">
-                                {% for error in form.tattoo_start.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="bulk-field">
-                    <div class="bulk-toggle">
-                        {{ form.use_progressive_mouse_ids }}
-                        {{ form.use_progressive_mouse_ids.label_tag }}
-                    </div>
-
-                    {% if form.use_progressive_mouse_ids.errors %}
-                        <ul class="error-list">
-                            {% for error in form.use_progressive_mouse_ids.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
-
-                <div class="bulk-field">
-                    <div class="bulk-input">
-                        {{ form.mouse_id_prefix.label_tag }}
-                        {{ form.mouse_id_prefix }}
-
-                        {% if form.mouse_id_prefix.help_text %}
-                            <small>{{ form.mouse_id_prefix.help_text }}</small>
-                        {% endif %}
-
-                        {% if form.mouse_id_prefix.errors %}
-                            <ul class="error-list">
-                                {% for error in form.mouse_id_prefix.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="bulk-field">
-                    <div class="bulk-input">
-                        {{ form.mouse_id_start.label_tag }}
-                        {{ form.mouse_id_start }}
-
-                        {% if form.mouse_id_start.help_text %}
-                            <small>{{ form.mouse_id_start.help_text }}</small>
-                        {% endif %}
-
-                        {% if form.mouse_id_start.errors %}
-                            <ul class="error-list">
-                                {% for error in form.mouse_id_start.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-                    </div>
-                </div>
+                {% endfor %}
             </div>
+            <p class="bulk-help"></p>
         </section>
 
         <section class="bulk-section">
-            <h2 class="bulk-title">Mouse fields</h2>
+            <h2 class="bulk-title">Shared litter details</h2>
+            <p class="bulk-help">These details apply to every mouse. Choose one Local ID type for the litter. Set each mouse’s local identifier, sex and genotype below.</p>
 
             {% for section in form.mouse_bound_field_sections %}
                 {% if section.title %}
@@ -166,6 +96,16 @@
                     </div>
                 {% endif %}
             {% endfor %}
+        </section>
+
+        <section class="bulk-section">
+            <h2 class="bulk-title">Individual mice</h2>
+            <p class="bulk-help">Review the Mouse IDs and enter each mouse’s local identifier, sex and genotype results. The Local ID type selected above applies to every mouse.</p>
+            <button type="submit" name="preview_mice" value="1" class="button" formnovalidate data-preview-mice>Update mouse rows</button>
+            <p role="status" aria-live="polite" data-litter-preview-status></p>
+            <div id="litter-mouse-rows">
+                {% include "lab/components/litter_mouse_rows.html" %}
+            </div>
         </section>
 
         <section class="bulk-section">
@@ -244,4 +184,5 @@
     });
     </script>
     {% include "lab/components/crossing_selector_script.html" %}
+    {% include "lab/components/litter_rows_script.html" %}
 {% endblock %}

@@ -7,6 +7,7 @@
 {% block header_extra %}
     <div class="actions">
         <span class="status-pill">Status: {{ status }}</span>
+        <span class="status-pill">ID status: {{ mouse.get_id_status_display }}</span>
         {% url 'lab:edit_mouse' mouse.pk as edit_mouse_url %}
         <a class="button" href="{% record_link edit_mouse_url request %}">Edit mouse</a>
     </div>

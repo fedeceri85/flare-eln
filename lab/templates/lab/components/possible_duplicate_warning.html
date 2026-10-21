@@ -1,45 +1,53 @@
 {% if possible_duplicate_warning %}
-    <input
-        type="hidden"
-        name="confirm_possible_duplicate"
-        value="1"
-    >
-    <input
-        type="hidden"
-        name="possible_duplicate_signature"
-        value="{{ possible_duplicate_warning.signature }}"
-    >
-
-    <div class="warning-message">
-        <p><strong>Possible duplicate mice found.</strong></p>
+    <input type="hidden" name="possible_duplicate_signature" value="{{ possible_duplicate_warning.signature }}">
+    <section class="warning-message" role="alert" aria-labelledby="possible-duplicate-title">
+        <h2 id="possible-duplicate-title">Possible existing mouse records found</h2>
         <p>
-            Existing mice have the same date of birth, breeding pair,
-            and crossing. Open and rename an existing record if this is the
-            same animal, or submit again to save anyway.
+            These records share the date of birth <strong>{{ possible_duplicate_warning.date_of_birth|date:"d/m/Y" }}</strong>
+            and crossing <strong>{{ possible_duplicate_warning.crossing.display_name }}</strong>.
+            These records have temporary IDs or an unknown ID status and may already represent these animals.
+            Matching details are highlighted below. Missing or different breeding pairs do not rule out a match.
         </p>
-        <ul>
-            {% for mouse in possible_duplicate_warning.mice %}
-                <li>
-                    <a href="{% url 'lab:mouse_record' mouse.pk %}">
-                        {{ mouse.mouse_id }}
-                    </a>
-                    {% if mouse.tattoo %}
-                        - {{ mouse.tattoo }}
-                    {% endif %}
-                    {% if mouse.protocol %}
-                        - Protocol {{ mouse.protocol.protocol_number }}
-                        {% if mouse.protocol.name %}
-                            {{ mouse.protocol.name }}
-                        {% endif %}
-                    {% endif %}
-                </li>
+        <p>
+            If this is the same animal, open its existing record and assign its permanent ID to keep its history.
+            Littermates can share these details; if these are different animals, choose <strong>Save as new mouse anyway</strong>.
+        </p>
+        <ul class="duplicate-candidates">
+            {% for row in possible_duplicate_warning.rows %}
+                {% with mouse=row.mouse %}
+                    <li class="duplicate-candidate">
+                        <p>
+                            <a href="{% url 'lab:mouse_record' mouse.pk %}"><strong>{{ mouse.mouse_id }}</strong></a>
+                            — {{ mouse.get_id_status_display }} ID{% if mouse.id_status == "unknown" %} (ID origin not recorded){% endif %}
+                        </p>
+                        <dl class="duplicate-candidate-details">
+                            <div>
+                                <dt>Local identifier</dt>
+                                <dd>{% if row.local_identifier_matches %}<strong>{{ mouse.tattoo }} (matches)</strong>{% else %}{{ mouse.tattoo|default:"Not recorded" }}{% endif %}</dd>
+                            </div>
+                            <div>
+                                <dt>Sex</dt>
+                                <dd>{% if row.sex_matches %}<strong>{{ mouse.get_sex_display }} (matches)</strong>{% else %}{{ mouse.get_sex_display|default:"Unknown" }}{% endif %}</dd>
+                            </div>
+                            <div>
+                                <dt>Breeding pair</dt>
+                                <dd>{% if row.breeding_pair_matches %}<strong>{{ mouse.breeding_pair }} (matches)</strong>{% else %}{{ mouse.breeding_pair|default:"Not recorded" }}{% endif %}</dd>
+                            </div>
+                            <div>
+                                <dt>Protocol</dt>
+                                <dd>{{ mouse.protocol.licence_reference }} / {{ mouse.protocol.protocol_number }} — {{ mouse.protocol.name }}</dd>
+                            </div>
+                        </dl>
+                        <a class="button" href="{{ row.rename_url }}">Assign permanent ID</a>
+                    </li>
+                {% endwith %}
             {% endfor %}
         </ul>
         {% if possible_duplicate_warning.more_count %}
-            <p>
-                {{ possible_duplicate_warning.more_count }} more matching mice
-                are not shown.
-            </p>
+            <p>{{ possible_duplicate_warning.more_count }} more matching mice are not shown. Review them by crossing and birth date before continuing.</p>
         {% endif %}
-    </div>
+        {% if not form.errors %}
+            <button class="button button-primary" type="submit" name="confirm_possible_duplicate" value="1">Save as new mouse anyway</button>
+        {% endif %}
+    </section>
 {% endif %}

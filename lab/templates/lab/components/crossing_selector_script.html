@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
     crossingField.appendChild(results);
 
     function removeGenotypeFields() {
+        if (crossingInput.closest("[data-litter-form]")) return;
         document.querySelectorAll("[data-genotype-subset]").forEach(function (subset) {
             subset.remove();
         });
@@ -82,34 +83,21 @@ document.addEventListener("DOMContentLoaded", function () {
             const controls = document.createElement("div");
             controls.className = "genotype-result-controls";
             controls.appendChild(select);
-            const uncertaintyLabel = document.createElement("label");
-            uncertaintyLabel.className = "genotype-uncertainty";
-            const uncertainty = document.createElement(bulkMode ? "select" : "input");
-            uncertainty.name = line.uncertainty_field_name;
-            uncertainty.id = "id_" + uncertainty.name;
-            uncertainty.dataset.genotypeUncertainty = "true";
-            uncertainty.setAttribute("aria-label", line.name + ": uncertainty");
-            uncertaintyLabel.htmlFor = uncertainty.id;
-            if (bulkMode) {
-                [
-                    ["", "Leave uncertainty unchanged"],
-                    ["uncertain", "Mark uncertain"],
-                    ["certain", "Clear uncertainty"],
-                ].forEach(function (choice) {
-                    const option = document.createElement("option");
-                    option.value = choice[0];
-                    option.textContent = choice[1];
-                    uncertainty.appendChild(option);
-                });
-            } else {
+            if (!bulkMode) {
+                const uncertaintyLabel = document.createElement("label");
+                uncertaintyLabel.className = "genotype-uncertainty";
+                const uncertainty = document.createElement("input");
+                uncertainty.name = line.uncertainty_field_name;
+                uncertainty.id = "id_" + uncertainty.name;
+                uncertainty.dataset.genotypeUncertainty = "true";
+                uncertainty.setAttribute("aria-label", line.name + ": uncertainty");
+                uncertaintyLabel.htmlFor = uncertainty.id;
                 uncertainty.type = "checkbox";
                 uncertainty.checked = Boolean(line.is_uncertain);
-            }
-            uncertaintyLabel.appendChild(uncertainty);
-            if (!bulkMode) {
+                uncertaintyLabel.appendChild(uncertainty);
                 uncertaintyLabel.appendChild(document.createTextNode("Uncertain"));
+                controls.appendChild(uncertaintyLabel);
             }
-            controls.appendChild(uncertaintyLabel);
             wrapper.appendChild(label);
             wrapper.appendChild(controls);
             subset.appendChild(wrapper);
@@ -119,6 +107,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function loadGenotypeFields(crossingId) {
+        if (crossingInput.closest("[data-litter-form]")) return;
         const params = new URLSearchParams({crossing: crossingId});
 
         if (mouseId) {

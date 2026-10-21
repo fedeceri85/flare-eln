@@ -52,9 +52,61 @@ Flx/Y, Null/Y, Flx/WT, Null/WT, WT/Y, and Unknown.
 Genotype results also have a separate **Uncertain** checkbox for each gene on
 mouse and litter forms. Checked results display as, for example, `Het (uncertain)`.
 The flag is independent of the category, including Unknown. Existing results
-start unmarked. In bulk updates, check **Update genotype** and choose whether to
-leave uncertainty unchanged, mark it, or clear it for each gene. Changing a
-category alone preserves its existing uncertainty flag.
+start unmarked. In bulk updates, uncertainty is changed using each mouse’s checkbox. Changing a
+shared genotype category preserves the uncertainty flags.
+
+## Adding a litter
+
+Enter an optional **Prefix** and a **Numbers** list such as `1,3,5-7`. This creates
+five mice with IDs formed by joining the prefix to each number. Leading zeros
+are preserved. The list replaces the mouse count and starting-number controls.
+Duplicate numbers and existing Mouse IDs are rejected rather than renamed.
+
+Check **No ID available — generate IDs** to fill the visible prefix from birth
+date, breeding pair and crossing. Uncheck it to enter your own prefix or leave it
+blank. Review the individual rows before saving; each mouse has its own sex,
+genotype, uncertainty flags and optional local identifier. Shared details and
+any procedure apply to the whole batch.
+
+**Local ID type** is shared across the litter: **Other** (the default),
+**Tattoo** or **Ear clip**. Each mouse has its own **Local identifier**, stored as text so values
+such as `012` and `L2R1` are preserved. Unmarked pups can have blank local
+identifiers. Migration 0047 preserves existing local identifiers and classifies
+nonblank values as Other, without guessing their Local ID type.
+
+## Editing selected mice
+
+The bulk edit form includes an **Individual mice** table showing each mouse’s
+crossing, local identifier, sex and genotype. Change sex, genotype or uncertainty
+in a row to update that mouse; selections can include different crossings.
+Sex and local identifiers are not shared update fields. With **Update genotype**
+checked, changing a shared genotype immediately fills the matching individual
+rows. The individual genotype values shown are saved, including any adjustments
+made after filling them. Uncertainty is controlled only on individual mice.
+Refresh the rows after choosing a new shared crossing to enter its genotype calls.
+Local identifiers remain optional; migration 0049 replaces empty Local ID types
+with Other.
+
+## Possible duplicate mice
+
+Mouse IDs have an explicit status: **Temporary** for IDs created automatically,
+**Assigned** for typed IDs, and **Unknown** for older or imported records whose
+ID origin was not recorded. Assigning a permanent ID through the rename form
+sets the status to Assigned and preserves linked records.
+
+When adding a mouse or litter, the app warns about existing Temporary or Unknown
+records with the same date of birth and crossing, even if breeding pair is blank
+or different. Matches are checked across protocols. Assigned-ID records are
+excluded, even when breeding pair or local identifier matches.
+The warning highlights matching breeding pair, local identifier and sex and links
+to each existing record and its permanent-ID form.
+
+Use **Save as new mouse anyway** to confirm that the animals are different.
+Changing form details or matching records requires a fresh review. Existing
+unique Mouse ID checks still apply. Local-identifier uniqueness applies only
+to Temporary/Unknown records; distinct assigned IDs can share those details.
+Migration 0051 applies this restriction. Migration 0050 marks existing records Unknown without guessing from ID text and indexes birth date
+and crossing for this lookup.
 
 ## License
 

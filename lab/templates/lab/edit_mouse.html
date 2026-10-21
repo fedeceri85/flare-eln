@@ -13,6 +13,7 @@
         <div>
             <p class="read-only-label">Mouse ID</p>
             <p class="read-only-value">{{ mouse.mouse_id }}</p>
+            <small>ID status: {{ mouse.get_id_status_display }}</small>
         </div>
 
         <div class="actions">

@@ -4,7 +4,7 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 
 from .forms import (
-    BulkMouseUpdateForm, LitterCreateForm, MouseEditForm, MouseForm, genotype_field_name,
+    BulkMouseUpdateForm, LitterCreateForm, MouseEditForm, MouseForm, genotype_field_name, individual_mouse_field_prefix,
     sync_mouse_structured_genetics,
 )
 from .models import Mouse, MouseLine, Protocol, Species, resolve_crossing
@@ -89,9 +89,14 @@ class GenotypeUncertaintyTests(TestCase):
         self.assertEqual(call.zygosity, "hom")
         self.assertTrue(call.is_uncertain)
 
-    def test_bulk_can_mark_and_clear_without_changing_category(self):
-        for value, expected in [("uncertain", True), ("certain", False)]:
-            form = self.bulk_form(**{self.field: "", self.uncertain_field: value})
+    def test_individual_checkbox_can_mark_and_clear_without_changing_category(self):
+        stem = individual_mouse_field_prefix(self.mouse)
+        for expected in (True, False):
+            data = {f"{stem}_present": "on"}
+            if expected:
+                data[f"{stem}_{self.uncertain_field}"] = "on"
+            form = BulkMouseUpdateForm(data, selected_mice=[self.mouse])
+            self.assertTrue(form.is_valid(), form.errors)
             apply_bulk_mouse_updates([self.mouse], form)
             call = self.mouse.genotype_calls.get(mouse_line=self.lines[0])
             self.assertEqual(call.zygosity, "het")
@@ -118,17 +123,17 @@ class GenotypeUncertaintyTests(TestCase):
         self.assertIn("Uncertain", html)
         bulk = BulkMouseUpdateForm(selected_mice=[self.mouse])
         html = render_to_string("lab/edit_selected_mice.html", {"form": bulk, "selected_mice": [self.mouse]})
-        self.assertIn(f'name="{self.uncertain_field}"', html)
-        self.assertIn("Leave uncertainty unchanged", html)
+        self.assertIn(f'name="{individual_mouse_field_prefix(self.mouse)}_{self.uncertain_field}"', html)
+        self.assertNotIn("Leave uncertainty unchanged", html)
 
     def test_litter_applies_flag_to_each_new_mouse(self):
         form = LitterCreateForm(self.mouse_data(
-            mouse_count=2, tattoo_start=1, use_progressive_mouse_ids="on",
-            mouse_id_prefix="UNC-LITTER-", **{self.uncertain_field: "on"},
+            mouse_numbers="1-2", mouse_id_prefix="UNC-LITTER-",
+            **{f"pup_{number}_{self.uncertain_field}": "on" for number in (1, 2)},
         ))
         self.assertTrue(form.is_valid(), form.errors)
         html = render_to_string("lab/add_litter.html", {"form": form})
-        self.assertEqual(html.count(f'name="{self.uncertain_field}"'), 1)
+        self.assertEqual(html.count(f'name="pup_1_{self.uncertain_field}"'), 1)
         mice, _ = create_litter_mice(self.protocol, form)
         self.assertEqual(len(mice), 2)
         for mouse in mice:

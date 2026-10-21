@@ -187,8 +187,22 @@ class Crossing(models.Model):
 
 class Mouse(models.Model):
     mouse_id = models.CharField(max_length=100, primary_key=True)
+    ID_TEMPORARY = "temporary"
+    ID_ASSIGNED = "assigned"
+    ID_UNKNOWN = "unknown"
+    ID_STATUS_CHOICES = [
+        (ID_TEMPORARY, "Temporary"), (ID_ASSIGNED, "Assigned"), (ID_UNKNOWN, "Unknown"),
+    ]
+    id_status = models.CharField(
+        max_length=10, choices=ID_STATUS_CHOICES, default=ID_UNKNOWN,
+        editable=False, verbose_name="Mouse ID status",
+    )
     date_of_birth = models.DateField(null=True, blank=True)
-    tattoo = models.CharField(max_length=100, blank=True)
+    MARKING_CHOICES = [
+        ("other", "Other"), ("tattoo", "Tattoo"), ("ear_clip", "Ear clip"),
+    ]
+    marking_type = models.CharField(max_length=10, choices=MARKING_CHOICES, default="other", verbose_name="Local ID type")
+    tattoo = models.CharField(max_length=100, blank=True, verbose_name="Local identifier")
     genotype = models.CharField(max_length=100, blank=True)
     crossing = models.CharField(max_length=100, blank=True)
     breeding_pair = models.CharField(max_length=100, blank=True)
@@ -256,6 +270,9 @@ class Mouse(models.Model):
     class Meta:
         verbose_name = "Mouse"
         verbose_name_plural = "Mice"
+        indexes = [
+            models.Index(fields=["date_of_birth", "crossing_definition"], name="mouse_birth_crossing_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=[
@@ -263,8 +280,10 @@ class Mouse(models.Model):
                     "breeding_pair",
                     "crossing_definition",
                     "tattoo",
+                    "marking_type",
                 ],
-                name="unique_mouse_birth_pair_crossing_identifier",
+                condition=~models.Q(tattoo="") & models.Q(id_status__in=["temporary", "unknown"]),
+                name="unique_mouse_birth_pair_crossing_marking",
             ),
         ]
 

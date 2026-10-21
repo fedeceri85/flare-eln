@@ -3,6 +3,8 @@
 - Added persistent Save and Cancel actions on long forms, clearer validation, and responsive tables.
 - Preserved list filters and workflow context when opening and returning from records.
 - User-determined zygozity choices through admin panel. Added "Uncertain" label to genotype result to mark not clear-cut results.
+- NEW add litter form, which supports mixtures of ranges and individual ids. 
+- Change the rule to check for existing animals with auto-generated IDs. 
 
 21/10/2026
 NEW: switch to Docker images.
