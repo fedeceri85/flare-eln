@@ -1,6 +1,7 @@
 Supported Compose files:
 - compose.local-stack.yml: local laptop testing
 - compose.synology.yml: Synology production
+- compose.synology.images.yml: prebuilt release images for Synology (see guide)
 
 Local laptop test:
 1. cp .env.example .env
@@ -35,6 +36,12 @@ Private lab defaults:
 
 Synology update:
 bash scripts/update_synology_web.sh
+
+Automatic updates when publishing a public GitHub Release:
+Follow docs/automatic-synology-updates.md for one-time NAS Task Scheduler setup.
+GitHub builds the image; the NAS downloads it, backs up, migrates, and restarts.
+After converting to images, use the scheduled updater instead of the manual
+build-from-source update script above.
 
 Manual Synology backup:
 bash scripts/backup_synology_db.sh

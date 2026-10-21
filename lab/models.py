@@ -134,6 +134,14 @@ class Crossing(models.Model):
     def __str__(self):
         return f"{self.species} - {self.display_name}"
 
+    def ordered_lines(self):
+        return [
+            membership.line
+            for membership in self.crossing_lines.select_related("line").order_by(
+                "position", "crossing_line_id"
+            )
+        ]
+
     @property
     def inferred_crossing_type(self):
         lines = list(self.lines.all())
@@ -261,11 +269,15 @@ class Mouse(models.Model):
         if not self.crossing_definition_id:
             return self.genotype
 
-        genotype_calls = (
-            self.genotype_calls
-            .select_related("mouse_line")
-            .order_by("mouse_line__name", "mouse_line_id")
-        )
+        calls_by_line = {
+            call.mouse_line_id: call
+            for call in self.genotype_calls.select_related("mouse_line")
+        }
+        genotype_calls = [
+            calls_by_line[line.pk]
+            for line in self.crossing_definition.ordered_lines()
+            if line.pk in calls_by_line
+        ]
 
         return "; ".join(
             f"{call.mouse_line.name}: {call.get_zygosity_display()}"
@@ -286,8 +298,10 @@ class CrossingLine(models.Model):
         related_name="crossing_lines",
     )
 
+    position = models.PositiveIntegerField(default=0)
+
     class Meta:
-        ordering = ["crossing", "line__name"]
+        ordering = ["crossing", "position", "crossing_line_id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["crossing", "line"],
@@ -414,7 +428,7 @@ def crossing_canonical_key(lines):
 def crossing_display_name(lines):
     return " x ".join(
         line.name
-        for line in sorted(lines, key=lambda line: line.name.lower())
+        for line in lines
     )
 
 
@@ -461,8 +475,8 @@ def resolve_crossing(species, lines):
     if created:
         CrossingLine.objects.bulk_create(
             [
-                CrossingLine(crossing=crossing, line=line)
-                for line in normalized_lines
+                CrossingLine(crossing=crossing, line=line, position=position)
+                for position, line in enumerate(normalized_lines)
             ]
         )
 

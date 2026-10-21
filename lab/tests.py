@@ -21,6 +21,7 @@ from .models import (
     CrossingLine,
     Experiment,
     Mouse,
+    MAX_SEVERITY_CHOICES,
     MouseGenotype,
     MouseLine,
     Procedure,
@@ -3407,6 +3408,11 @@ class ReportsPageTests(AuthenticatedTestCase):
             report["total"],
             {
                 "total": 4,
+                "non-recovery": 0,
+                "severity_rows": [
+                    {"label": label, "count": 0 if value == "Non-recovery" else 1}
+                    for value, label in MAX_SEVERITY_CHOICES
+                ],
                 "mild": 1,
                 "moderate": 1,
                 "severe": 1,
@@ -3506,6 +3512,35 @@ class ReportsPageTests(AuthenticatedTestCase):
             content.index("Breakdown by protocol"),
             content.index("Breakdown by procedure"),
         )
+
+    def test_home_office_return_includes_non_recovery_in_all_breakdowns(self):
+        mouse = Mouse.objects.create(
+            mouse_id="REPORT-NON-RECOVERY",
+            protocol=self.protocol_1,
+            protocol_start_date=date(self.current_year, 1, 1),
+            severity="Non-recovery",
+        )
+        Procedure.objects.create(mouse=mouse, procedure_type=self.surgery)
+
+        for output_mode in ("table", "text"):
+            with self.subTest(output_mode=output_mode):
+                response = self.client.get(self.home_office_query(output_mode))
+                self.assertEqual(response.status_code, 200)
+                report = response.context["home_office_report"]
+                protocol = next(row for row in report["protocol_rows"] if row["protocol"] == self.protocol_1)
+                procedure = next(row for row in report["procedure_rows"] if row["procedure_type"] == self.surgery)
+                for counts in (report["total"], protocol, procedure):
+                    self.assertEqual(counts["non-recovery"], 1)
+                    self.assertEqual(counts["severity_rows"], [
+                        {"label": label, "count": counts[value.lower()]}
+                        for value, label in MAX_SEVERITY_CHOICES
+                    ])
+                self.assertEqual(report["total"]["total"], 5)
+                if output_mode == "table":
+                    for _, label in MAX_SEVERITY_CHOICES:
+                        self.assertContains(response, f"<th>{label}</th>", count=3)
+                else:
+                    self.assertContains(response, "Non-recovery: 1", count=3)
 
     def test_home_office_return_counts_legacy_double_triple_as_multiple(self):
         Mouse.objects.create(
@@ -5125,7 +5160,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "selected_mouse": [self.mouse_1.pk, self.mouse_2.pk],
                 "update_status": "on",
                 "status": "Culled",
-                "append_notes": "on",
+                "notes_action": "append",
                 "notes": "Bulk note",
                 "procedure_type": self.procedure_type.pk,
                 "update_procedure_date": "on",

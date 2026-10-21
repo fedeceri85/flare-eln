@@ -1,3 +1,14 @@
+21/10/2026
+NEW: switch to Docker images.
+- Feature: allow easy import of mulitple paths at once.
+Solved bugs
+- home office return crashes with "non recovery" status.
+- date erased when procedure updated
+- add positional argument to gene lists, so that they are displayed in the correct order.
+- allow bulk changes in the notes.
+- preserve entered information in forms if switching forms in between. 
+
+
 25/08/2026
 - Added entry log to the admin website.
 

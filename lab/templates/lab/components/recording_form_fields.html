@@ -26,9 +26,15 @@
             {% endif %}
 
             <div class="field-inline-actions">
-                <a class="button" href="{{ select_mouse_url }}">
+                <button
+                    class="button"
+                    type="submit"
+                    name="recording_action"
+                    value="select_mice"
+                    formnovalidate
+                >
                     Add mice
-                </a>
+                </button>
             </div>
         </div>
 

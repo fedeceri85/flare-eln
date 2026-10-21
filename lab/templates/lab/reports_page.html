@@ -56,9 +56,9 @@
                                 <thead>
                                     <tr>
                                         <th>Mice under procedure</th>
-                                        <th>Mild</th>
-                                        <th>Moderate</th>
-                                        <th>Severe</th>
+                                        {% for label in home_office_report.severity_labels %}
+                                            <th>{{ label }}</th>
+                                        {% endfor %}
                                         <th>Severity not set</th>
                                         <th>Surpassed threshold</th>
                                     </tr>
@@ -67,9 +67,9 @@
                                 <tbody>
                                     <tr>
                                         <td>{{ home_office_report.total.total }}</td>
-                                        <td>{{ home_office_report.total.mild }}</td>
-                                        <td>{{ home_office_report.total.moderate }}</td>
-                                        <td>{{ home_office_report.total.severe }}</td>
+                                        {% for severity in home_office_report.total.severity_rows %}
+                                            <td>{{ severity.count }}</td>
+                                        {% endfor %}
                                         <td>{{ home_office_report.total.not_set }}</td>
                                         <td>{{ home_office_report.total.exceeded }}</td>
                                     </tr>
@@ -116,9 +116,9 @@
                                         <th>Protocol</th>
                                         <th>Max severity</th>
                                         <th>Mice under procedure</th>
-                                        <th>Mild</th>
-                                        <th>Moderate</th>
-                                        <th>Severe</th>
+                                        {% for label in home_office_report.severity_labels %}
+                                            <th>{{ label }}</th>
+                                        {% endfor %}
                                         <th>Severity not set</th>
                                         <th>Surpassed threshold</th>
                                         {% for label in home_office_report.crossing_type_labels %}
@@ -139,9 +139,9 @@
                                                 {% endif %}
                                             </td>
                                             <td>{{ row.total }}</td>
-                                            <td>{{ row.mild }}</td>
-                                            <td>{{ row.moderate }}</td>
-                                            <td>{{ row.severe }}</td>
+                                            {% for severity in row.severity_rows %}
+                                                <td>{{ severity.count }}</td>
+                                            {% endfor %}
                                             <td>{{ row.not_set }}</td>
                                             <td>{{ row.exceeded }}</td>
                                             {% for crossing_type_row in row.crossing_type_rows %}
@@ -150,7 +150,7 @@
                                         </tr>
                                     {% empty %}
                                         <tr>
-                                            <td colspan="12">No protocols are registered for this licence.</td>
+                                            <td colspan="{{ home_office_report.protocol_column_count }}">No protocols are registered for this licence.</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -169,9 +169,9 @@
                                     <tr>
                                         <th>Procedure</th>
                                         <th>Mice under procedure</th>
-                                        <th>Mild</th>
-                                        <th>Moderate</th>
-                                        <th>Severe</th>
+                                        {% for label in home_office_report.severity_labels %}
+                                            <th>{{ label }}</th>
+                                        {% endfor %}
                                         <th>Severity not set</th>
                                         <th>Surpassed threshold</th>
                                     </tr>
@@ -182,15 +182,15 @@
                                         <tr>
                                             <td>{{ row.procedure_label }}</td>
                                             <td>{{ row.total }}</td>
-                                            <td>{{ row.mild }}</td>
-                                            <td>{{ row.moderate }}</td>
-                                            <td>{{ row.severe }}</td>
+                                            {% for severity in row.severity_rows %}
+                                                <td>{{ severity.count }}</td>
+                                            {% endfor %}
                                             <td>{{ row.not_set }}</td>
                                             <td>{{ row.exceeded }}</td>
                                         </tr>
                                     {% empty %}
                                         <tr>
-                                            <td colspan="7">No procedures are recorded for mice in this return.</td>
+                                            <td colspan="{{ home_office_report.procedure_column_count }}">No procedures are recorded for mice in this return.</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>

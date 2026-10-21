@@ -1,3 +1,4 @@
+from uuid import uuid4
 from copy import deepcopy
 from datetime import datetime
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -252,7 +253,8 @@ def append_text(existing_text, text_to_append):
 def apply_bulk_mouse_updates(mice, form):
     mouse_updates = form.selected_mouse_updates()
     structured_genetics_update = form.selected_structured_genetics_update()
-    notes_to_append = form.notes_to_append()
+    notes_action = form.cleaned_data.get("notes_action")
+    notes = form.cleaned_data.get("notes", "").strip()
     procedure_type = form.cleaned_data.get("procedure_type")
     procedure_updates = form.selected_procedure_updates()
 
@@ -263,8 +265,12 @@ def apply_bulk_mouse_updates(mice, form):
             setattr(mouse, field_name, value)
             changed_mouse_fields.append(field_name)
 
-        if notes_to_append:
-            mouse.notes = append_text(mouse.notes, notes_to_append)
+        if notes_action in {"append", "replace"}:
+            mouse.notes = (
+                append_text(mouse.notes, notes)
+                if notes_action == "append"
+                else notes
+            )
             changed_mouse_fields.append("notes")
 
         if changed_mouse_fields:
@@ -553,9 +559,7 @@ LEGACY_HOME_OFFICE_CROSSING_TYPE_LABELS = {
 def empty_home_office_counts():
     return {
         "total": 0,
-        "mild": 0,
-        "moderate": 0,
-        "severe": 0,
+        **dict.fromkeys(HOME_OFFICE_SEVERITY_KEYS.values(), 0),
         "not_set": 0,
         "exceeded": 0,
     }
@@ -644,9 +648,7 @@ def build_home_office_return_text(report):
         "",
         "Total numbers",
         f"Mice under procedure: {report['total']['total']}",
-        f"Mild: {report['total']['mild']}",
-        f"Moderate: {report['total']['moderate']}",
-        f"Severe: {report['total']['severe']}",
+        *(f"{row['label']}: {row['count']}" for row in report["total"]["severity_rows"]),
         f"Severity not set: {report['total']['not_set']}",
         f"Surpassed severity threshold: {report['total']['exceeded']}",
         "",
@@ -669,9 +671,7 @@ def build_home_office_return_text(report):
                 row["protocol_label"],
                 f"Max severity: {max_severity}",
                 f"Mice under procedure: {row['total']}",
-                f"Mild: {row['mild']}",
-                f"Moderate: {row['moderate']}",
-                f"Severe: {row['severe']}",
+                *(f"{severity['label']}: {severity['count']}" for severity in row["severity_rows"]),
                 f"Severity not set: {row['not_set']}",
                 f"Surpassed severity threshold: {row['exceeded']}",
                 "By crossing type:",
@@ -693,9 +693,7 @@ def build_home_office_return_text(report):
                 "",
                 row["procedure_label"],
                 f"Mice under procedure: {row['total']}",
-                f"Mild: {row['mild']}",
-                f"Moderate: {row['moderate']}",
-                f"Severe: {row['severe']}",
+                *(f"{severity['label']}: {severity['count']}" for severity in row["severity_rows"]),
                 f"Severity not set: {row['not_set']}",
                 f"Surpassed severity threshold: {row['exceeded']}",
             ]
@@ -799,7 +797,16 @@ def build_home_office_return_report(
             }
         )
 
+    for counts in [total_counts, *protocol_rows, *procedure_rows]:
+        counts["severity_rows"] = [
+            {"label": label, "count": counts[HOME_OFFICE_SEVERITY_KEYS[value]]}
+            for value, label in MAX_SEVERITY_CHOICES
+        ]
+
     report = {
+        "severity_labels": [label for _, label in MAX_SEVERITY_CHOICES],
+        "protocol_column_count": 5 + len(MAX_SEVERITY_CHOICES) + len(total_crossing_type_counts),
+        "procedure_column_count": 4 + len(MAX_SEVERITY_CHOICES),
         "licence_reference": licence_reference,
         "start_date": start_date,
         "end_date": end_date,
@@ -958,6 +965,52 @@ def select_recording_mouse_url(project, experiment):
         "lab:select_recording_mouse",
         args=[project.pk, experiment.pk],
     )
+
+
+def recording_form_draft_initial(request):
+    draft = request.session.get("recording_form_drafts", {}).get(
+        request.GET.get("draft"), {}
+    )
+    if draft.get("path") == request.path:
+        return draft.get("initial", {})
+    return {}
+
+
+def discard_recording_form_draft(request):
+    drafts = request.session.get("recording_form_drafts", {}).copy()
+    if drafts.pop(request.GET.get("draft"), None) is not None:
+        request.session["recording_form_drafts"] = drafts
+
+
+def recording_mouse_selection_redirect(request, form, project, experiment, form_url):
+    if request.POST.get("recording_action") != "select_mice":
+        return None
+
+    # Store raw widget values without validating an unfinished recording.
+    initial = {
+        name: field.widget.value_from_datadict(request.POST, request.FILES, name)
+        for name, field in form.fields.items()
+        if name != "mice"
+    }
+    drafts = request.session.get("recording_form_drafts", {}).copy()
+    token = request.GET.get("draft")
+    if token not in drafts or drafts[token].get("path") != request.path:
+        token = uuid4().hex
+    drafts.pop(token, None)
+    drafts[token] = {"path": request.path, "initial": initial}
+    # Bound abandoned drafts per session, while keeping the current one.
+    drafts = dict(list(drafts.items())[-20:])
+    request.session["recording_form_drafts"] = drafts
+    form_url = url_with_query_params(
+        form_url,
+        draft=token,
+        duplicate=request.GET.get("duplicate"),
+        mice=recording_mice_query_value(form.selected_mouse_ids()),
+        mouse=None,
+    )
+    return redirect(recording_form_mouse_workflow_urls(
+        project, experiment, form_url, form.selected_mouse_ids(),
+    )["select_mouse_url"])
 
 
 def recording_form_mouse_workflow_urls(
@@ -1842,7 +1895,7 @@ def crossing_genotype_fields(request):
                 for genotype in mouse.genotype_calls.all()
             }
 
-    lines = crossing.lines.order_by("name", "mouse_line_id")
+    lines = crossing.ordered_lines()
 
     return JsonResponse(
         {
@@ -2356,8 +2409,15 @@ def add_recording(request, project_pk, experiment_pk):
             owner=request.user,
         )
 
+        selection_redirect = recording_mouse_selection_redirect(
+            request, form, project, experiment, form_url,
+        )
+        if selection_redirect is not None:
+            return selection_redirect
+
         if form.is_valid():
             recording = form.save()
+            discard_recording_form_draft(request)
             messages.success(
                 request,
                 f"Recording {recording.pk} was created successfully.",
@@ -2369,6 +2429,7 @@ def add_recording(request, project_pk, experiment_pk):
             source_recording=source_recording,
             owner=request.user,
             selected_mice=selected_mice,
+            initial=recording_form_draft_initial(request),
         )
 
     mouse_workflow_urls = recording_form_mouse_workflow_urls(
@@ -2462,8 +2523,15 @@ def edit_recording(request, project_pk, experiment_pk, recording_pk):
             instance=recording,
         )
 
+        selection_redirect = recording_mouse_selection_redirect(
+            request, form, project, experiment, form_url,
+        )
+        if selection_redirect is not None:
+            return selection_redirect
+
         if form.is_valid():
             recording = form.save()
+            discard_recording_form_draft(request)
             messages.success(
                 request,
                 f"Recording {recording.pk} was updated successfully.",
@@ -2474,6 +2542,7 @@ def edit_recording(request, project_pk, experiment_pk, recording_pk):
             experiment=experiment,
             instance=recording,
             selected_mice=selected_mice,
+            initial=recording_form_draft_initial(request),
         )
 
     mouse_workflow_urls = recording_form_mouse_workflow_urls(

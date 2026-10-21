@@ -333,7 +333,10 @@ class RecordingForm(forms.Form):
         widget=forms.HiddenInput(),
     )
     recording_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}),
+        widget=forms.DateInput(
+            format=HTML_DATE_FORMAT,
+            attrs={"type": "date"},
+        ),
         label="Date",
     )
     sequence_number = forms.IntegerField(
@@ -879,7 +882,7 @@ def sync_mouse_structured_genetics(
     mouse.crossing = truncate_compat_text(crossing.display_name)
     mouse.crossing_type = crossing.inferred_crossing_type
 
-    lines = list(crossing.lines.order_by("name", "mouse_line_id"))
+    lines = list(crossing.ordered_lines())
     existing_calls = {}
 
     if preserve_missing:
@@ -1114,7 +1117,7 @@ class MouseStructuredGeneticsMixin:
 
         genotype_form_fields = OrderedDict()
 
-        for line in self.selected_crossing.lines.order_by("name", "mouse_line_id"):
+        for line in self.selected_crossing.ordered_lines():
             field_name = genotype_field_name(line)
             self.genotype_fields.append(field_name)
             genotype_form_fields[field_name] = forms.ChoiceField(
@@ -1297,7 +1300,7 @@ class MouseStructuredGeneticsMixin:
                 for genotype in self.instance.genotype_calls.all()
             }
 
-        for line in crossing.lines.order_by("name", "mouse_line_id"):
+        for line in crossing.ordered_lines():
             field_name = genotype_field_name(line)
             zygosity = cleaned_data.get(field_name)
 
@@ -1885,7 +1888,10 @@ class BaseProcedureForm(forms.ModelForm):
             "lab_book_page": "Lab-book page",
         }
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
+            "date": forms.DateInput(
+                format=HTML_DATE_FORMAT,
+                attrs={"type": "date"},
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -2069,15 +2075,23 @@ class BulkMouseUpdateForm(forms.Form):
         label="Date of birth",
     )
 
-    append_notes = forms.BooleanField(
+    notes_action = forms.ChoiceField(
         required=False,
-        label="Append mouse notes",
+        choices=[
+            ("", "Leave unchanged"),
+            ("append", "Append"),
+            ("replace", "Replace"),
+        ],
+        label="Mouse notes action",
     )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"rows": 4}),
-        label="Notes to append",
-        help_text="These notes are appended to each selected mouse.",
+        label="Mouse notes",
+        help_text=(
+            "Append adds this text to each selected mouse. Replace overwrites "
+            "their existing notes; leave the text blank to clear them."
+        ),
     )
 
     procedure_type = forms.ModelChoiceField(
@@ -2143,10 +2157,7 @@ class BulkMouseUpdateForm(forms.Form):
         if self.selected_crossing is not None:
             genotype_form_fields = OrderedDict()
 
-            for line in self.selected_crossing.lines.order_by(
-                "name",
-                "mouse_line_id",
-            ):
+            for line in self.selected_crossing.ordered_lines():
                 field_name = genotype_field_name(line)
                 self.genotype_fields.append(field_name)
                 genotype_form_fields[field_name] = forms.ChoiceField(
@@ -2248,7 +2259,7 @@ class BulkMouseUpdateForm(forms.Form):
             cleaned_data.get(update_field)
             for update_field, _ in self.MOUSE_UPDATE_FIELDS
         )
-        has_notes_update = cleaned_data.get("append_notes")
+        has_notes_update = cleaned_data.get("notes_action") in {"append", "replace"}
         has_procedure_field_update = any(
             cleaned_data.get(update_field)
             for update_field, _, _ in self.PROCEDURE_UPDATE_FIELDS
@@ -2304,7 +2315,7 @@ class BulkMouseUpdateForm(forms.Form):
             else:
                 genotype_values = {}
 
-                for line in crossing.lines.order_by("name", "mouse_line_id"):
+                for line in crossing.ordered_lines():
                     field_name = genotype_field_name(line)
                     zygosity = cleaned_data.get(field_name)
 
@@ -2355,10 +2366,10 @@ class BulkMouseUpdateForm(forms.Form):
                     + ", ".join(disallowed_mouse_ids[:5])
                 )
 
-        if has_notes_update and not cleaned_data.get("notes", "").strip():
+        if cleaned_data.get("notes_action") == "append" and not cleaned_data.get("notes", "").strip():
             self.add_error(
                 "notes",
-                "Enter notes to append, or leave this update unchecked.",
+                "Enter notes to append, or choose Leave unchanged.",
             )
 
         if has_procedure_field_update and cleaned_data.get("procedure_type") is None:
@@ -2427,11 +2438,6 @@ class BulkMouseUpdateForm(forms.Form):
             self.cleaned_data.get("genotype_values", {}),
             not update_crossing,
         )
-
-    def notes_to_append(self):
-        if self.cleaned_data.get("append_notes"):
-            return self.cleaned_data.get("notes", "").strip()
-        return ""
 
     def selected_procedure_updates(self):
         return {
