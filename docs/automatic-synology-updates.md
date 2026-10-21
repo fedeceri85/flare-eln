@@ -173,6 +173,10 @@ The updater also supports the older `docker-compose` command if the last command
 is unavailable. Git, Python, and jq do not need to be installed on DSM: the
 updater uses Python already present in the running web container.
 
+If you use Synology's older **Docker** package, find the web container under
+**Docker → Container** instead of Container Manager. Use the SSH inspection
+commands above to identify its existing Compose project and configuration.
+
 ## 6. Upload the updater and make one Compose change
 
 On the NAS, still as root:
@@ -242,6 +246,26 @@ chmod 700 /volume1/docker/flare-eln/automation/auto_update_synology_release.sh
 bash -n /volume1/docker/flare-eln/automation/auto_update_synology_release.sh
 ```
 
+The hardened updater also checks ownership and permissions before writing files.
+For the standard paths above, run the following once as root (after uploading
+the script). These commands are deliberately **not recursive**; they do not
+change PostgreSQL data-file ownership:
+
+```bash
+mkdir -p /volume1/docker/flare-eln/backups
+chown root:root /volume1/docker/flare-eln /volume1/docker/flare-eln/project /volume1/docker/flare-eln/automation /volume1/docker/flare-eln/backups
+chown root:root /volume1/docker/flare-eln/project/.env /volume1/docker/flare-eln/project/compose.synology.yml
+chmod go-w /volume1/docker/flare-eln /volume1/docker/flare-eln/project
+chmod 700 /volume1/docker/flare-eln/automation /volume1/docker/flare-eln/backups
+chmod 600 /volume1/docker/flare-eln/project/.env /volume1/docker/flare-eln/project/compose.synology.yml
+```
+
+Use your actual paths if different. The configured project, automation, and backup
+folders must be separate directories beneath `DEPLOY_ROOT` (default
+`/volume1/docker/flare-eln`). Symlinks in these paths or files are rejected.
+Also restrict DSM shared-folder ACL permissions to trusted administrators; the
+script checks Unix ownership/mode bits, not every Synology ACL rule.
+
 The last command should return silently. Changing the files has not yet
 restarted your running website. Let the updater do the first restart, including
 the database backup and migrations; do not click Build or recreate the project.
@@ -259,6 +283,7 @@ the database backup and migrations; do not click Build or recreate the project.
 
 ```bash
 COMPOSE_PROJECT_NAME='YOUR_EXISTING_PROJECT_NAME' \
+DEPLOY_ROOT='/volume1/docker/flare-eln' \
 PROJECT_DIR='/volume1/docker/flare-eln/project' \
 COMPOSE_FILE='compose.synology.yml' \
 STATE_DIR='/volume1/docker/flare-eln/automation' \
@@ -274,6 +299,12 @@ Enable email run details for abnormal termination, and configure/test DSM email
 delivery if needed. Save the task.
 
 ## 8. Run it once, then enable the schedule
+
+First append ` --check-only` to the end of the scheduled command and click
+**Run**. This validates paths, permissions, Compose configuration, and the
+existing containers without downloading an image, stopping web, or migrating.
+It writes the normal log/temporary lock. Look for `Preflight checks passed`.
+Remove ` --check-only` before testing a real update or enabling the schedule.
 
 Pick a time when a short website interruption is acceptable. Select the task
 and click **Run**. The first image deployment runs even if the old Git-based
@@ -334,13 +365,45 @@ tags with different code.
 
 ## If something goes wrong
 
+### HTTPS reverse proxy: CSRF verification failed (403)
+
+If Synology serves HTTPS but forwards HTTP to the container, configure the exact
+browser origin, including its HTTPS scheme and nonstandard port. For example,
+add to the NAS `.env`:
+
+```text
+DJANGO_CSRF_TRUSTED_ORIGINS=https://marcotti-nas:8000
+```
+
+Ensure `web.environment` in the NAS Compose file includes:
+
+```yaml
+      DJANGO_CSRF_TRUSTED_ORIGINS: "${DJANGO_CSRF_TRUSTED_ORIGINS:-}"
+```
+
+This requires an image containing the matching environment-variable support in
+`labdb/settings.py`; adding the variable alone to an older image has no effect.
+Publish/deploy an updated release with that support, then recreate web to apply
+the configuration. Keep `LABDB_WEB_PORT` at the HTTP backend port (for example
+8001) if the reverse proxy uses port 8000 for HTTPS. Reload the login page before
+trying again. Do not disable CSRF protection or enable production debug mode.
+
+### Updater failures
+
 Read `automation/update.log` and any DSM failure email first.
+
+If the log shows the `config` usage screen followed by `ERROR: install
+compose.synology.images.yml`, you may have an older copy of this updater that
+used `config --images`, which older Synology Compose versions do not support.
+Replace `automation/auto_update_synology_release.sh` with the current script and
+run the task again. That preflight error does not stop or change the website.
 
 | Failure | What happens |
 | --- | --- |
 | GitHub API/image download fails | Website keeps running; next check retries |
 | Downloaded image fails its initial Django check | Website keeps running; next check retries |
-| Backup, migration, restart, or final check fails | Deployment stops; a `FAILED` marker blocks further deployments |
+| Backup fails before migrations | Original web container is restarted; a `FAILED` marker blocks further deployments |
+| Migration, restart, or final check fails | Deployment stops; a `FAILED` marker blocks further deployments |
 
 If a deployment-stage failure occurs, disable the task. The website may be
 stopped or may be running the new image without passing checks. The script does
@@ -381,6 +444,17 @@ Never remove an active lock.
 Backups, downloaded images, and `update.log` accumulate. Include them in your
 normal storage-retention and off-NAS backup routine. This script does not
 silently delete backups or prune Docker images.
+
+The updater requires at least 2048 MB free in Docker storage and the backup
+filesystem before deployment. Its backup subprocess has a file-size limit of
+half the free backup budget after that reserve. An oversized backup fails and
+blocks deployment rather than consuming the entire measured free budget.
+These checks cannot reserve space against other processes or bound image-layer
+expansion; monitor storage and keep a backup retention policy. `MIN_FREE_MB`
+can increase the reserve in the task's environment.
+
+See the [automation safety review](automation-safety-review.md) for the audited
+write scope, tests, and remaining trust assumptions.
 
 ## About private commit history
 
