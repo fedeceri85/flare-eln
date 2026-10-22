@@ -1,4 +1,5 @@
 22/10/2026
+- Upgraded Django from unsupported 4.2.30 to 5.2.18 LTS and updated deprecated HTML helpers.
 - Visual overhaul and code cleanup.
 - Unification of the add one mouse/litter and edit interfaces.
 

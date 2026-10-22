@@ -4,11 +4,12 @@ from urllib.parse import urlencode
 from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 
 from .models import Mouse
 
 
-EMPTY_VALUE = format_html("&mdash;")
+EMPTY_VALUE = mark_safe("&mdash;")
 DEFAULT_TABLE_PAGE_SIZE = 25
 TABLE_PAGE_SIZE_CHOICES = [25, 50, 100, 150, 200]
 
@@ -1450,7 +1451,7 @@ def format_value(value, value_format=None):
 
     if value_format == "recording_paths":
         return format_html_join(
-            format_html("<br>"),
+            mark_safe("<br>"),
             "{}",
             ((path,) for path in value),
         )
@@ -1465,7 +1466,7 @@ def format_procedure_status(procedures, severity_exceeded=False):
     procedures = list(procedures or [])
 
     if not procedures:
-        return format_html('<span class="empty-mark">&mdash;</span>')
+        return mark_safe('<span class="empty-mark">&mdash;</span>')
 
     procedure = latest_procedure(procedures)
     procedure_count = len(procedures)
