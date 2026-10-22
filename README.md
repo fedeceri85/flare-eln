@@ -36,37 +36,6 @@ The scheduled updater checks for the latest stable release, downloads its image,
 
 For an existing deployment, follow the guide to install the image-based configuration under the existing Compose filename and retain the existing project name, database mount, and settings. After conversion, use the scheduled updater instead of the manual build-from-source update script. Database migrations still need to run when deploying a new image.
 
-## Development checks
-
-With the project dependencies installed, run Django tests against an isolated,
-in-memory SQLite database:
-
-```sh
-python manage.py test --settings=labdb.test_settings --noinput
-```
-
-To run a specific feature, append its test label, for example
-`lab.test_bulk_existing_procedures`. These settings use the normal Django test
-runner and do not connect to the configured application database. SQLite checks
-do not replace PostgreSQL validation of database-specific behavior.
-
-Run the JavaScript component checks with Node.js:
-
-```sh
-node --test scripts/test_*.cjs
-```
-
-The deployment-orchestration tests use temporary mock tools and need no network,
-Docker daemon or NAS:
-
-```sh
-python -m unittest discover -s scripts -p 'test_*.py'
-```
-
-See [the repository cleanup plan](docs/repository-cleanup-plan.md) for the feature
-module map, compatibility details and the CSS cascade audit.
-
-
 ## License
 
 FLARE-ELN is released under the Apache License 2.0. See `LICENSE`.
