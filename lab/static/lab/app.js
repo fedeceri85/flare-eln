@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const checkboxes = Array.from(
             tableCard.querySelectorAll("[data-row-checkbox]")
         );
+        const form = tableCard.closest("form");
+        const animalAction = form && document.querySelector('[data-animal-action="' + form.id + '"]');
+        const createUrl = animalAction && animalAction.getAttribute("href");
 
         if (checkboxes.length === 0) {
             return;
@@ -37,6 +40,22 @@ document.addEventListener("DOMContentLoaded", function () {
             if (selectionCount) {
                 selectionCount.textContent = count ? count + " selected" : "No rows selected";
             }
+            if (animalAction) {
+                let destination = createUrl;
+                if (count) {
+                    // Opening the editor is read-only; leave all writes to its
+                    // existing CSRF-protected forms. Never put CSRF tokens in URLs.
+                    const editUrl = new URL(form.action, window.location.href);
+                    checkboxes.filter(checkbox => checkbox.checked).forEach(function (checkbox) {
+                        editUrl.searchParams.append("selected_mouse", checkbox.value);
+                    });
+                    const returnUrl = form.querySelector('[name="return_url"]');
+                    if (returnUrl) editUrl.searchParams.set("return_url", returnUrl.value);
+                    destination = editUrl.href;
+                }
+                animalAction.setAttribute("href", destination);
+                animalAction.textContent = count ? "Edit selected" : "Add animals";
+            }
         }
 
         function setAllRows(checked) {
@@ -63,6 +82,7 @@ document.addEventListener("DOMContentLoaded", function () {
             checkbox.addEventListener("change", updateSelectAllState);
         });
 
+        window.addEventListener("pageshow", updateSelectAllState);
         updateSelectAllState();
     });
 });

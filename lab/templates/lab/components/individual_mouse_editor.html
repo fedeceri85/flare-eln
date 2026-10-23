@@ -1,19 +1,19 @@
 <section class="{% if embedded %}single-mouse-rows{% else %}bulk-section{% endif %}" {% if embedded %}id="mouse-individual-details"{% else %}id="mouse-panel-individual" data-mouse-tab-panel="individual"{% endif %}>
-    <h2 class="visually-hidden">Individual mice</h2>
-    <p class="bulk-help">{% if embedded %}Set this mouse’s{% else %}Set each mouse’s{% endif %} local identifier, sex and genotype. Check Uncertain beside any doubtful result.</p>
+    <h2 class="visually-hidden">Individual animals</h2>
+    <p class="bulk-help">{% if embedded %}Set this animal’s{% else %}Set each animal’s{% endif %} local identifier, sex and genotype. Check Uncertain beside any doubtful result.</p>
     {% if not embedded %}
         <details class="individual-mouse-help">
             <summary>How shared genotype changes apply</summary>
-            <p class="bulk-help">With Genotype checked in Mouse details, shared results immediately fill matching cells here. You can adjust any mouse afterward; the displayed values are saved.</p>
+            <p class="bulk-help">With Genotype checked in Animal details, shared results immediately fill matching cells here. You can adjust any animal afterward; the displayed values are saved.</p>
         </details>
     {% endif %}
     <span hidden data-bulk-rows-retry>
-        <button type="submit" name="preview_individual_mice" value="1" class="button" formnovalidate data-preview-individual-mice>Retry updating mouse rows</button>
+        <button type="submit" name="preview_individual_mice" value="1" class="button" formnovalidate data-preview-individual-mice>Retry updating animal rows</button>
     </span>
     <p role="status" aria-live="polite" data-bulk-rows-status></p>
     <noscript>
-        <p>After changing a crossing, refresh the mouse rows before saving.</p>
-        <button type="submit" name="preview_individual_mice" value="1" class="button" formnovalidate>Refresh mouse rows</button>
+        <p>After changing a crossing, refresh the animal rows before saving.</p>
+        <button type="submit" name="preview_individual_mice" value="1" class="button" formnovalidate>Refresh animal rows</button>
     </noscript>
     <div id="bulk-individual-mouse-rows">
         {% include "lab/components/bulk_individual_rows.html" %}

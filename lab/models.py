@@ -186,6 +186,15 @@ class Crossing(models.Model):
 
 
 class Mouse(models.Model):
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="added_mice",
+        verbose_name="Added by",
+    )
     mouse_id = models.CharField(max_length=100, primary_key=True)
     ID_TEMPORARY = "temporary"
     ID_ASSIGNED = "assigned"

@@ -4,12 +4,11 @@ from urllib.parse import urlencode
 from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
-from django.utils.safestring import mark_safe
 
 from .models import Mouse
 
 
-EMPTY_VALUE = mark_safe("&mdash;")
+EMPTY_VALUE = format_html("&mdash;")
 DEFAULT_TABLE_PAGE_SIZE = 25
 TABLE_PAGE_SIZE_CHOICES = [25, 50, 100, 150, 200]
 
@@ -24,11 +23,17 @@ CROSSING_FILTER_AUTOCOMPLETE = {
 MOUSE_TABLE_COLUMN_SPECS = [
     {
         "key": "mouse_id",
-        "label": "Mouse ID",
+        "label": "Animal ID",
         "sort": "mouse_id",
         "url": lambda mouse: reverse("lab:mouse_record", args=[mouse.pk]),
         "link_class": "mouse-link",
         "cell_class": "mouse-id-cell",
+    },
+    {
+        "key": "added_by__get_username",
+        "label": "Added by",
+        "sort": "added_by__username",
+        "cell_class": "compact-text-cell",
     },
     {
         "key": "date_of_birth",
@@ -100,11 +105,17 @@ MOUSE_TABLE_COLUMN_SPECS = [
 MICE_PAGE_TABLE_COLUMN_SPECS = [
     {
         "key": "mouse_id",
-        "label": "Mouse ID",
+        "label": "Animal ID",
         "sort": "mouse_id",
         "url": lambda mouse: reverse("lab:mouse_record", args=[mouse.pk]),
         "link_class": "mouse-link",
         "cell_class": "mouse-id-cell",
+    },
+    {
+        "key": "added_by__get_username",
+        "label": "Added by",
+        "sort": "added_by__username",
+        "cell_class": "compact-text-cell",
     },
     {
         "key": "genetics_genotype_display",
@@ -270,10 +281,10 @@ RECORDING_FILTER_SPECS = [
     },
     {
         "name": "mouse",
-        "label": "Mouse",
+        "label": "Animal",
         "type": "text",
         "lookup": "mice__mouse_id__icontains",
-        "placeholder": "Type mouse ID",
+        "placeholder": "Type animal ID",
     },
     {
         "name": "notes",
@@ -289,10 +300,17 @@ MOUSE_FILTER_SPECS = [
 
     {
         "name": "mouse_id",
-        "label": "Mouse ID",
+        "label": "Animal ID",
         "type": "text",
         "lookup": "mouse_id__icontains",
         "placeholder": "e.g. M123",
+    },
+    {
+        "name": "added_by",
+        "label": "Added by",
+        "type": "text",
+        "lookup": "added_by__username__icontains",
+        "placeholder": "Search username",
     },
     {
         "name": "dob",
@@ -329,6 +347,13 @@ MOUSE_FILTER_SPECS = [
         "autocomplete": CROSSING_FILTER_AUTOCOMPLETE,
     },
     {
+        "name": "notes",
+        "label": "Notes",
+        "type": "text",
+        "lookup": "notes__icontains",
+        "placeholder": "Search animal notes",
+    },
+    {
         "name": "show_current_year",
         "label": "Show only current year",
         "type": "checkbox",
@@ -352,7 +377,7 @@ def build_mice_page_filter_specs():
     return [
         {
             "name": "mouse_id",
-            "label": "Mouse ID",
+            "label": "Animal ID",
             "type": "text",
             "lookup": "mouse_id__icontains",
             "placeholder": "e.g. M123",
@@ -394,7 +419,8 @@ def build_mice_page_filter_specs():
 
 
 MOUSE_DETAIL_FIELD_SPECS = [
-    {"key": "mouse_id", "label": "Mouse ID"},
+    {"key": "mouse_id", "label": "Animal ID"},
+    {"key": "added_by__get_username", "label": "Added by"},
     {"key": "date_of_birth", "label": "Date of birth", "format": "date"},
     {"key": "breeding_pair", "label": "Breeding pair"},
     {"key": "genetics_genotype_display", "label": "Genotype"},
@@ -462,7 +488,7 @@ RECORDINGS_PAGE_BASE_COLUMN_SPECS = [
     {"key": "recording_date", "label": "Date", "format": "date"},
     {
         "key": "mice",
-        "label": "Mice",
+        "label": "Animals",
         "format": "recording_mice",
         "cell_class": "compact-text-cell",
     },
@@ -616,7 +642,7 @@ def build_home_cards(user=None):
     cards = [
         {
             "title": "Experimental animals and procedures",
-            "description": "View mice by licence and protocol and manage animal procedures.",
+            "description": "View animals by licence and protocol and manage animal procedures.",
             "url": reverse("lab:procedure_page"),
         },
         {
@@ -633,7 +659,7 @@ def build_home_cards(user=None):
         },
         {
             "title": "Reports",
-            "description": "Generate reports on mice, procedures and recordings.",
+            "description": "Generate reports on animals, procedures and recordings.",
             "url": reverse("lab:reports_page"),
         },
     ]
@@ -709,7 +735,7 @@ def build_procedure_matrix_table(
         {
             "class": "select-cell",
             "header_checkbox": {
-                "aria_label": "Select all mice",
+                "aria_label": "Select all animals",
             },
         },
         *build_sortable_columns(
@@ -770,7 +796,7 @@ def build_procedure_matrix_table(
         "columns": columns,
         "rows": rows,
         "has_selectable_rows": bool(rows),
-        "empty_message": "No mice are registered under this protocol.",
+        "empty_message": "No animals are registered under this protocol.",
     }
 
 
@@ -784,7 +810,7 @@ def build_mice_table(
         {
             "class": "select-cell",
             "header_checkbox": {
-                "aria_label": "Select all mice",
+                "aria_label": "Select all animals",
             },
         },
         *build_sortable_columns(
@@ -821,7 +847,7 @@ def build_mice_table(
         "columns": columns,
         "rows": rows,
         "has_selectable_rows": bool(rows),
-        "empty_message": "No mice match these filters.",
+        "empty_message": "No animals match these filters.",
     }
 
 
@@ -837,7 +863,7 @@ def build_mouse_selector_table(
         {
             "class": "select-cell",
             "header_checkbox": {
-                "aria_label": "Select all mice",
+                "aria_label": "Select all animals",
             },
         },
         *build_sortable_columns(
@@ -875,7 +901,7 @@ def build_mouse_selector_table(
         "columns": columns,
         "rows": rows,
         "has_selectable_rows": bool(rows),
-        "empty_message": "No mice match these filters.",
+        "empty_message": "No animals match these filters.",
     }
 
 
@@ -1451,7 +1477,7 @@ def format_value(value, value_format=None):
 
     if value_format == "recording_paths":
         return format_html_join(
-            mark_safe("<br>"),
+            format_html("<br>"),
             "{}",
             ((path,) for path in value),
         )
@@ -1466,7 +1492,7 @@ def format_procedure_status(procedures, severity_exceeded=False):
     procedures = list(procedures or [])
 
     if not procedures:
-        return mark_safe('<span class="empty-mark">&mdash;</span>')
+        return format_html('<span class="empty-mark">&mdash;</span>')
 
     procedure = latest_procedure(procedures)
     procedure_count = len(procedures)

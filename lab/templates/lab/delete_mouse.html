@@ -1,23 +1,23 @@
 {% extends "lab/base.html" %}
 
-{% block title %}Delete mouse {{ mouse.mouse_id }}{% endblock %}
-{% block page_title %}Delete mouse{% endblock %}
+{% block title %}Delete animal {{ mouse.mouse_id }}{% endblock %}
+{% block page_title %}Delete animal{% endblock %}
 {% block main_class %}container container-narrow{% endblock %}
 
 {% block page_subtitle %}
-    <p>This action permanently deletes the mouse.</p>
+    <p>This action permanently deletes the animal.</p>
 {% endblock %}
 
 {% block content %}
     <div class="read-only-field">
-        <p class="read-only-label">Mouse ID</p>
+        <p class="read-only-label">Animal ID</p>
         <p class="read-only-value">{{ mouse.mouse_id }}</p>
     </div>
 
     <div class="warning-message">
         <p>
             {{ procedure_count }} procedure{{ procedure_count|pluralize }}
-            will be deleted with this mouse.
+            will be deleted with this animal.
         </p>
 
         {% if recording_count %}
@@ -42,7 +42,7 @@
 
         <div class="actions">
             <button class="button button-danger" type="submit">
-                Delete mouse
+                Delete animal
             </button>
 
             <a

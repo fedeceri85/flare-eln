@@ -43,7 +43,7 @@ class MouseEditorTabTests(TestCase):
             with self.subTest(name=name):
                 _, html = self.editor(name, selected_mouse=[mouse.pk for mouse in self.mice])
                 self.assert_tabs(html)
-                shared = html.find("input", name="status")[0]
+                shared = html.find("select", name="status")[0]
                 self.assertTrue(shared.within("section", id="mouse-panel-shared"))
                 individual = html.find("select", name=f"{individual_mouse_field_prefix(self.mice[0])}_sex")[0]
                 self.assertTrue(individual.within("section", id="mouse-panel-individual"))
@@ -63,7 +63,7 @@ class MouseEditorTabTests(TestCase):
                 prefix = html.find("input", name="mouse_id_prefix")[0]
                 self.assertTrue(prefix.within("section", id="mouse-panel-ids"))
                 self.assertEqual(len(html.find("input", name="crossing_search")), 1)
-                self.assertContains(response, "Save the mice before adding service records.")
+                self.assertContains(response, "Save the animals before adding service records.")
                 self.assertFalse(html.find("form", **{"data-existing-procedure-editor": None}))
 
     def test_save_while_services_tab_active_creates_mice_and_procedures_from_other_tabs(self):

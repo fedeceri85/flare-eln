@@ -295,7 +295,7 @@ class LinesCrossingsPageTests(AuthenticatedTestCase):
             response,
             (
                 "Line Genotyped line cannot be deleted because it is linked to "
-                "1 mouse genotype record."
+                "1 animal genotype record."
             ),
         )
 
@@ -346,6 +346,6 @@ class LinesCrossingsPageTests(AuthenticatedTestCase):
             response,
             (
                 "Crossing Protected crossing cannot be deleted because "
-                "1 mouse uses it."
+                "1 animal uses it."
             ),
         )

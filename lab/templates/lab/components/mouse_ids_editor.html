@@ -1,9 +1,9 @@
 <section class="bulk-section" id="mouse-panel-ids" data-mouse-tab-panel="ids">
-    <h2 class="visually-hidden">Mouse IDs</h2>
-    <p class="bulk-help">Edit Mouse IDs below. Renaming keeps linked procedures, genotypes and service records, and marks the new ID as assigned.</p>
+    <h2 class="visually-hidden">Animal IDs</h2>
+    <p class="bulk-help">Edit Animal IDs below. Renaming keeps linked procedures, genotypes and service records, and marks the new ID as assigned.</p>
     <div class="table-scroll">
-        <table class="data-table">
-            <thead><tr><th>Current Mouse ID</th><th>Mouse ID</th></tr></thead>
+        <table class="data-table mouse-ids-table">
+            <thead><tr><th>Current Animal ID</th><th>Animal ID</th></tr></thead>
             <tbody>{% for row in form.identity_rows %}
                 <tr><th scope="row">{{ row.mouse_id }}</th><td>{% include "lab/components/field_control.html" with field=row.field only %}</td></tr>
             {% endfor %}</tbody>

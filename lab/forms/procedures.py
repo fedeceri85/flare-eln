@@ -40,7 +40,7 @@ class ProcedureCreateForm(BaseProcedureForm):
     class Meta(BaseProcedureForm.Meta):
         help_texts = {
             "procedure_type": (
-                "This always adds a new procedure row for the mouse."
+                "This always adds a new procedure row for the animal."
             ),
         }
 
@@ -88,7 +88,7 @@ class BulkProcedureCreateForm(BaseProcedureForm):
 class ExistingProcedureBulkForm(forms.Form):
     selected_procedures = forms.ModelMultipleChoiceField(
         queryset=Procedure.objects.none(), widget=forms.MultipleHiddenInput,
-        error_messages={"invalid_choice": "One or more procedures are no longer available in this mouse selection."},
+        error_messages={"invalid_choice": "One or more procedures are no longer available in this animal selection."},
     )
     snapshot = forms.CharField(required=False, widget=forms.HiddenInput)
     update_procedure_type = forms.BooleanField(required=False, label="Update procedure type")

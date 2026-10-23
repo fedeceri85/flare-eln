@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -63,6 +64,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--added-by",
+            help="Account username to attribute newly imported mice to. Existing attribution is preserved; omit for unknown.",
+        )
+        parser.add_argument(
             "--excel-file",
             type=Path,
             default=self.EXCEL_FILE,
@@ -91,6 +96,12 @@ class Command(BaseCommand):
         sheet_name = options["sheet_name"]
         protocol_number = options["protocol_number"]
         header_row = options["header_row"]
+        added_by = None
+        if options.get("added_by"):
+            try:
+                added_by = get_user_model().objects.get_by_natural_key(options["added_by"])
+            except get_user_model().DoesNotExist as exc:
+                raise CommandError("The --added-by account does not exist.") from exc
 
         if not excel_file.exists():
             raise CommandError(
@@ -227,6 +238,9 @@ class Command(BaseCommand):
                 )
 
                 if created:
+                    if added_by is not None:
+                        mouse.added_by = added_by
+                        mouse.save(update_fields=["added_by"])
                     created_mice += 1
                 else:
                     updated_mice += 1

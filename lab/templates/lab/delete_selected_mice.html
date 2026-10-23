@@ -1,7 +1,7 @@
 {% extends "lab/base.html" %}
 
-{% block title %}Delete selected mice{% endblock %}
-{% block page_title %}Delete selected mice{% endblock %}
+{% block title %}Delete selected animals{% endblock %}
+{% block page_title %}Delete selected animals{% endblock %}
 {% block main_class %}container container-wide{% endblock %}
 
 {% block page_subtitle %}
@@ -9,16 +9,16 @@
         {% if selected_protocol %}
             Protocol {{ selected_protocol.protocol_number }}.
         {% else %}
-            All mice.
+            All animals.
         {% endif %}
-        This action permanently deletes the selected mice.
+        This action permanently deletes the selected animals.
     </p>
 {% endblock %}
 
 {% block content %}
     <div class="selected-list">
         <p class="selected-list-label">
-            Selected mice
+            Selected animals
         </p>
 
         <ul class="selected-list-items">
@@ -33,7 +33,7 @@
     <div class="warning-message">
         <p>
             {{ procedure_count }} procedure{{ procedure_count|pluralize }}
-            will be deleted with these mice.
+            will be deleted with these animals.
         </p>
 
         {% if recording_count %}
@@ -66,7 +66,7 @@
 
         <div class="actions">
             <button class="button button-danger" type="submit">
-                Delete selected mice
+                Delete selected animals
             </button>
 
             <a class="button" href="{{ return_url }}">

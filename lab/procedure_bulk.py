@@ -157,7 +157,7 @@ def handle_procedure_action(request, mice, protocol=None, return_url=""):
                 } if deleting else None
                 save_preview(form.cleaned_data["snapshot"], mice, protocol, ids, scope, updates, deleting, delete_snapshots)
                 verb = "Deleted" if deleting else "Updated"
-                message = f"{verb} {len(ids)} procedure records. Mouse changes have not been saved."
+                message = f"{verb} {len(ids)} procedure records. Animal changes have not been saved."
                 form = ExistingProcedureBulkForm(procedures=queryset)
                 status = 200
             except (signing.BadSignature, ValueError, TypeError):
@@ -194,7 +194,7 @@ def handle_create_procedures(request, mice, protocol=None, return_url=""):
     status = 400
     message = ""
     if request.headers.get("X-Requested-With") != "XMLHttpRequest":
-        form.add_error(None, "Enable JavaScript to add procedures without leaving the mouse editor.")
+        form.add_error(None, "Enable JavaScript to add procedures without leaving the animal editor.")
     elif form.is_valid():
         try:
             with transaction.atomic():
@@ -202,13 +202,13 @@ def handle_create_procedures(request, mice, protocol=None, return_url=""):
                     pk__in=[mouse.pk for mouse in mice],
                 ).order_by("pk"))
                 if len(current_mice) != len(mice) or (protocol and any(mouse.protocol_id != protocol.pk for mouse in current_mice)):
-                    raise ValidationError("The mouse selection changed. Review the selected mice before adding procedures.")
+                    raise ValidationError("The animal selection changed. Review the selected animals before adding procedures.")
                 if any(not mouse.protocol.allows_regulated_procedures for mouse in current_mice):
-                    raise ValidationError("Regulated procedure creation is disabled for one or more selected mice.")
+                    raise ValidationError("Regulated procedure creation is disabled for one or more selected animals.")
                 values = {name: form.cleaned_data[name] for name in form.Meta.fields}
                 for mouse in current_mice:
                     Procedure.objects.create(mouse=mouse, **values)
-            message = f"Added {len(mice)} procedure records. Mouse changes have not been saved."
+            message = f"Added {len(mice)} procedure records. Animal changes have not been saved."
             form = BulkProcedureCreateForm()
             status = 200
         except ValidationError as error:

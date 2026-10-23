@@ -12,7 +12,7 @@ HOME_OFFICE_RETURN_REPORT = "home_office_return"
 
 
 HOME_OFFICE_WARNING = (
-    "Mice are assigned to this return based on protocol start date, "
+    "Animals are assigned to this return based on protocol start date, "
     "not protocol end date."
 )
 
@@ -97,8 +97,8 @@ def add_mouse_to_home_office_counts(counts, mouse):
 def build_report_cards():
     return [
         {
-            "title": "Mice",
-            "description": "Browse, filter and manage all mouse records.",
+            "title": "Animals",
+            "description": "Browse, filter and manage all animal records.",
             "url": reverse("lab:mice_page"),
         },
         {
@@ -128,7 +128,7 @@ def build_home_office_return_text(report):
         f"Warning: {report['warning']}",
         "",
         "Total numbers",
-        f"Mice under procedure: {report['total']['total']}",
+        f"Animals under procedure: {report['total']['total']}",
         *(f"{row['label']}: {row['count']}" for row in report["total"]["severity_rows"]),
         f"Severity not set: {report['total']['not_set']}",
         f"Surpassed severity threshold: {report['total']['exceeded']}",
@@ -151,7 +151,7 @@ def build_home_office_return_text(report):
                 "",
                 row["protocol_label"],
                 f"Max severity: {max_severity}",
-                f"Mice under procedure: {row['total']}",
+                f"Animals under procedure: {row['total']}",
                 *(f"{severity['label']}: {severity['count']}" for severity in row["severity_rows"]),
                 f"Severity not set: {row['not_set']}",
                 f"Surpassed severity threshold: {row['exceeded']}",
@@ -173,7 +173,7 @@ def build_home_office_return_text(report):
             [
                 "",
                 row["procedure_label"],
-                f"Mice under procedure: {row['total']}",
+                f"Animals under procedure: {row['total']}",
                 *(f"{severity['label']}: {severity['count']}" for severity in row["severity_rows"]),
                 f"Severity not set: {row['not_set']}",
                 f"Surpassed severity threshold: {row['exceeded']}",

@@ -61,7 +61,7 @@ class BulkMouseDeleteRouteTests(TestCase):
                 response = method(url, {"return_url": "https://outside.example/"})
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], self.scoped_fallback if protocol else reverse("lab:mice_page"))
-                self.assertIn("Select at least one mouse before deleting.",
+                self.assertIn("Select at least one animal before deleting.",
                               [str(message) for message in get_messages(response.wsgi_request)])
 
     def test_missing_mouse_rejects_whole_selection(self):
@@ -78,7 +78,7 @@ class BulkMouseDeleteRouteTests(TestCase):
                 response = method(url, self.payload(selected_mouse=[self.mice[0].pk, self.outside.pk], confirm_delete="on"))
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], self.return_url)
-                self.assertIn("One or more selected mice could not be found for this protocol.",
+                self.assertIn("One or more selected animals could not be found for this protocol.",
                               [str(message) for message in get_messages(response.wsgi_request)])
         self.assertEqual(Mouse.objects.count(), 3)
 
@@ -126,7 +126,7 @@ class BulkMouseDeleteRouteTests(TestCase):
             self.assertEqual(response["Location"], self.return_url)
             self.assertEqual(Mouse.objects.count(), 3)
             self.assertTrue(Procedure.objects.filter(pk=self.procedure.pk).exists())
-            self.assertIn("Selected mice could not be deleted because another record still protects at least one mouse.",
+            self.assertIn("Selected animals could not be deleted because another record still protects at least one animal.",
                           [str(message) for message in get_messages(response.wsgi_request)])
 
     def test_selection_is_rechecked_under_lock_before_deletion(self):

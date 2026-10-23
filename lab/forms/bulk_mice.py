@@ -34,15 +34,16 @@ class BulkMouseUpdateForm(forms.Form):
     ]
 
 
-    confirm_mouse_ids = forms.BooleanField(required=False, label="Confirm Mouse ID changes")
+    confirm_mouse_ids = forms.BooleanField(required=False, label="Confirm Animal ID changes")
 
     update_status = forms.BooleanField(
         required=False,
         label="Update status",
     )
-    status = forms.CharField(
+    status = forms.ChoiceField(
         required=False,
-        max_length=50,
+        choices=Mouse.STATUS_CHOICES,
+        initial="Alive",
         label="Status",
     )
 
@@ -129,14 +130,14 @@ class BulkMouseUpdateForm(forms.Form):
             ("append", "Append"),
             ("replace", "Replace"),
         ],
-        label="Mouse notes action",
+        label="Animal notes action",
     )
     notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"rows": 4}),
-        label="Mouse notes",
+        label="Animal notes",
         help_text=(
-            "Append adds this text to each selected mouse. Replace overwrites "
+            "Append adds this text to each selected animal. Replace overwrites "
             "their existing notes; leave the text blank to clear them."
         ),
     )
@@ -157,6 +158,9 @@ class BulkMouseUpdateForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.selected_mice = list(kwargs.pop("selected_mice", []))
         super().__init__(*args, **kwargs)
+        statuses = {mouse.status for mouse in self.selected_mice}
+        if len(statuses) == 1 and next(iter(statuses)) in dict(Mouse.STATUS_CHOICES):
+            self.fields["status"].initial = next(iter(statuses))
         self.single_mouse_mode = len(self.selected_mice) == 1
         if self.single_mouse_mode:
             mouse = self.selected_mice[0]
@@ -165,6 +169,8 @@ class BulkMouseUpdateForm(forms.Form):
             for update_name, name in self.MOUSE_UPDATE_FIELDS:
                 if name != "crossing_search":
                     value = getattr(mouse, name)
+                    if name == "status" and value not in dict(Mouse.STATUS_CHOICES):
+                        value = self.fields["status"].initial
                     self.fields[name].initial = value
                     if (self.is_bound and self.add_prefix(name) not in self.data
                             and not self.fields[update_name].clean(self.data.get(self.add_prefix(update_name)))):
@@ -179,6 +185,8 @@ class BulkMouseUpdateForm(forms.Form):
             self.fields["update_genotype"].widget = forms.HiddenInput()
             for name in ("date_of_birth", "protocol_start_date", "cull_date"):
                 self.fields[name].widget.format = "%Y-%m-%d"
+        if self.is_bound and not self.fields["update_status"].clean(self.data.get(self.add_prefix("update_status"))):
+            self.fields["status"].disabled = True
         self.fields["crossing_definition"].queryset = active_crossings_queryset()
         self.genotype_fields = []
         self.current_crossing = self.shared_selected_crossing()
@@ -235,8 +243,8 @@ class BulkMouseUpdateForm(forms.Form):
         for mouse in self.selected_mice:
             stem = individual_mouse_field_prefix(mouse)
             self.fields[f"{stem}_mouse_id"] = forms.CharField(
-                required=False, max_length=100, initial=mouse.pk, label="Mouse ID",
-                widget=forms.TextInput(attrs={"aria-label": f"{mouse.pk}: Mouse ID"}),
+                required=False, max_length=100, initial=mouse.pk, label="Animal ID",
+                widget=forms.TextInput(attrs={"aria-label": f"{mouse.pk}: Animal ID"}),
             )
             self.identity_rows.append({"mouse_id": mouse.pk, "field": self[f"{stem}_mouse_id"]})
             crossing = self.selected_crossing if change_crossing and self.selected_crossing else crossings.get(mouse.crossing_definition_id)
@@ -328,7 +336,7 @@ class BulkMouseUpdateForm(forms.Form):
                 continue
             value = (cleaned_data[field.name] or "").strip()
             if not value:
-                self.add_error(field.name, "Enter a Mouse ID.")
+                self.add_error(field.name, "Enter an Animal ID.")
             final_ids[old_id] = value
             if value and value != old_id:
                 renames[old_id] = value
@@ -337,9 +345,9 @@ class BulkMouseUpdateForm(forms.Form):
         for row in self.identity_rows:
             value = final_ids[row["mouse_id"]]
             if value and (value in occupied or list(final_ids.values()).count(value) > 1):
-                self.add_error(row["field"].name, "A mouse with this ID already exists or is named twice in this selection.")
+                self.add_error(row["field"].name, "An animal with this ID already exists or is named twice in this selection.")
         if renames and not cleaned_data.get("confirm_mouse_ids"):
-            self.add_error("confirm_mouse_ids", "Confirm the Mouse ID changes before saving.")
+            self.add_error("confirm_mouse_ids", "Confirm the Animal ID changes before saving.")
         return renames
 
     def validate_local_identifiers(self, cleaned_data):
@@ -366,7 +374,7 @@ class BulkMouseUpdateForm(forms.Form):
         seen = set()
         for stem, key in candidates:
             if key in seen or key in outside_keys:
-                self.add_error(f"{stem}_local_identifier", "This local identifier is already used by another mouse with the same birth date, breeding pair, crossing and Local ID type.")
+                self.add_error(f"{stem}_local_identifier", "This local identifier is already used by another animal with the same birth date, breeding pair, crossing and Local ID type.")
             seen.add(key)
 
     def shared_selected_crossing(self):
@@ -461,6 +469,9 @@ class BulkMouseUpdateForm(forms.Form):
         update_genotype = cleaned_data.get("update_genotype")
         has_mouse_update = has_mouse_update or bool(update_genotype)
 
+        if cleaned_data.get("update_status") and not cleaned_data.get("status") and "status" not in self.errors:
+            self.add_error("status", "Select Alive or Culled.")
+
         if (
             cleaned_data.get("update_protocol")
             and cleaned_data.get("protocol") is None
@@ -487,7 +498,7 @@ class BulkMouseUpdateForm(forms.Form):
                 self.add_error(
                     "crossing_search",
                     (
-                        "Select an existing crossing, or select mice that "
+                        "Select an existing crossing, or select animals that "
                         "already share one crossing."
                     ),
                 )
@@ -534,7 +545,7 @@ class BulkMouseUpdateForm(forms.Form):
 
             if mice_with_procedures:
                 raise forms.ValidationError(
-                    "Remove existing procedures before moving these mice to a "
+                    "Remove existing procedures before moving these animals to a "
                     "protocol that does not allow regulated procedures: "
                     + ", ".join(mice_with_procedures[:5])
                 )
@@ -546,7 +557,7 @@ class BulkMouseUpdateForm(forms.Form):
             )
 
         if not has_mouse_update and not has_notes_update:
-            raise forms.ValidationError("Select at least one mouse change before saving.")
+            raise forms.ValidationError("Select at least one animal change before saving.")
 
         self.validate_local_identifiers(cleaned_data)
         return cleaned_data

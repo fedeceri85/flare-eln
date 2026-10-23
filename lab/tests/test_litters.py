@@ -71,6 +71,23 @@ class AddLitterTests(AuthenticatedTestCase):
                 payload[f"pup_{number}_genotype_line_{line.pk}"] = "het"
         return payload
 
+    def test_status_defaults_to_alive_and_allows_creating_culled_animals(self):
+        response = self.client.get(self.add_litter_url)
+        self.assertEqual(response.context["form"]["status"].value(), "Alive")
+        self.assertIn('<select ', str(response.context["form"]["status"]))
+        self.assertContains(response, '<option value="Alive" selected>Alive</option>', html=True)
+        response = self.client.post(self.add_litter_url, self.litter_payload(status="Culled"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(list(Mouse.objects.values_list("status", flat=True)), ["Culled", "Culled"])
+
+    def test_creation_rejects_blank_or_unrecognised_status_without_creating_mice(self):
+        for status in ("", "Archived"):
+            with self.subTest(status=status):
+                response = self.client.post(self.add_litter_url, self.litter_payload(status=status))
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("status", response.context["form"].errors)
+                self.assertFalse(Mouse.objects.exists())
+
     def test_add_litter_form_renders_litter_and_procedure_fields(self):
         response = self.client.get(self.add_litter_url)
 
@@ -262,7 +279,7 @@ class AddLitterTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(
-            "Mouse IDs already exist: L-100.",
+            "Animal IDs already exist: L-100.",
             response.context["form"].errors["mouse_numbers"],
         )
         self.assertFalse(Mouse.objects.filter(mouse_id="L-101").exists())

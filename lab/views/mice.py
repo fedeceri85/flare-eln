@@ -314,19 +314,20 @@ def possible_duplicate_confirmed(request, warning):
     return context == warning["confirmation_context"]
 
 
-def create_litter_mice(selected_protocol, form):
+def create_litter_mice(selected_protocol, form, *, added_by=None):
     cleaned_data = form.cleaned_data
     litter_protocol = cleaned_data.get("protocol") or selected_protocol
     mice = []
     for row in form.mouse_creation_rows():
         mouse = Mouse.objects.create(
             mouse_id=row["mouse_id"],
+            added_by=added_by,
             id_status=Mouse.ID_TEMPORARY if cleaned_data.get("no_id_available") else Mouse.ID_ASSIGNED,
             date_of_birth=cleaned_data.get("date_of_birth"),
             tattoo=row["tattoo"],
             marking_type=row["marking_type"],
             sex=row["sex"],
-            status=cleaned_data.get("status", ""),
+            status=cleaned_data["status"],
             protocol_start_date=cleaned_data.get("protocol_start_date"),
             cull_date=cleaned_data.get("cull_date"),
             protocol=litter_protocol,
@@ -364,7 +365,7 @@ def mice_page(request):
     filter_specs = build_mice_page_filter_specs()
     filter_values = read_filter_values(request.GET, filter_specs)
 
-    mice = Mouse.objects.select_related("protocol")
+    mice = Mouse.objects.select_related("protocol", "added_by")
     mice = apply_filter_specs(mice, filter_specs, filter_values)
 
     mice = order_mice_page_queryset(mice, sort, direction)
@@ -395,7 +396,7 @@ def mice_page(request):
                 ],
                 clear_url=reverse("lab:mice_page"),
             ),
-            "record_count": build_record_count(page_obj, "mouse"),
+            "record_count": build_record_count(page_obj, "animal"),
             "pagination": build_pagination(page_obj, query_params),
             "page_size_control": build_table_page_size_control(
                 request.GET,
@@ -456,20 +457,20 @@ def delete_mouse(request, mouse_pk):
             except Mouse.DoesNotExist:
                 messages.error(
                     request,
-                    "Mouse could not be found.",
+                    "Animal could not be found.",
                 )
             except ProtectedError:
                 messages.error(
                     request,
                     (
-                        "Mouse could not be deleted because another record "
+                        "Animal could not be deleted because another record "
                         "still protects it."
                     ),
                 )
             else:
                 messages.success(
                     request,
-                    f"Mouse {mouse_id} was deleted.",
+                    f"Animal {mouse_id} was deleted.",
                 )
 
             return redirect(return_url)
@@ -531,7 +532,7 @@ def _edit_selected_mice(request, selected_protocol=None):
     if not mouse_ids:
         messages.error(
             request,
-            "Select at least one mouse before editing.",
+            "Select at least one animal before editing.",
         )
         return redirect(return_url)
 
@@ -543,8 +544,8 @@ def _edit_selected_mice(request, selected_protocol=None):
     except Mouse.DoesNotExist:
         messages.error(
             request,
-            "One or more selected mice could not be found for this protocol."
-            if scoped else "One or more selected mice could not be found.",
+            "One or more selected animals could not be found for this protocol."
+            if scoped else "One or more selected animals could not be found.",
         )
         return redirect(return_url)
 
@@ -583,9 +584,9 @@ def _edit_selected_mice(request, selected_protocol=None):
             try:
                 apply_bulk_mouse_updates(selected_mice, form)
             except IntegrityError:
-                form.add_error(None, "The mouse changes conflict with an existing record. No changes were saved. Review the local identifiers and shared details.")
+                form.add_error(None, "The animal changes conflict with an existing record. No changes were saved. Review the local identifiers and shared details.")
             else:
-                messages.success(request, f"{len(selected_mice)} mice were updated successfully.")
+                messages.success(request, f"{len(selected_mice)} animals were updated successfully.")
                 renames = form.cleaned_data.get("mouse_id_renames", {})
                 if renames:
                     parts = urlsplit(return_url)
@@ -650,8 +651,8 @@ def _delete_selected_mice(request, selected_protocol=None):
     return_url = safe_return_url(request, fallback_url)
     mouse_ids = selected_mouse_ids(request)
     missing_message = (
-        "One or more selected mice could not be found for this protocol."
-        if scoped else "One or more selected mice could not be found."
+        "One or more selected animals could not be found for this protocol."
+        if scoped else "One or more selected animals could not be found."
     )
 
     def load_selected_mice(for_update=False):
@@ -664,7 +665,7 @@ def _delete_selected_mice(request, selected_protocol=None):
     if not mouse_ids:
         messages.error(
             request,
-            "Select at least one mouse before deleting.",
+            "Select at least one animal before deleting.",
         )
         return redirect(return_url)
 
@@ -716,14 +717,14 @@ def _delete_selected_mice(request, selected_protocol=None):
                 messages.error(
                     request,
                     (
-                        "Selected mice could not be deleted because another "
-                        "record still protects at least one mouse."
+                        "Selected animals could not be deleted because another "
+                        "record still protects at least one animal."
                     ),
                 )
             else:
                 messages.success(
                     request,
-                    f"{deleted_count} mice were deleted.",
+                    f"{deleted_count} animals were deleted.",
                 )
 
             return redirect(return_url)
@@ -746,10 +747,10 @@ def _delete_selected_mice(request, selected_protocol=None):
 
 def protocol_assignment_message(mouse_count, protocol):
     if protocol is None:
-        return f"{mouse_count} mice were added with no protocol."
+        return f"{mouse_count} animals were added with no protocol."
 
     return (
-        f"{mouse_count} mice were added to protocol "
+        f"{mouse_count} animals were added to protocol "
         f"{protocol.protocol_number}."
     )
 
@@ -827,14 +828,15 @@ def add_litter(request, protocol_number=None, licence_reference=None):
                         mice, litter_protocol = create_litter_mice(
                             selected_protocol,
                             form,
+                            added_by=request.user,
                         )
                 except IntegrityError:
                     possible_duplicate_warning = None
                     form.add_error(
                         None,
                         (
-                            "One or more Mouse IDs or local identifiers already exist. "
-                            "Review the individual mouse rows."
+                            "One or more Animal IDs or local identifiers already exist. "
+                            "Review the individual animal rows."
                         ),
                     )
                 else:
@@ -967,7 +969,7 @@ def mouse_lookup(request):
 
 
 def mouse_record(request, mouse_pk):
-    mouse = get_object_or_404(Mouse, pk=mouse_pk)
+    mouse = get_object_or_404(Mouse.objects.select_related("added_by"), pk=mouse_pk)
 
     procedures = (
         mouse.procedures

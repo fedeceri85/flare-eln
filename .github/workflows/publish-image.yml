@@ -103,7 +103,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/fedeceri85/flare-eln
             org.opencontainers.image.revision=${{ steps.source.outputs.commit }}
             org.opencontainers.image.version=${{ env.RELEASE_TAG }}
-            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.licenses=AGPL-3.0-only
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

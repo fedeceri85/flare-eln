@@ -170,7 +170,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         for label in (
             "Date",
-            "Mice",
+            "Animals",
             "Sequence",
             "Objective",
             "FPS",
@@ -357,11 +357,11 @@ class RecordingsPageTests(AuthenticatedTestCase):
         content = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add mice")
+        self.assertContains(response, "Add animals")
         self.assertContains(response, 'name="recording_action"')
         self.assertContains(response, 'value="select_mice"')
         self.assertContains(response, 'formnovalidate')
-        self.assertContains(response, "No mice selected")
+        self.assertContains(response, "No animals selected")
         paths = Markup(content).find("textarea", name="data_paths")
         self.assertEqual(len(paths), 1)
         self.assertEqual(paths[0].attrs.get("rows"), "2")
@@ -377,10 +377,10 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertNotContains(response, 'list="mouse-options"')
         self.assertLess(
             content.index('name="mice"'),
-            content.index("Add mice"),
+            content.index("Add animals"),
         )
         self.assertLess(
-            content.index("Add mice"),
+            content.index("Add animals"),
             content.index('name="recording_date"'),
         )
 
@@ -431,11 +431,11 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Select mice")
+        self.assertContains(response, "Select animals")
         self.assertContains(response, "Back to Add recording")
         self.assertContains(response, f'href="{self.add_recording_url}"')
         self.assertContains(response, "Add animals")
-        self.assertContains(response, "Add selected mice")
+        self.assertContains(response, "Add selected animals")
         self.assertContains(response, reverse("lab:add_litter_all"))
         self.assertContains(response, "return_with_mouse=1")
         self.assertNotContains(response, "Mouse page")
@@ -558,7 +558,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(
-            "Genotyping records can only include mice from one crossing.",
+            "Genotyping records can only include animals from one crossing.",
             response.context["form"].errors["mice"][0],
         )
         self.assertFalse(
@@ -584,7 +584,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(
-            "Select mice with a crossing before creating a genotyping record",
+            "Select animals with a crossing before creating a genotyping record",
             response.context["form"].errors["mice"][0],
         )
         self.assertFalse(
@@ -769,7 +769,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Select registered mouse IDs: REC-PAGE.",
+            "Select registered animal IDs: REC-PAGE.",
         )
         self.assertFalse(
             Recording.objects.filter(

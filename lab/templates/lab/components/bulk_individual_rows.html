@@ -1,6 +1,6 @@
 <div class="litter-rows-scroll">
     {% regroup form.individual_rows by crossing as crossing_groups %}
     {% for group in crossing_groups %}
-        {% include "lab/components/individual_mouse_table.html" with rows=group.list crossing=group.grouper empty_genotype_message="Choose a crossing in Mouse details to enter genotypes." %}
+        {% include "lab/components/individual_mouse_table.html" with rows=group.list crossing=group.grouper empty_genotype_message="Choose a crossing in Animal details to enter genotypes." %}
     {% endfor %}
 </div>

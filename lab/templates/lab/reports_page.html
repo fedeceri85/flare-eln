@@ -48,7 +48,7 @@
                             <table class="data-table report-table">
                                 <thead>
                                     <tr>
-                                        <th scope="col">Mice under procedure</th>
+                                        <th scope="col">Animals under procedure</th>
                                         {% for label in home_office_report.severity_labels %}
                                             <th scope="col">{{ label }}</th>
                                         {% endfor %}
@@ -81,7 +81,7 @@
                                 <thead>
                                     <tr>
                                         <th scope="col">Crossing type</th>
-                                        <th scope="col">Mice under procedure</th>
+                                        <th scope="col">Animals under procedure</th>
                                     </tr>
                                 </thead>
 
@@ -108,7 +108,7 @@
                                     <tr>
                                         <th scope="col">Protocol</th>
                                         <th scope="col">Max severity</th>
-                                        <th scope="col">Mice under procedure</th>
+                                        <th scope="col">Animals under procedure</th>
                                         {% for label in home_office_report.severity_labels %}
                                             <th scope="col">{{ label }}</th>
                                         {% endfor %}
@@ -161,7 +161,7 @@
                                 <thead>
                                     <tr>
                                         <th scope="col">Procedure</th>
-                                        <th scope="col">Mice under procedure</th>
+                                        <th scope="col">Animals under procedure</th>
                                         {% for label in home_office_report.severity_labels %}
                                             <th scope="col">{{ label }}</th>
                                         {% endfor %}
@@ -183,7 +183,7 @@
                                         </tr>
                                     {% empty %}
                                         <tr>
-                                            <td colspan="{{ home_office_report.procedure_column_count }}">No procedures are recorded for mice in this return.</td>
+                                            <td colspan="{{ home_office_report.procedure_column_count }}">No procedures are recorded for animals in this return.</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>

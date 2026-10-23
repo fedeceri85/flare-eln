@@ -43,7 +43,7 @@ class BulkMouseNotesTests(TestCase):
 
     def test_leave_unchanged_ignores_notes_during_other_update(self):
         form = BulkMouseUpdateForm(
-            {"notes_action": "", "notes": "Ignored", "update_status": "on", "status": "Updated"},
+            {"notes_action": "", "notes": "Ignored", "update_status": "on", "status": "Culled"},
             selected_mice=self.mice,
         )
         self.assertTrue(form.is_valid(), form.errors)
@@ -51,7 +51,7 @@ class BulkMouseNotesTests(TestCase):
         for mouse, expected in zip(self.mice, ("Original A", "Original B", "")):
             mouse.refresh_from_db()
             self.assertEqual(mouse.notes, expected)
-            self.assertEqual(mouse.status, "Updated")
+            self.assertEqual(mouse.status, "Culled")
 
     def test_empty_append_and_invalid_action_are_rejected(self):
         for action, text in (("append", " "), ("invalid", "text")):

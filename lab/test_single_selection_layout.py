@@ -35,7 +35,7 @@ class SingleSelectionLayoutTests(TestCase):
             self.assertEqual(response.status_code, 200)
             html = Markup(response.content.decode())
             self.assertEqual([node.attrs["data-mouse-tab"] for node in html.find("button", role="tab")], ["ids", "shared", "procedures", "services"])
-            self.assertIn("Mouse details", html.find("button", id="mouse-tab-shared")[0].text)
+            self.assertIn("Animal details", html.find("button", id="mouse-tab-shared")[0].text)
             self.assertFalse(html.find("section", id="mouse-panel-individual"))
             local = html.find("input", name=self.stem + "_local_identifier")[0]
             sex = html.find("select", name=self.stem + "_sex")[0]
@@ -43,7 +43,7 @@ class SingleSelectionLayoutTests(TestCase):
             for field in (local, sex, gene):
                 self.assertTrue(field.within("section", id="mouse-panel-shared"))
                 self.assertTrue(field.within("section", id="mouse-individual-details"))
-            self.assertLess(html.elements.index(gene), html.elements.index(html.find("input", name="status")[0]))
+            self.assertLess(html.elements.index(gene), html.elements.index(html.find("select", name="status")[0]))
             ids = [node.attrs["id"] for node in html.elements if "id" in node.attrs]
             self.assertEqual(len(ids), len(set(ids)))
             self.assertFalse(html.find("select", name=self.gene))
@@ -62,13 +62,13 @@ class SingleSelectionLayoutTests(TestCase):
         self.assertEqual(html.find("input", name="date_of_birth")[0].attrs["value"], "2026-01-02")
         self.assertFalse(form["update_status"].value())
 
-    def test_multiple_selection_keeps_individual_tab_and_no_single_mouse_defaults(self):
+    def test_multiple_selection_keeps_individual_tab_and_prefills_shared_status(self):
         response = self.get(self.urls[0], [self.mouse, self.other])
         html = Markup(response.content.decode())
         self.assertEqual(len(html.find("button", role="tab")), 5)
         self.assertTrue(html.find("section", id="mouse-panel-individual"))
         self.assertFalse(html.find("section", id="mouse-individual-details"))
-        self.assertIsNone(response.context["form"]["status"].value())
+        self.assertEqual(response.context["form"]["status"].value(), "Alive")
 
     def test_single_row_changes_save_without_modifying_unchecked_details(self):
         for index, url in enumerate(self.urls):

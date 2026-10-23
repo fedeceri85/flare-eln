@@ -1,14 +1,13 @@
 {% extends "lab/base.html" %}
 {% load navigation %}
 
-{% block title %}Mouse record {{ mouse.mouse_id }}{% endblock %}
-{% block page_title %}Mouse {{ mouse.mouse_id }}{% endblock %}
+{% block title %}Animal record {{ mouse.mouse_id }}{% endblock %}
+{% block page_title %}Animal {{ mouse.mouse_id }}{% endblock %}
 
 {% block header_extra %}
     <div class="actions">
         <span class="status-pill">Status: {{ status }}</span>
-        <span class="status-pill">ID status: {{ mouse.get_id_status_display }}</span>
-        <a class="button" href="{% record_link edit_mouse_url request %}">Edit mouse</a>
+        <a class="button" href="{% record_link edit_mouse_url request %}">Edit animal</a>
     </div>
 {% endblock %}
 

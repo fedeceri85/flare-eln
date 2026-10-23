@@ -1,7 +1,7 @@
 {% extends "lab/base.html" %}
 
-{% block title %}Select mice{% endblock %}
-{% block page_title %}Select mice{% endblock %}
+{% block title %}Select animals{% endblock %}
+{% block page_title %}Select animals{% endblock %}
 {% block main_class %}container container-fluid{% endblock %}
 
 {% block page_subtitle %}
@@ -54,7 +54,7 @@
 
         <div class="selected-list">
             <p class="selected-list-label">
-                Selected mice
+                Selected animals
             </p>
 
             {% if selected_mice %}
@@ -66,7 +66,7 @@
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="read-only-value">No mice selected</p>
+                <p class="read-only-value">No animals selected</p>
             {% endif %}
         </div>
 

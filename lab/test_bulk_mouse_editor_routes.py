@@ -52,7 +52,7 @@ class BulkMouseEditorRouteTests(TestCase):
                 response = method(url, {"return_url": "https://outside.example/"})
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], self.fallback(protocol))
-                self.assertIn("Select at least one mouse before editing.", [str(message) for message in get_messages(response.wsgi_request)])
+                self.assertIn("Select at least one animal before editing.", [str(message) for message in get_messages(response.wsgi_request)])
 
     def test_missing_mouse_rejects_entire_selection_on_every_route(self):
         for url, protocol in self.routes:
@@ -73,7 +73,7 @@ class BulkMouseEditorRouteTests(TestCase):
                                             HTTP_X_REQUESTED_WITH="XMLHttpRequest")
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], self.scoped_fallback)
-                self.assertIn("One or more selected mice could not be found for this protocol.",
+                self.assertIn("One or more selected animals could not be found for this protocol.",
                               [str(message) for message in get_messages(response.wsgi_request)])
         self.assertFalse(Procedure.objects.exists())
         self.assertFalse(Mouse.objects.exclude(status="Alive").exists())
@@ -95,11 +95,11 @@ class BulkMouseEditorRouteTests(TestCase):
     def test_global_editor_can_save_mixed_protocol_mice(self):
         response = self.client.post(self.global_url, {
             "selected_mouse": [self.mice[0].pk, self.outside.pk], "apply_bulk_edit": "1",
-            "update_status": "on", "status": "Updated", "return_url": self.return_url,
+            "update_status": "on", "status": "Culled", "return_url": self.return_url,
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], self.return_url)
-        self.assertEqual(set(Mouse.objects.filter(status="Updated").values_list("pk", flat=True)),
+        self.assertEqual(set(Mouse.objects.filter(status="Culled").values_list("pk", flat=True)),
                          {self.mice[0].pk, self.outside.pk})
         self.assertFalse(Procedure.objects.exists())
 

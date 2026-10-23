@@ -72,7 +72,7 @@ class MicePageTests(AuthenticatedTestCase):
         response = self.client.get(reverse("lab:reports_page"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Mice")
+        self.assertContains(response, "Animals")
         self.assertContains(response, f'href="{self.mice_url}"')
 
     def test_mice_page_renders_all_mice_including_non_regulated_protocol(self):
@@ -113,7 +113,7 @@ class MicePageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         for label in (
-            "Mouse ID",
+            "Animal ID",
             "Genotype",
             "Sex",
             "Status",
@@ -128,8 +128,9 @@ class MicePageTests(AuthenticatedTestCase):
         self.assertContains(response, f'href="{self.add_mouse_url}?return_url=')
         self.assertContains(response, f'href="{self.add_litter_url}?return_url=')
         self.assertContains(response, "Add animals")
-        self.assertContains(response, "Add animals")
-        self.assertNotContains(response, "Edit mouse")
+        self.assertContains(response, 'data-animal-action="selected-mice-form"', count=1)
+        self.assertNotContains(response, 'form="selected-mice-form"')
+        self.assertNotContains(response, "Edit animal")
         self.assertContains(response, "Select all")
         self.assertContains(response, "data-table-select-all-button")
         self.assertContains(response, 'name="per_page"')
@@ -447,13 +448,13 @@ class MicePageTests(AuthenticatedTestCase):
         response = self.client.get(response["Location"])
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "All mice.")
+        self.assertContains(response, "All animals.")
         self.assertContains(response, self.recent_mouse.mouse_id)
         self.assertContains(response, self.old_mouse.mouse_id)
         self.assertContains(response, self.non_regulated_mouse.mouse_id)
         self.assertContains(
             response,
-            "Regulated procedure creation is disabled for one or more selected mice.",
+            "Regulated procedure creation is disabled for one or more selected animals.",
         )
         self.assertFalse(response.context["can_add_bulk_procedure"])
         self.assertContains(response, "<fieldset")
@@ -475,7 +476,7 @@ class MicePageTests(AuthenticatedTestCase):
                     self.non_regulated_mouse.pk,
                 ],
                 "update_status": "on",
-                "status": "Archived",
+                "status": "Culled",
             },
         )
 
@@ -486,9 +487,9 @@ class MicePageTests(AuthenticatedTestCase):
         self.old_mouse.refresh_from_db()
         self.non_regulated_mouse.refresh_from_db()
         self.no_dob_mouse.refresh_from_db()
-        self.assertEqual(self.recent_mouse.status, "Archived")
-        self.assertEqual(self.old_mouse.status, "Archived")
-        self.assertEqual(self.non_regulated_mouse.status, "Archived")
+        self.assertEqual(self.recent_mouse.status, "Culled")
+        self.assertEqual(self.old_mouse.status, "Culled")
+        self.assertEqual(self.non_regulated_mouse.status, "Culled")
         self.assertEqual(self.no_dob_mouse.status, "Alive")
 
     def test_unscoped_delete_selected_removes_mixed_protocol_mice(self):

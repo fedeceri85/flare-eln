@@ -1,6 +1,6 @@
 <div class="actions form-actions">
     {% if possible_duplicate_warning and not form.errors %}
-        <button class="button button-primary" type="submit" name="confirm_possible_duplicate" value="1"{% if external %} form="primary-form"{% endif %}>Save as new mouse anyway</button>
+        <button class="button button-primary" type="submit" name="confirm_possible_duplicate" value="1"{% if external %} form="primary-form"{% endif %}>Save as new animal anyway</button>
     {% else %}
         <button class="button button-primary" type="submit"{% if external %} form="primary-form"{% endif %}{% if navigation.primary.name %} name="{{ navigation.primary.name }}" value="{{ navigation.primary.value }}"{% endif %}>
             {{ navigation.primary.label }}

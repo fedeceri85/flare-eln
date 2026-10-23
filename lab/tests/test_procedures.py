@@ -464,6 +464,8 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertNotContains(response, "Add mouse")
         self.assertContains(response, f'href="{add_litter_url}?return_url=')
         self.assertContains(response, f'action="{edit_selected_url}"')
+        self.assertContains(response, 'data-animal-action="selected-mice-form"', count=1)
+        self.assertNotContains(response, 'form="selected-mice-form"')
 
     def test_add_mouse_scoped_protocol_cannot_be_changed(self):
         crossing, lines = create_test_crossing(("Scoped",))

@@ -31,7 +31,7 @@ class MouseForm(MouseStructuredGeneticsMixin, forms.ModelForm):
     generate_mouse_id = forms.BooleanField(
         required=False,
         initial=True,
-        label="Generate mouse ID automatically",
+        label="Generate animal ID automatically",
     )
 
     class Meta:
@@ -64,6 +64,7 @@ class MouseForm(MouseStructuredGeneticsMixin, forms.ModelForm):
             ),
         }
         labels = {
+            "mouse_id": "Animal ID",
             "tattoo": LOCAL_IDENTIFIER_LABEL,
         }
         help_texts = {
@@ -111,12 +112,12 @@ class MouseForm(MouseStructuredGeneticsMixin, forms.ModelForm):
                 if not cleaned_data.get(field_name):
                     self.add_error(
                         field_name,
-                        "Required when generating the mouse ID automatically.",
+                        "Required when generating the animal ID automatically.",
                     )
         elif not cleaned_data.get("mouse_id"):
             self.add_error(
                 "mouse_id",
-                "Enter a mouse ID or enable automatic generation.",
+                "Enter an animal ID or enable automatic generation.",
             )
 
         return cleaned_data
@@ -169,7 +170,7 @@ class MouseEditForm(MouseStructuredGeneticsMixin, forms.ModelForm):
             and self.instance.procedures.exists()
         ):
             raise forms.ValidationError(
-                "Remove existing procedures before moving this mouse to a "
+                "Remove existing procedures before moving this animal to a "
                 "protocol that does not allow regulated procedures."
             )
 
@@ -179,11 +180,11 @@ class MouseEditForm(MouseStructuredGeneticsMixin, forms.ModelForm):
 class MouseRenameForm(forms.Form):
     new_mouse_id = forms.CharField(
         max_length=100,
-        label="New mouse ID",
+        label="New animal ID",
     )
     confirm_new_mouse_id = forms.CharField(
         max_length=100,
-        label="Confirm new mouse ID",
+        label="Confirm new animal ID",
     )
 
     def __init__(self, *args, **kwargs):
@@ -194,11 +195,11 @@ class MouseRenameForm(forms.Form):
         new_mouse_id = self.cleaned_data["new_mouse_id"].strip()
 
         if new_mouse_id == self.mouse.pk:
-            raise forms.ValidationError("Enter a different mouse ID.")
+            raise forms.ValidationError("Enter a different animal ID.")
 
         if Mouse.objects.filter(pk=new_mouse_id).exists():
             raise forms.ValidationError(
-                "A mouse with this ID already exists."
+                "An animal with this ID already exists."
             )
 
         return new_mouse_id
@@ -218,7 +219,7 @@ class MouseRenameForm(forms.Form):
         ):
             self.add_error(
                 "confirm_new_mouse_id",
-                "The mouse IDs do not match.",
+                "The animal IDs do not match.",
             )
 
         return cleaned_data
@@ -227,7 +228,7 @@ class MouseRenameForm(forms.Form):
 class MouseDeleteConfirmForm(forms.Form):
     confirm_mouse_id = forms.CharField(
         max_length=100,
-        label="Type the mouse ID to confirm",
+        label="Type the animal ID to confirm",
     )
 
     def __init__(self, *args, **kwargs):
@@ -239,7 +240,7 @@ class MouseDeleteConfirmForm(forms.Form):
 
         if confirm_mouse_id != self.mouse.pk:
             raise forms.ValidationError(
-                "Type the current mouse ID exactly to confirm deletion."
+                "Type the current animal ID exactly to confirm deletion."
             )
 
         return confirm_mouse_id
@@ -248,5 +249,5 @@ class MouseDeleteConfirmForm(forms.Form):
 class BulkMouseDeleteConfirmForm(forms.Form):
     confirm_delete = forms.BooleanField(
         required=True,
-        label="I understand these mice will be deleted.",
+        label="I understand these animals will be deleted.",
     )

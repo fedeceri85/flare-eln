@@ -1,7 +1,7 @@
 {% if possible_duplicate_warning %}
     <input type="hidden" name="possible_duplicate_signature" value="{{ possible_duplicate_warning.signature }}">
     <section class="warning-message" role="alert" aria-labelledby="possible-duplicate-title">
-        <h2 id="possible-duplicate-title">Possible existing mouse records found</h2>
+        <h2 id="possible-duplicate-title">Possible existing animal records found</h2>
         <p>
             These records share the date of birth <strong>{{ possible_duplicate_warning.date_of_birth|date:"d/m/Y" }}</strong>
             and crossing <strong>{{ possible_duplicate_warning.crossing.display_name }}</strong>.
@@ -10,7 +10,7 @@
         </p>
         <p>
             If this is the same animal, open its existing record and assign its permanent ID to keep its history.
-            Littermates can share these details; if these are different animals, choose <strong>Save as new mouse anyway</strong>.
+            Littermates can share these details; if these are different animals, choose <strong>Save as new animal anyway</strong>.
         </p>
         <ul class="duplicate-candidates">
             {% for row in possible_duplicate_warning.rows %}
@@ -44,10 +44,10 @@
             {% endfor %}
         </ul>
         {% if possible_duplicate_warning.more_count %}
-            <p>{{ possible_duplicate_warning.more_count }} more matching mice are not shown. Review them by crossing and birth date before continuing.</p>
+            <p>{{ possible_duplicate_warning.more_count }} more matching animals are not shown. Review them by crossing and birth date before continuing.</p>
         {% endif %}
         {% if not form.errors %}
-            <button class="button button-primary" type="submit" name="confirm_possible_duplicate" value="1">Save as new mouse anyway</button>
+            <button class="button button-primary" type="submit" name="confirm_possible_duplicate" value="1">Save as new animal anyway</button>
         {% endif %}
     </section>
 {% endif %}

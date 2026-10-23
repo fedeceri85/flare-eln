@@ -38,4 +38,4 @@ For an existing deployment, follow the guide to install the image-based configur
 
 ## License
 
-FLARE-ELN is released under the Apache License 2.0. See `LICENSE`.
+FLARE-ELN is released under the GNU Affero General Public License, version 3 only (`AGPL-3.0-only`). See [LICENSE](LICENSE).

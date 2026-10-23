@@ -11,7 +11,7 @@
     <div class="filter-grid">
         {% for field in filter_form.fields %}
             {% if field.type != "checkbox" or not compact_filters %}
-            <div class="filter-field">
+            <div class="filter-field{% if field.autocomplete %} filter-field--autocomplete{% endif %}">
                 {% if field.type == "checkbox" %}
                     {% include "lab/components/filter_checkbox.html" %}
                 {% elif field.type == "select" %}

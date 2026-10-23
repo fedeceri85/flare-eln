@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
         individualSelector: "[data-individual-genotype-field], [data-individual-genotype-uncertainty]",
         seedDefaults: true,
         onCopy() {
-            status.textContent = "Shared genotype copied to all mouse rows. You can adjust individual mice afterward.";
+            status.textContent = "Shared genotype copied to all animal rows. You can adjust individual animals afterward.";
         },
     });
     document.addEventListener("litter:rows-updated", function (event) {

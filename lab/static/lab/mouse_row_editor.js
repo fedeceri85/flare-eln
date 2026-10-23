@@ -18,7 +18,7 @@
             dirty = false;
             retryContainer.hidden = true;
             button.disabled = true;
-            status.textContent = "Updating mouse rows…";
+            status.textContent = "Updating animal rows…";
             try {
                 const response = await fetch(form.action || window.location.href, {
                     method: "POST", body: data, headers: {"X-Requested-With": "XMLHttpRequest"},
@@ -44,7 +44,7 @@
                 if (currentRequest !== requestNumber) return;
                 dirty = true;
                 retryContainer.hidden = false;
-                status.textContent = "Could not update the rows. Use Retry updating mouse rows to try again.";
+                status.textContent = "Could not update the rows. Use Retry updating animal rows to try again.";
             } finally {
                 if (currentRequest === requestNumber) {
                     pending = false;
@@ -76,7 +76,7 @@
             if (event.submitter === button || (options.skipSubmit && options.skipSubmit(event))) return;
             if (pending || dirty) {
                 event.preventDefault();
-                status.textContent = "Updating mouse rows. Review them before saving.";
+                status.textContent = "Updating animal rows. Review them before saving.";
                 if (!pending) refresh();
             }
         });

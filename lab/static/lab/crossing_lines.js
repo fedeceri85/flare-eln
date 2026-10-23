@@ -1,7 +1,9 @@
 document.addEventListener("DOMContentLoaded", function () {
-        const crossingForm = document.querySelector(
+        const actionInput = document.querySelector(
             'form input[name="action"][value="create_crossing"]'
-        ).closest("form");
+        );
+        if (!actionInput) return;
+        const crossingForm = actionInput.closest("form");
         const speciesSelect = crossingForm.querySelector('[name="species"]');
         const lineInput = document.querySelector("[data-line-lookup-input]");
         const lineResults = document.querySelector("[data-line-lookup-results]");
@@ -83,5 +85,9 @@ document.addEventListener("DOMContentLoaded", function () {
             syncSelectedLines();
         });
 
+        const initial = document.getElementById('catalogue-selected-lines');
+        if (initial) {
+            JSON.parse(initial.textContent).forEach(line => selectedLines.set(String(line.id), line));
+        }
         syncSelectedLines();
     });

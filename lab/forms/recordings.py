@@ -53,7 +53,7 @@ class RecordingForm(forms.Form):
 
     mice = forms.CharField(
         required=False,
-        label="Mice",
+        label="Animals",
         widget=forms.HiddenInput(),
     )
     recording_date = forms.DateField(
@@ -194,7 +194,7 @@ class RecordingForm(forms.Form):
         field = self.fields[field_name]
         field.required = False
         field.disabled = True
-        field.help_text = "Inferred from selected mice."
+        field.help_text = "Inferred from selected animals."
         field.initial = ""
 
         if self.is_bound:
@@ -246,7 +246,7 @@ class RecordingForm(forms.Form):
     def genotyping_crossing_label(self, mice):
         if not mice:
             raise forms.ValidationError(
-                "Select at least one mouse to infer the genotyping crossing."
+                "Select at least one animal to infer the genotyping crossing."
             )
 
         missing_crossing_mouse_ids = []
@@ -272,7 +272,7 @@ class RecordingForm(forms.Form):
 
         if missing_crossing_mouse_ids:
             raise forms.ValidationError(
-                "Select mice with a crossing before creating a genotyping "
+                "Select animals with a crossing before creating a genotyping "
                 "record: "
                 f"{', '.join(missing_crossing_mouse_ids)}."
             )
@@ -283,7 +283,7 @@ class RecordingForm(forms.Form):
                 for group in crossing_groups.values()
             ]
             raise forms.ValidationError(
-                "Genotyping records can only include mice from one crossing. "
+                "Genotyping records can only include animals from one crossing. "
                 "Current selection includes: "
                 f"{'; '.join(crossing_details)}."
             )
@@ -316,7 +316,7 @@ class RecordingForm(forms.Form):
 
         if missing_mouse_ids:
             raise forms.ValidationError(
-                "Select registered mouse IDs: "
+                "Select registered animal IDs: "
                 f"{', '.join(missing_mouse_ids)}."
             )
 

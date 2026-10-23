@@ -43,7 +43,7 @@
         {% endfor %}
 
         <section class="bulk-section" id="mouse-panel-ids" data-mouse-tab-panel="ids">
-            <h2 class="visually-hidden">Mouse IDs</h2>
+            <h2 class="visually-hidden">Animal IDs</h2>
             <div class="form-grid">
                 {% for field in form.id_bound_fields %}
                     <div class="form-field">
@@ -65,7 +65,7 @@
         </div>
         <section class="bulk-section shared-mouse-details">
             <h2 class="visually-hidden">Shared litter details</h2>
-            <p class="bulk-help">These details apply to every mouse. Choose one Local ID type for the litter. Set each mouse’s local identifier, sex and genotype below.</p>
+            <p class="bulk-help">These details apply to every animal. Choose one Local ID type for the litter. Set each animal’s local identifier, sex and genotype below.</p>
 
             <div class="shared-detail-groups">
                 {% for group in form.shared_mouse_field_groups %}
@@ -86,7 +86,7 @@
                 <div class="shared-genotype-column" data-multiple-mice-only {% if form.single_mouse_mode %}hidden{% endif %}>
                     <div data-litter-shared-genotypes>{% include "lab/components/litter_shared_genotypes.html" %}</div>
                     <p role="status" aria-live="polite" data-litter-genotype-status></p>
-                    <noscript><button class="button" type="submit" name="apply_shared_genotype" value="1" formnovalidate>Apply shared genotype to mouse rows</button></noscript>
+                    <noscript><button class="button" type="submit" name="apply_shared_genotype" value="1" formnovalidate>Apply shared genotype to animal rows</button></noscript>
                 </div>
             </div>
             <details class="shared-notes" {% if form.notes.value or form.notes.errors %}open{% endif %}>
@@ -108,7 +108,7 @@
 
     <section class="bulk-section" id="mouse-panel-services" data-mouse-tab-panel="services">
         <h2 class="visually-hidden">Services</h2>
-        <p>Save the mice before adding service records.</p>
+        <p>Save the animals before adding service records.</p>
     </section>
     </div>
 {% endblock %}

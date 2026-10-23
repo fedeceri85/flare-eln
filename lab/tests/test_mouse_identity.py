@@ -102,7 +102,7 @@ class MouseIdentityAndDeletionTests(AuthenticatedTestCase):
         html = Markup(response.content.decode())
         field = html.find("input", name=individual_mouse_field_prefix(self.mouse) + "_mouse_id")[0]
         self.assertTrue(field.within("section", id="mouse-panel-ids"))
-        self.assertContains(response, "Confirm Mouse ID changes")
+        self.assertContains(response, "Confirm Animal ID changes")
         self.assertContains(response, "Delete selected")
         self.assertTrue(Mouse.objects.filter(pk=self.mouse.pk).exists())
 
@@ -239,7 +239,7 @@ class MouseIdentityAndDeletionTests(AuthenticatedTestCase):
             response,
             "Associated recording links will be removed.",
         )
-        self.assertContains(response, "Delete mouse")
+        self.assertContains(response, "Delete animal")
 
     def test_procedure_page_does_not_render_delete_selected_action(self):
         response = self.client.get(self.return_url)

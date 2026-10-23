@@ -468,7 +468,7 @@ def select_recording_mouse(request, project_pk, experiment_pk):
                     return_url=return_url,
                 ),
             ),
-            "record_count": build_record_count(page_obj, "mouse"),
+            "record_count": build_record_count(page_obj, "animal"),
             "pagination": build_pagination(page_obj, query_params),
             "page_size_control": build_table_page_size_control(
                 request.GET,

@@ -155,7 +155,7 @@ class ReportsPageTests(AuthenticatedTestCase):
         response = self.client.get(self.report_url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Mice")
+        self.assertContains(response, "Animals")
         self.assertContains(response, f'href="{reverse("lab:mice_page")}"')
 
     def test_home_office_return_form_defaults_to_current_year_to_today(self):
@@ -279,7 +279,7 @@ class ReportsPageTests(AuthenticatedTestCase):
         self.assertEqual(procedure_rows[self.abr.pk]["exceeded"], 1)
         self.assertContains(
             response,
-            "Mice are assigned to this return based on protocol start date",
+            "Animals are assigned to this return based on protocol start date",
         )
         self.assertContains(response, "Total by crossing type")
         self.assertContains(response, "Unknown")
@@ -302,7 +302,7 @@ class ReportsPageTests(AuthenticatedTestCase):
                 f"to {self.today:%d/%m/%Y}"
             ),
         )
-        self.assertContains(response, "Mice under procedure: 4")
+        self.assertContains(response, "Animals under procedure: 4")
         self.assertContains(response, "Mild: 1")
         self.assertContains(response, "Moderate: 1")
         self.assertContains(response, "Severe: 1")

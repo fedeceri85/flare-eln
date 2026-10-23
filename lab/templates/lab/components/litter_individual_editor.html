@@ -1,12 +1,12 @@
 <section class="bulk-section" data-litter-individual-editor>
-    <h2 class="visually-hidden">Individual mice</h2>
-    <p class="bulk-help">Enter each mouse’s local identifier, sex and genotype. Local ID type comes from Mouse details.</p>
+    <h2 class="visually-hidden">Individual animals</h2>
+    <p class="bulk-help">Enter each animal’s local identifier, sex and genotype. Local ID type comes from Animal details.</p>
     <span hidden data-litter-rows-retry>
-        <button type="submit" name="preview_mice" value="1" class="button" formnovalidate data-preview-mice>Retry updating mouse rows</button>
+        <button type="submit" name="preview_mice" value="1" class="button" formnovalidate data-preview-mice>Retry updating animal rows</button>
     </span>
     <noscript>
-        <p>After changing Mouse IDs or crossing, update the mouse rows before saving.</p>
-        <button type="submit" name="preview_mice" value="1" class="button" formnovalidate>Update mouse rows</button>
+        <p>After changing Animal IDs or crossing, update the animal rows before saving.</p>
+        <button type="submit" name="preview_mice" value="1" class="button" formnovalidate>Update animal rows</button>
     </noscript>
     <p role="status" aria-live="polite" data-litter-preview-status></p>
     <div id="litter-mouse-rows">{% include "lab/components/litter_mouse_rows.html" %}</div>

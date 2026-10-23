@@ -77,12 +77,12 @@ class NavigationTests(TestCase):
 
     def test_consistent_home_and_current_location_on_all_lab_pages(self):
         cases = [
-            ("home", (), "Home"), ("mice_page", (), "Mice"),
+            ("home", (), "Home"), ("mice_page", (), "Animals"),
             ("procedure_page", (), "Procedures"), ("projects_page", (), "Projects"),
             ("services_page", (), "Services"), ("reports_page", (), "Reports"),
-            ("add_mouse_all", (), "Mice"), ("add_litter_all", (), "Mice"),
+            ("add_mouse_all", (), "Animals"), ("add_litter_all", (), "Animals"),
             ("add_mouse_licence_protocol", (self.protocol.licence_reference, 17), "Procedures"),
-            ("mouse_record", (self.mouse.pk,), "Mice"), ("edit_mouse", (self.mouse.pk,), "Procedures"),
+            ("mouse_record", (self.mouse.pk,), "Animals"), ("edit_mouse", (self.mouse.pk,), "Procedures"),
             ("rename_mouse", (self.mouse.pk,), "Procedures"), ("delete_mouse", (self.mouse.pk,), "Procedures"),
             ("edit_mouse_procedure", (self.mouse.pk, self.procedure.pk), "Procedures"),
             ("add_project", (), "Projects"), ("edit_project", (self.project.pk,), "Projects"),
@@ -143,7 +143,7 @@ class NavigationTests(TestCase):
         cancel = [node for node in html.find("a") if node.text.strip() == "Cancel"]
         self.assertTrue(cancel)
         self.assertTrue(all(node.attrs["href"] == url for node in cancel))
-        crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Mice")
+        crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Animals")
         self.assertEqual(crumb.attrs["href"], url)
 
     def test_record_to_edit_to_list_keeps_original_context(self):
@@ -151,14 +151,14 @@ class NavigationTests(TestCase):
         record_url = reverse("lab:mouse_record", args=[self.mouse.pk]) + "?" + urlencode({"return_url": destination})
         response = self.client.get(record_url)
         html = Markup(response.content.decode())
-        edit = next(node for node in html.find("a") if node.text.strip() == "Edit mouse")
+        edit = next(node for node in html.find("a") if node.text.strip() == "Edit animal")
         self.assertEqual(parse_qs(urlsplit(edit.attrs["href"]).query)["return_url"], [record_url])
         response = self.client.get(edit.attrs["href"], follow=True)
         html = Markup(response.content.decode())
         self.assertEqual(html.find("a", **{"class": "back-link"})[0].attrs["href"], record_url)
-        crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Mice")
+        crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Animals")
         self.assertEqual(crumb.attrs["href"], destination)
-        self.assertEqual(html.find("a", **{"aria-current": "true"})[0].text, "Mice")
+        self.assertEqual(html.find("a", **{"aria-current": "true"})[0].text, "Animals")
 
     def test_procedure_context_has_licence_and_protocol_without_extra_queries(self):
         destination = reverse("lab:procedure_page_licence_protocol", args=[self.protocol.licence_reference, 17]) + "?status=Alive&page=2"
@@ -170,7 +170,7 @@ class NavigationTests(TestCase):
             nav = build_navigation({"request": request, "mouse": mouse})
         self.assertEqual(nav["section"], "procedures")
         labels = [item["label"] for item in nav["breadcrumbs"]]
-        self.assertEqual(labels, ["Home", "Procedures", "UI-LICENCE", "Behaviour protocol", self.mouse.pk, "Edit mouse"])
+        self.assertEqual(labels, ["Home", "Procedures", "UI-LICENCE", "Behaviour protocol", self.mouse.pk, "Edit animal"])
         self.assertEqual(nav["breadcrumbs"][3]["url"], destination)
 
     def test_recording_return_actions_preserve_filtered_list(self):

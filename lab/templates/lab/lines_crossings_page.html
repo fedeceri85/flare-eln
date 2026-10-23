@@ -1,241 +1,55 @@
-{% extends "lab/base.html" %}
-{% load static %}
-
+{% extends "lab/base.html" %}{% load static %}
 {% block title %}Lines & Crossings{% endblock %}
 {% block page_title %}Lines & Crossings{% endblock %}
 {% block main_class %}container container-fluid{% endblock %}
-
-{% block page_subtitle %}
-    <p>Manage approved species, lines and genetic crossings.</p>
-{% endblock %}
-
+{% block page_subtitle %}<p>Manage species, lines and genetic crossings.</p>{% endblock %}
 {% block content %}
-    <div class="toolbar">
-        <form method="get" class="filter-form">
-            <div class="filter-row">
-                <div class="filter-field">
-                    <label for="species-filter">Species</label>
-                    <select
-                        id="species-filter"
-                        name="species"
-                        onchange="this.form.submit()"
-                    >
-                        {% for species in species_options %}
-                            <option
-                                value="{{ species.pk }}"
-                                {% if species.pk == selected_species.pk %}selected{% endif %}
-                            >
-                                {{ species.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-        </form>
-
-        <div class="actions">
+<div class="genetics-catalogue">
+    <form method="get" class="filter-form filter-form--compact catalogue-filter" aria-label="Filter lines and crossings" data-catalogue-filter>
+        <input type="hidden" name="tab" value="{{ active_tab }}"><input type="hidden" name="per_page" value="{{ page_size }}">
+        <div class="filter-grid">
+            <div class="filter-field"><label for="species-filter">Species</label><select id="species-filter" name="species">{% for species in species_options %}<option value="{{ species.pk }}" {% if species.pk == selected_species.pk %}selected{% endif %}>{{ species.name }}</option>{% endfor %}</select></div>
+            <div class="filter-field"><label for="catalogue-name">Name</label><input id="catalogue-name" name="q" type="search" value="{{ line_query }}" placeholder="Enter part of a name"></div>
         </div>
+    </form>
+    <p class="catalogue-filter-status" data-catalogue-filter-status role="status" aria-live="polite"></p>
+    <div data-catalogue-results-region data-active-tab="{{ active_tab }}" data-page-size="{{ page_size }}">
+    <div class="toolbar page-action-bar catalogue-bar" aria-label="Catalogue navigation and actions">
+        <nav class="protocol-tabs" aria-label="Lines and crossings">{% for tab in tabs %}<a class="protocol-tab{% if tab.active %} active{% endif %}" href="{{ tab.url }}" {% if tab.active %}aria-current="page"{% endif %}>{{ tab.label }}</a>{% endfor %}</nav>
+        <div class="actions"><a class="button button-primary" href="{{ add_lines_url }}" data-catalogue-panel="add-lines">Add lines</a><a class="button" href="{{ create_crossing_url }}" data-catalogue-panel="create-crossing">Create crossing</a></div>
+    </div>
+    {% if line_form.errors or crossing_form.errors or editor_form.errors %}<p class="message message-error" role="alert">Please correct the errors in the open form below the table.</p>{% endif %}
+    <div class="table-summary"><p class="record-count">Showing {{ catalogue_page.start_index }}–{{ catalogue_page.end_index }} of {{ catalogue_page.paginator.count }} {% if active_tab == 'lines' %}line{% else %}crossing{% endif %}{{ catalogue_page.paginator.count|pluralize }}</p>{% include 'lab/components/page_size_select.html' %}</div>
+    <div class="table-card" id="catalogue-results"><div class="table-scroll"><table class="data-table procedure-matrix catalogue-table">
+        <thead><tr><th scope="col">Name</th>{% if active_tab == 'lines' %}<th scope="col" class="catalogue-kind">Wild type/reference</th>{% else %}<th scope="col" class="catalogue-kind">Type</th>{% endif %}<th scope="col" class="catalogue-state">Active</th><th scope="col">Actions</th></tr></thead>
+        <tbody>{% for item in catalogue_page %}<tr>
+            <td>{% if active_tab == 'lines' %}{{ item.name }}{% else %}{{ item.display_name }}{% endif %}</td>
+            {% if active_tab == 'lines' %}<td>{{ item.is_wild_type|yesno:'Yes,No' }}</td>{% else %}<td>{{ item.inferred_crossing_type }}</td>{% endif %}
+            <td>{{ item.active|yesno:'Yes,No' }}</td><td><div class="catalogue-row-actions">
+                {% if active_tab == 'lines' %}<a class="catalogue-row-action" href="{{ item.edit_url }}">Edit</a>{% elif item.catalogue_lines|length > 1 %}<a class="catalogue-row-action" href="{{ item.edit_url }}">Edit order</a>{% endif %}
+                <form method="post" class="inline-form" onsubmit="return confirm('Delete this {% if active_tab == 'lines' %}line{% else %}crossing{% endif %}?');">{% csrf_token %}<input type="hidden" name="action" value="{% if active_tab == 'lines' %}delete_line{% else %}delete_crossing{% endif %}"><input type="hidden" name="{% if active_tab == 'lines' %}line_id{% else %}crossing_id{% endif %}" value="{{ item.pk }}"><button class="catalogue-row-action catalogue-row-action--danger" type="submit">Delete</button></form>
+            </div></td>
+        </tr>{% empty %}<tr><td colspan="4">No {% if active_tab == 'lines' %}lines{% else %}crossings{% endif %} match these filters.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    {% include 'lab/components/pagination.html' %}
     </div>
 
-    <div class="two-column-layout">
-        <form method="post" class="form-card">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="add_lines">
+    {% if editor %}<section class="form-card catalogue-panel" id="catalogue-editor"><h2>{% if edit_kind == 'line' %}Rename line: {{ editor.name }}{% else %}Edit order: {{ editor.display_name }}{% endif %}</h2>
+        <form method="post" {% if edit_kind == 'crossing' %}data-crossing-order{% endif %}>{% csrf_token %}
+            <input type="hidden" name="action" value="{% if edit_kind == 'line' %}rename_line{% else %}reorder_crossing{% endif %}"><input type="hidden" name="{% if edit_kind == 'line' %}line_id{% else %}crossing_id{% endif %}" value="{{ editor.pk }}">
+            {% include 'lab/components/form_fields.html' with form=editor_form %}
+            {% if edit_kind == 'crossing' %}<p>Only line order can change. Existing animals and genotype values are preserved.</p><ol data-order-list>{% for line in editor_lines %}<li data-line-id="{{ line.pk }}"><span>{{ line.name }}</span><button class="button" type="submit" name="move" value="{{ line.pk }}:up" aria-label="Move {{ line.name }} up" {% if forloop.first %}disabled{% endif %}>Move up</button><button class="button" type="submit" name="move" value="{{ line.pk }}:down" aria-label="Move {{ line.name }} down" {% if forloop.last %}disabled{% endif %}>Move down</button></li>{% endfor %}</ol>{% endif %}
+            <div class="actions"><button class="button button-primary" type="submit">{% if edit_kind == 'line' %}Save name{% else %}Save order{% endif %}</button><a class="button" href="{{ cancel_edit_url }}">Cancel</a></div>
+        </form></section>{% endif %}
 
-            <h2 class="section-title">Add Lines</h2>
-
-            {% include "lab/components/form_fields.html" with form=line_form %}
-
-            <div class="actions">
-                <button class="button button-primary" type="submit">
-                    Add lines
-                </button>
-            </div>
-        </form>
-
-        <form method="post" class="form-card">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_crossing">
-
-            <h2 class="section-title">Create Crossing</h2>
-
-            {% include "lab/components/error_summary.html" with form=crossing_form %}
-
-            <div class="form-field">
-                {{ crossing_form.species.label_tag }}
-                {{ crossing_form.species }}
-
-                {% if crossing_form.species.errors %}
-                    <ul class="error-list">
-                        {% for error in crossing_form.species.errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-            </div>
-
-            {{ crossing_form.selected_lines }}
-
-            {% if crossing_form.selected_lines.errors %}
-                <ul class="error-list">
-                    {% for error in crossing_form.selected_lines.errors %}
-                        <li>{{ error }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-            <div class="form-field">
-                <label for="line-search">Line search</label>
-                <input
-                    id="line-search"
-                    type="text"
-                    autocomplete="off"
-                    data-line-lookup-input="true" data-lookup-url="{{ line_lookup_url }}"
-                    placeholder="Type to search lines"
-                >
-                <div
-                    class="lookup-results"
-                    data-line-lookup-results="true"
-                ></div>
-            </div>
-
-            <div class="selected-list">
-                <p class="selected-list-label">Selected lines</p>
-                <ul
-                    class="selected-list-items"
-                    data-selected-lines="true"
-                ></ul>
-            </div>
-
-            <div class="actions">
-                <button class="button button-primary" type="submit">
-                    Create crossing
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <section class="section">
-        <h2 class="section-title">Existing Lines</h2>
-
-        <div class="table-card">
-            <div class="table-scroll">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Wild type/reference</th>
-                            <th scope="col">Active</th>
-                            <th scope="col">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for line in lines %}
-                            <tr>
-                                <td>{{ line.name }}</td>
-                                <td>{{ line.is_wild_type|yesno:"Yes,No" }}</td>
-                                <td>{{ line.active|yesno:"Yes,No" }}</td>
-                                <td>
-                                    <form
-                                        method="post"
-                                        class="inline-form"
-                                        onsubmit="return confirm('Delete this line?');"
-                                    >
-                                        {% csrf_token %}
-                                        <input
-                                            type="hidden"
-                                            name="action"
-                                            value="delete_line"
-                                        >
-                                        <input
-                                            type="hidden"
-                                            name="line_id"
-                                            value="{{ line.pk }}"
-                                        >
-                                        <button
-                                            class="button button-danger"
-                                            type="submit"
-                                        >
-                                            Delete
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="4">No lines for this species.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <section class="section">
-        <h2 class="section-title">Existing Crossings</h2>
-
-        <div class="table-card">
-            <div class="table-scroll">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Lines</th>
-                            <th scope="col">Type</th>
-                            <th scope="col">Active</th>
-                            <th scope="col">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for crossing in crossings %}
-                            <tr>
-                                <td>{{ crossing.display_name }}</td>
-                                <td>
-                                    {% for line in crossing.lines.all %}
-                                        {{ line.name }}{% if not forloop.last %}<br>{% endif %}
-                                    {% endfor %}
-                                </td>
-                                <td>{{ crossing.inferred_crossing_type }}</td>
-                                <td>{{ crossing.active|yesno:"Yes,No" }}</td>
-                                <td>
-                                    <form
-                                        method="post"
-                                        class="inline-form"
-                                        onsubmit="return confirm('Delete this crossing?');"
-                                    >
-                                        {% csrf_token %}
-                                        <input
-                                            type="hidden"
-                                            name="action"
-                                            value="delete_crossing"
-                                        >
-                                        <input
-                                            type="hidden"
-                                            name="crossing_id"
-                                            value="{{ crossing.pk }}"
-                                        >
-                                        <button
-                                            class="button button-danger"
-                                            type="submit"
-                                        >
-                                            Delete
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="5">No crossings for this species.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
+    <details class="form-card catalogue-panel" id="add-lines" {% if line_form.errors or open_panel == 'add-lines' %}open{% endif %}><summary>Add Lines</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="add_lines">{% include 'lab/components/form_fields.html' with form=line_form %}<div class="actions"><button class="button button-primary" type="submit">Add lines</button></div></form></details>
+    <details class="form-card catalogue-panel" id="create-crossing" {% if crossing_form.errors or open_panel == 'create-crossing' %}open{% endif %}><summary>Create Crossing</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="create_crossing">
+        {% include 'lab/components/form_fields.html' with form=crossing_form %}
+        <div class="form-field"><label for="line-search">Line search</label><input id="line-search" type="text" autocomplete="off" data-line-lookup-input="true" data-lookup-url="{{ line_lookup_url }}" placeholder="Type to search lines"><div class="lookup-results" data-line-lookup-results="true"></div></div>
+        <div class="selected-list"><p class="selected-list-label">Selected lines</p><ul class="selected-list-items" data-selected-lines="true"></ul></div>
+        {{ initial_selected_lines|json_script:'catalogue-selected-lines' }}
+        <div class="actions"><button class="button button-primary" type="submit">Create crossing</button></div>
+    </form></details>
+</div>
 {% endblock %}
-
-{% block scripts %}
-    <script src="{% static 'lab/crossing_lines.js' %}"></script>
-{% endblock %}
+{% block scripts %}<script src="{% static 'lab/crossing_lines.js' %}"></script><script src="{% static 'lab/genetics_catalogue.js' %}" defer></script>{% endblock %}

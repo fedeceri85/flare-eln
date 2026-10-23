@@ -85,7 +85,7 @@
                 initialize(replacement);
             } catch (error) {
                 invalidate();
-                status.textContent = 'Could not complete the request. Your mouse edits are still here. Review the procedure list before trying again.';
+                status.textContent = 'Could not complete the request. Your animal edits are still here. Review the procedure list before trying again.';
             } finally {
                 pending = false;
                 delete form.dataset.procedureBusy;

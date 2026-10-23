@@ -1,8 +1,8 @@
 {% extends "lab/base.html" %}
 {% load static %}
 
-{% block title %}Edit selected mice{% endblock %}
-{% block page_title %}Edit selected mice{% endblock %}
+{% block title %}Edit selected animals{% endblock %}
+{% block page_title %}Edit selected animals{% endblock %}
 {% block main_class %}container container-wide{% endblock %}
 
 {% block page_subtitle %}
@@ -10,9 +10,9 @@
         {% if selected_protocol %}
             Protocol {{ selected_protocol.protocol_number }}.
         {% else %}
-            All mice.
+            All animals.
         {% endif %}
-        Apply shared changes to the selection or edit individual mice below.
+        Apply shared changes to the selection or edit individual animals below.
     </p>
 {% endblock %}
 
@@ -20,8 +20,8 @@
 
 {% block page_action_scope %}
     <div class="bulk-selected-mice" data-sticky-selected-mice>
-        <p class="selected-list-label">Selected mice ({{ selected_mice|length }})</p>
-        <ul class="selected-list-items" tabindex="0" role="region" aria-label="Selected Mouse IDs">
+        <p class="selected-list-label">Selected animals ({{ selected_mice|length }})</p>
+        <ul class="selected-list-items" tabindex="0" role="region" aria-label="Selected Animal IDs">
             {% for mouse in selected_mice %}
                 <li class="selected-list-item">{{ mouse.mouse_id }}</li>
             {% endfor %}
@@ -81,7 +81,7 @@
             {% if form.single_mouse_mode %}
                 {% include "lab/components/individual_mouse_editor.html" with embedded=True %}
             {% endif %}
-            <h2 class="visually-hidden">Mouse details</h2>
+            <h2 class="visually-hidden">Animal details</h2>
             <p class="bulk-help">Check the fields you want to change. Checked blank values will be cleared.</p>
             <div class="shared-detail-groups">
                 {% for group in form.mouse_update_groups %}
@@ -149,7 +149,7 @@
     <section id="mouse-panel-services" data-mouse-tab-panel="services">
         {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 hide_service_title=True %}
         {% if not service_recording_actions %}
-            <div class="bulk-section"><h2 class="visually-hidden">Services</h2><p>No services are available for the selected mice.</p></div>
+            <div class="bulk-section"><h2 class="visually-hidden">Services</h2><p>No services are available for the selected animals.</p></div>
         {% endif %}
     </section>
     </div>

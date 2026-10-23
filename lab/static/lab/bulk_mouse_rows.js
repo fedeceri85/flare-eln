@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const genotypes = window.MouseGenotypeEditor.create({
         form, rows, sharedRoot: form, toggle: form.elements.update_genotype,
         onCopy(count) {
-            status.textContent = "Genotype copied to " + count + " mouse rows. Review the individual values before saving.";
+            status.textContent = "Genotype copied to " + count + " animal rows. Review the individual values before saving.";
         },
     });
 
@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", function () {
         watchFields: ["update_crossing", "crossing_definition"],
         delay: 250,
         afterRefresh() { genotypes.replay(); },
-        successMessage() { return "Mouse rows updated. The displayed genotype values will be saved."; },
+        successMessage() { return "Animal rows updated. The displayed genotype values will be saved."; },
         skipSubmit(event) { return event.submitter?.hasAttribute("formaction"); },
     });
 });

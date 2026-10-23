@@ -103,7 +103,7 @@ class LitterIdentityTests(TestCase):
         Mouse.objects.create(mouse_id="PUP-2", protocol=self.protocol)
         response = self.client.post(self.url, self.payload())
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Mouse IDs already exist")
+        self.assertContains(response, "Animal IDs already exist")
         self.assertEqual(Mouse.objects.count(), 1)
         for extra in ({"mouse_numbers": "1,1"}, {"mouse_numbers": "3-1"},
                       {"mouse_id_prefix": "X" * 99, "mouse_numbers": "10"}):

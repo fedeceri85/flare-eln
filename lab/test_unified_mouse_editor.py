@@ -43,12 +43,12 @@ class UnifiedMouseEditorTests(TestCase):
             procedures.append(Procedure.objects.create(mouse=mouse, procedure_type=self.kind, notes=mouse.pk))
         old_ids = [mouse.pk for mouse in self.mice]
         response = self.client.post(self.scoped, self.payload(dict(zip(old_ids, reversed(old_ids))),
-            update_status="on", status="Updated", **{individual_mouse_field_prefix(self.mice[0]) + "_local_identifier": "007"}))
+            update_status="on", status="Culled", **{individual_mouse_field_prefix(self.mice[0]) + "_local_identifier": "007"}))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(parse_qs(urlsplit(response["Location"]).query)["selected_mouse"], old_ids[::-1])
         for index, target in enumerate(old_ids[::-1]):
             mouse = Mouse.objects.get(pk=target)
-            self.assertEqual((mouse.notes, mouse.status, mouse.id_status), (old_ids[index], "Updated", Mouse.ID_ASSIGNED))
+            self.assertEqual((mouse.notes, mouse.status, mouse.id_status), (old_ids[index], "Culled", Mouse.ID_ASSIGNED))
             calls[index].refresh_from_db()
             procedures[index].refresh_from_db()
             self.assertEqual(calls[index].mouse_id, target)
@@ -65,7 +65,7 @@ class UnifiedMouseEditorTests(TestCase):
                  ({first.pk: "X" * 101}, {}), ({first.pk: "New"}, {"confirm_mouse_ids": ""})]
         for renames, extra in cases:
             with self.subTest(renames=renames):
-                response = self.client.post(self.url, self.payload(renames, update_status="on", status="Changed", **extra))
+                response = self.client.post(self.url, self.payload(renames, update_status="on", status="Culled", **extra))
                 self.assertEqual(response.status_code, 200)
                 self.assertTrue(response.context["form"].errors)
                 self.assertEqual(list(Mouse.objects.filter(pk__in=[m.pk for m in self.mice]).values_list("status", flat=True)), ["Alive", "Alive"])
@@ -80,7 +80,7 @@ class UnifiedMouseEditorTests(TestCase):
             return rename_mouse_identity(old, new)
         with patch("lab.views.mice.rename_mouse_identity", side_effect=conflict):
             response = self.client.post(self.url, self.payload({first.pk: "New first", second.pk: "New second"},
-                update_status="on", status="Changed"))
+                update_status="on", status="Culled"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No changes were saved")
         self.assertEqual(set(Mouse.objects.values_list("pk", flat=True)), {first.pk, second.pk})

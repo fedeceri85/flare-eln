@@ -632,6 +632,20 @@ button.button {
     box-shadow: 0 6px 18px rgba(31, 41, 51, 0.1);
 }
 
+/* Suggestions float below their input instead of resizing the filter grid. */
+.filter-field--autocomplete {
+    position: relative;
+}
+
+.filter-field--autocomplete > .autocomplete-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    z-index: 10;
+}
+
 .autocomplete-results.visible {
     display: block;
 }
@@ -852,6 +866,8 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .data-table tr:has([data-row-checkbox]:checked) td { background: #eaf2fc; }
 .data-table.sticky-first th:first-child { background: #f0f4f9; }
 .data-table.procedure-matrix { min-width: 1050px; }
+.data-table.procedure-matrix th,
+.data-table.procedure-matrix th:first-child { position: static; }
 .mouse-link { color: var(--blue); }
 .empty-message { padding: 48px 20px; color: var(--muted); font-size: 14px; }
 .record-count, .page-status { color: var(--muted); font-size: 12px; }
@@ -1118,12 +1134,12 @@ input[type="checkbox"] { accent-color: var(--blue); }
     .procedure-create-with-action { grid-template-columns: minmax(0, 1fr); }
 }
 
-.individual-mouse-table { table-layout: fixed; min-width: 880px; }
-.individual-mouse-id-column { width: 140px; }
+.individual-mouse-table { table-layout: fixed; min-width: 880px; white-space: normal; }
+.individual-mouse-id-column { width: 240px; }
 .individual-local-id-column { width: 150px; }
 .individual-sex-column { width: 120px; }
 .individual-genotype-column { width: auto; }
-.individual-mouse-table th[scope="row"] { position: sticky; top: auto; left: 0; z-index: 2; background: var(--surface); vertical-align: top; padding-top: 18px; }
+.individual-mouse-table th[scope="row"] { position: sticky; top: auto; left: 0; z-index: 2; background: var(--surface); vertical-align: top; padding-top: 18px; overflow-wrap: anywhere; }
 .individual-mouse-table td { padding: 12px; }
 .individual-mouse-table td > input,
 .individual-mouse-table td > select { width: 100%; min-height: 34px; padding: 6px 8px; }
@@ -1143,10 +1159,28 @@ input[type="checkbox"] { accent-color: var(--blue); }
 
 .individual-mouse-table thead th:first-child { left: 0; z-index: 4; }
 
+.mouse-ids-table { table-layout: fixed; white-space: normal; }
+.mouse-ids-table th:first-child { width: 40%; overflow-wrap: anywhere; }
+.mouse-ids-table td > input { width: 100%; min-width: 0; }
+
 /* Procedure filters: aligned fields above a compact options and actions row. */
+.procedure-filters { margin-bottom: 18px; }
+.procedure-filters > summary {
+    width: fit-content;
+    padding: 6px 0;
+    color: var(--blue);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.procedure-filters > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: 3px; }
+.procedure-filters .procedure-filters-hide,
+.procedure-filters[open] .procedure-filters-show { display: none; }
+.procedure-filters[open] .procedure-filters-hide { display: inline; }
+.procedure-filters > .filter-form { margin: 6px 0 0; }
 .filter-form--compact { padding: 14px 18px 12px; margin-bottom: 18px; }
 .filter-form--compact .filter-grid {
-    grid-template-columns: minmax(160px, 1.2fr) repeat(2, minmax(140px, 1fr)) repeat(2, minmax(150px, 1.2fr)) minmax(140px, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     align-items: end;
 }
@@ -1185,3 +1219,40 @@ input[type="checkbox"] { accent-color: var(--blue); }
 
 .single-mouse-rows { margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
 .shared-genetics.shared-genetics-single { grid-template-columns: minmax(0, 1fr); }
+
+/* Lines & Crossings: reuse procedure controls, scope only layout adjustments. */
+.genetics-catalogue {
+    max-width: 840px;
+    margin-inline: auto;
+}
+.genetics-catalogue .catalogue-filter { width: 100%; box-sizing: border-box; }
+.genetics-catalogue .catalogue-filter .filter-grid { grid-template-columns: minmax(160px, 1fr) minmax(200px, 3fr); }
+.genetics-catalogue .catalogue-row-actions { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+.genetics-catalogue .catalogue-panel { margin-top: 24px; scroll-margin-top: 100px; }
+.genetics-catalogue .catalogue-panel > summary { cursor: pointer; font-weight: 600; }
+.genetics-catalogue .catalogue-panel > form { margin-top: 16px; }
+.genetics-catalogue [data-order-list] li { padding: 8px 0; }
+.genetics-catalogue [data-order-list] li span { display: inline-block; min-width: 160px; margin-right: 12px; }
+.genetics-catalogue .catalogue-table { min-width: 640px; }
+@media (max-width: 640px) {
+    .genetics-catalogue .catalogue-filter .filter-grid { grid-template-columns: minmax(0, 1fr); }
+    .genetics-catalogue .catalogue-bar { align-items: stretch; flex-direction: column; }
+}
+
+.genetics-catalogue .catalogue-filter { margin-bottom: 12px; }
+.genetics-catalogue .catalogue-filter-status { margin: 0; font-size: 12px; color: var(--muted); }
+.genetics-catalogue .catalogue-filter-status:empty { display: none; }
+.genetics-catalogue .catalogue-bar .button { min-height: 30px; padding: 5px 10px; font-size: 12px; line-height: 1.25; border-radius: 6px; }
+.genetics-catalogue .catalogue-table th:last-child { width: 144px; }
+.genetics-catalogue .catalogue-table .catalogue-kind { width: 140px; }
+.genetics-catalogue .catalogue-table .catalogue-state { width: 70px; }
+.genetics-catalogue .catalogue-row-action {
+    display: inline-flex; align-items: center; padding: 4px 6px; margin: 0;
+    min-height: 0; border: 0; border-radius: 4px; background: transparent;
+    color: var(--blue); font-family: inherit; font-size: 12px; font-weight: 600;
+    line-height: 1.25; text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.genetics-catalogue .catalogue-row-action:hover { background: var(--blue-soft); text-decoration: underline; }
+.genetics-catalogue .catalogue-row-action--danger { color: #b42318; }
+.genetics-catalogue .catalogue-row-action--danger:hover { background: #fff1f0; }
+.genetics-catalogue .catalogue-row-action:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }

@@ -108,7 +108,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 302)
         response = self.client.get(response["Location"])
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Edit selected mice")
+        self.assertContains(response, "Edit selected animals")
         for mouse in (self.mouse_1, self.mouse_2):
             self.assertContains(response, mouse.mouse_id)
 
@@ -364,6 +364,46 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(self.mouse_1.status, "Alive")
         self.assertEqual(self.other_mouse.status, "Alive")
 
+    def test_status_dropdown_prefills_current_status_for_single_and_matching_mice(self):
+        for mouse in (self.mouse_1, self.mouse_2):
+            mouse.status = "Culled"
+            mouse.save(update_fields=["status"])
+        for selection in ([self.mouse_1.pk], [self.mouse_1.pk, self.mouse_2.pk]):
+            response = self.client.get(self.edit_selected_url, {"selected_mouse": selection})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["form"]["status"].value(), "Culled")
+            self.assertIn('<select ', str(response.context["form"]["status"]))
+            self.assertContains(response, '<option value="Culled" selected>Culled</option>', html=True)
+
+    def test_bulk_status_change_requires_valid_choice_and_rejects_all_changes_atomically(self):
+        for status in ("", "Archived"):
+            with self.subTest(status=status):
+                response = self.client.post(self.edit_selected_url, {
+                    "apply_bulk_edit": "1", "selected_mouse": [self.mouse_1.pk, self.mouse_2.pk],
+                    "update_status": "on", "status": status,
+                    "notes_action": "replace", "notes": "Should not be saved",
+                })
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("status", response.context["form"].errors)
+                for mouse in (self.mouse_1, self.mouse_2):
+                    mouse.refresh_from_db()
+                    self.assertEqual(mouse.status, "Alive")
+                    self.assertNotEqual(mouse.notes, "Should not be saved")
+
+    def test_notes_only_edit_preserves_current_and_legacy_status(self):
+        for status in ("Culled", "Archived"):
+            with self.subTest(status=status):
+                self.mouse_1.status = status
+                self.mouse_1.save(update_fields=["status"])
+                response = self.client.post(self.edit_selected_url, {
+                    "apply_bulk_edit": "1", "selected_mouse": [self.mouse_1.pk],
+                    "notes_action": "replace", "notes": "Updated notes",
+                })
+                self.assertEqual(response.status_code, 302)
+                self.mouse_1.refresh_from_db()
+                self.assertEqual(self.mouse_1.notes, "Updated notes")
+                self.assertEqual(self.mouse_1.status, status)
+
     def test_bulk_save_rejects_invalid_form_atomically(self):
         response = self.client.post(
             self.edit_selected_url,
@@ -403,7 +443,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Remove existing procedures before moving these mice to a protocol "
+            "Remove existing procedures before moving these animals to a protocol "
             "that does not allow regulated procedures: M1",
         )
 
@@ -418,7 +458,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Mouse ID")
+        self.assertContains(response, "Animal ID")
         self.assertContains(response, self.mouse_1.mouse_id)
         self.assertContains(response, "Local identifier")
         self.assertNotContains(response, 'name="mouse_id"')
@@ -727,7 +767,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(
             (
-                "Remove existing procedures before moving these mice to a "
+                "Remove existing procedures before moving these animals to a "
                 "protocol that does not allow regulated procedures: M1"
             ),
             response.context["form"].non_field_errors(),

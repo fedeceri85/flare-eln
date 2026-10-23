@@ -14,6 +14,7 @@ from ..models import (
     genotype_category_choices,
     genotype_category_labels,
     resolve_crossing,
+    crossing_display_name,
 )
 
 
@@ -206,6 +207,8 @@ class BulkMouseLineCreateForm(forms.Form):
         if not names:
             raise forms.ValidationError("Enter at least one line name.")
 
+        if any(len(name) > MouseLine._meta.get_field("name").max_length for name in names):
+            raise forms.ValidationError("Line names must contain at most 200 characters.")
         return names
 
     def save(self):
@@ -317,10 +320,9 @@ class CrossingCreateForm(forms.Form):
             )
             return cleaned_data
 
-        cleaned_data["lines"] = [
-            lines_by_id[line_id]
-            for line_id in line_ids
-        ]
+        cleaned_data["lines"] = [lines_by_id[line_id] for line_id in line_ids]
+        if len(crossing_display_name(cleaned_data["lines"])) > Crossing._meta.get_field("display_name").max_length:
+            self.add_error("selected_lines", "The resulting crossing name is too long (maximum 500 characters).")
         return cleaned_data
 
     def save(self):
@@ -619,3 +621,17 @@ class MouseStructuredGeneticsMixin:
             }
 
         return None
+
+
+class LineRenameForm(forms.Form):
+    name = forms.CharField(max_length=200, label="Line name")
+
+
+class CrossingOrderForm(forms.Form):
+    selected_lines = forms.CharField(widget=forms.HiddenInput)
+
+    def clean_selected_lines(self):
+        try:
+            return [int(value) for value in self.cleaned_data["selected_lines"].split(",")]
+        except (ValueError, TypeError):
+            raise forms.ValidationError("Select a valid order for the existing lines.")

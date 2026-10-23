@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
             document.dispatchEvent(new CustomEvent("mouse-editor:count-changed", {detail: {count: result.mouse_count}}));
         },
         successMessage(result) {
-            return result.errors.length ? result.errors.join(" ") : "Mouse rows updated.";
+            return result.errors.length ? result.errors.join(" ") : "Animal rows updated.";
         },
     });
 });

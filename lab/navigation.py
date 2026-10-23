@@ -7,7 +7,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 SECTIONS = (
     ("home", "Home", "home"),
-    ("mice", "Mice", "mice_page"),
+    ("mice", "Animals", "mice_page"),
     ("procedures", "Procedures", "procedure_page"),
     ("projects", "Projects", "projects_page"),
     ("services", "Services", "services_page"),
@@ -15,26 +15,26 @@ SECTIONS = (
     ("genetics", "Lines & Crossings", "lines_crossings_page"),
 )
 PAGE_TITLES = {
-    "home": "Home", "login": "Log in", "mice_page": "Mice",
+    "home": "Home", "login": "Log in", "mice_page": "Animals",
     "procedure_page": "Procedures", "projects_page": "Projects",
     "experiments_page": "Experiments", "recordings_page": "Recordings",
     "services_page": "Services", "reports_page": "Reports",
-    "lines_crossings_page": "Lines & Crossings", "mouse_record": "Mouse record",
+    "lines_crossings_page": "Lines & Crossings", "mouse_record": "Animal record",
     "add_project": "Add project", "edit_project": "Edit project",
     "add_experiment": "Add experiment", "edit_experiment": "Edit experiment",
     "add_recording": "Add recording", "edit_recording": "Edit recording",
-    "delete_recording": "Delete recording", "select_recording_mouse": "Select mice",
-    "edit_mouse": "Edit mouse", "rename_mouse": "Rename mouse",
-    "delete_mouse": "Delete mouse", "edit_mouse_procedure": "Edit procedure",
+    "delete_recording": "Delete recording", "select_recording_mouse": "Select animals",
+    "edit_mouse": "Edit animal", "rename_mouse": "Rename animal",
+    "delete_mouse": "Delete animal", "edit_mouse_procedure": "Edit procedure",
 }
 PRIMARY_ACTIONS = {
-    "add_mouse": "Save mouse", "add_litter": "Add animals",
-    "edit_mouse": "Save changes", "rename_mouse": "Rename mouse",
+    "add_mouse": "Save animal", "add_litter": "Add animals",
+    "edit_mouse": "Save changes", "rename_mouse": "Rename animal",
     "edit_mouse_procedure": "Save procedure", "edit_selected_mice": "Save bulk changes",
     "add_project": "Save project", "edit_project": "Save changes",
     "add_experiment": "Save experiment", "edit_experiment": "Save changes",
     "add_recording": "Save recording", "edit_recording": "Save changes",
-    "select_recording_mouse": "Add selected mice",
+    "select_recording_mouse": "Add selected animals",
 }
 CONTEXTUAL_ROUTES = {
     "mouse_record", "edit_mouse", "rename_mouse", "delete_mouse",
@@ -100,7 +100,7 @@ def build_navigation(context):
         protocol = mouse._state.fields_cache.get("protocol")
     title = PAGE_TITLES.get(action, {
         "add_mouse": "Add animals", "add_litter": "Add animals",
-        "edit_selected_mice": "Edit selected mice", "delete_selected_mice": "Delete selected mice",
+        "edit_selected_mice": "Edit selected animals", "delete_selected_mice": "Delete selected animals",
     }.get(action, "FLARE-ELN"))
 
     if name == "home":
@@ -167,13 +167,13 @@ def build_navigation(context):
     back_name = action_route(route_name(back_url)) if back_url else ""
     back_label = PAGE_TITLES.get(back_name, {
         "add_mouse": "Add animals", "add_litter": "Add animals",
-        "edit_selected_mice": "selected mice", "procedure_page": "Procedures",
+        "edit_selected_mice": "selected animals", "procedure_page": "Procedures",
     }.get(back_name, parent["label"] if parent else "previous page"))
     if name in {"rename_mouse", "delete_mouse"} and mouse:
         back_url = reverse("lab:edit_mouse", args=[mouse.pk])
         if return_url:
             back_url += "?" + urlencode({"return_url": return_url})
-        back_label = "Edit mouse"
+        back_label = "Edit animal"
 
     if breadcrumbs:
         breadcrumbs[-1]["url"] = ""
@@ -189,5 +189,5 @@ def build_navigation(context):
         "links": links, "breadcrumbs": breadcrumbs, "section": section,
         "back_url": back_url if name not in {"home", "login"} else "",
         "back_label": f"Back to {back_label}", "primary": primary,
-        "scope": "Mouse details" if name == "edit_mouse" else title,
+        "scope": "Animal details" if name == "edit_mouse" else title,
     }

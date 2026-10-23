@@ -1,27 +1,21 @@
 {% extends "lab/base.html" %}
 
-{% block title %}Mice{% endblock %}
-{% block page_title %}Mice{% endblock %}
+{% block title %}Animals{% endblock %}
+{% block page_title %}Animals{% endblock %}
 {% block main_class %}container container-fluid{% endblock %}
 
 {% block page_subtitle %}
-    <p>All mouse records, including mice with no protocol.</p>
+    <p>All animal records, including animals with no protocol.</p>
 {% endblock %}
 
 {% block content %}
     <div class="toolbar">
         <div class="actions">
 
-            <button
-                class="button"
-                type="submit"
-                form="selected-mice-form"
-            >
-                Edit selected mice
-            </button>
-
             <a
                 class="button button-primary"
+                data-animal-action="selected-mice-form"
+                aria-live="polite"
                 href="{{ add_litter_url }}?return_url={{ request.get_full_path|urlencode }}"
             >
                 Add animals

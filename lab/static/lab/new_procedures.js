@@ -55,7 +55,7 @@
                 section.replaceWith(replacement);
                 initialize(replacement);
             } catch (error) {
-                status.textContent = 'Could not confirm whether procedures were added. Your mouse edits are still here. Check existing procedures before trying again.';
+                status.textContent = 'Could not confirm whether procedures were added. Your animal edits are still here. Check existing procedures before trying again.';
             } finally {
                 pending = false;
                 fields.disabled = form.dataset.canAdd !== 'true';

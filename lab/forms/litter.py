@@ -36,7 +36,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
 
     marking_type = forms.ChoiceField(
         required=False, choices=Mouse.MARKING_CHOICES, initial="other", label="Local ID type",
-        help_text="Applies to every mouse in this litter. Other is the default; local identifiers can be left blank.",
+        help_text="Applies to every animal in this litter. Other is the default; local identifiers can be left blank.",
     )
     no_id_available = forms.BooleanField(
         required=False, label="No ID available — generate IDs",
@@ -44,11 +44,11 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
     )
     mouse_id_prefix = forms.CharField(
         required=False, max_length=100, label="Prefix",
-        help_text="Optional. Mouse IDs are this prefix followed by each number. For one arbitrary ID, enter the full ID here and leave Numbers blank.",
+        help_text="Optional. Animal IDs are this prefix followed by each number. For one arbitrary ID, enter the full ID here and leave Numbers blank.",
     )
     mouse_numbers = forms.CharField(
         required=False, max_length=5000, label="Numbers",
-        help_text="Enter numbers, ranges or both: 1,3,5-7 creates five mice. Leading zeros are preserved.",
+        help_text="Enter numbers, ranges or both: 1,3,5-7 creates five animals. Leading zeros are preserved.",
         widget=forms.TextInput(attrs={"placeholder": "1,3,5-7"}),
     )
     breeding_pair = forms.CharField(
@@ -67,9 +67,8 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         queryset=Crossing.objects.none(),
         label="Crossing",
     )
-    status = forms.CharField(
-        required=False,
-        max_length=50,
+    status = forms.ChoiceField(
+        choices=Mouse.STATUS_CHOICES,
         initial="Alive",
         label="Status",
     )
@@ -155,6 +154,8 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         self.crossing_lines = self.selected_crossing.ordered_lines() if self.selected_crossing else []
         if self.is_bound:
             self.data = self.data.copy()
+            # Older callers may omit status; use the same default as a new Mouse.
+            self.data.setdefault(self.add_prefix("status"), Mouse._meta.get_field("status").get_default())
             self.data[self.add_prefix("mouse_id_prefix")] = self.data.get(self.add_prefix("mouse_id_prefix"), "").strip()
         self.numbers_error = None
         self.numbers = []
@@ -186,7 +187,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                 "marking": forms.CharField(required=False, max_length=100, label="Local identifier"),
                 "sex": forms.ChoiceField(required=False, choices=[("", "Unknown"), *Mouse.SEX_CHOICES], label="Sex"),
             }.items():
-                field.widget.attrs["aria-label"] = f"Mouse {number}: {field.label}"
+                field.widget.attrs["aria-label"] = f"Animal {number}: {field.label}"
                 self.fields[f"{stem}_{suffix}"] = field
             genotype_fields = []
             for line in self.crossing_lines:
@@ -202,10 +203,10 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                             self.add_prefix(f"{shared_name}_uncertain"), "")
                 self.fields[name] = forms.ChoiceField(required=False, choices=choices, initial="unknown", label=line.name,
                     widget=forms.Select(attrs={"data-individual-genotype-field": "true", "data-line-id": line.pk}))
-                self.fields[name].widget.attrs["aria-label"] = f"Mouse {number}: {line.name} genotype"
+                self.fields[name].widget.attrs["aria-label"] = f"Animal {number}: {line.name} genotype"
                 self.fields[f"{name}_uncertain"] = forms.BooleanField(
                     required=False, label="Uncertain", widget=forms.CheckboxInput(attrs={
-                        "aria-label": f"Mouse {number}: {line.name} uncertain result",
+                        "aria-label": f"Animal {number}: {line.name} uncertain result",
                         "data-individual-genotype-uncertainty": "true", "data-line-id": line.pk,
                     }),
                 )
@@ -229,17 +230,17 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         prefix = cleaned_data.get("mouse_id_prefix", "")
         mouse_ids = [f"{prefix}{number}" for number in self.numbers]
         if any(len(mouse_id) > 100 for mouse_id in mouse_ids):
-            self.add_error("mouse_id_prefix", "Mouse IDs must be 100 characters or fewer.")
+            self.add_error("mouse_id_prefix", "Animal IDs must be 100 characters or fewer.")
         existing_ids = list(Mouse.objects.filter(pk__in=mouse_ids).values_list("pk", flat=True)[:5])
         if existing_ids:
-            self.add_error("mouse_numbers", f"Mouse IDs already exist: {', '.join(existing_ids)}.")
+            self.add_error("mouse_numbers", f"Animal IDs already exist: {', '.join(existing_ids)}.")
         markings = set()
         for number in self.numbers:
             name = f"pup_{number}_marking"
             marking = cleaned_data.get(name, "")
             if marking and cleaned_data.get("no_id_available"):
                 if marking in markings:
-                    self.add_error(name, "This local identifier is already used by another mouse in this litter.")
+                    self.add_error(name, "This local identifier is already used by another animal in this litter.")
                 markings.add(marking)
 
         protocol = cleaned_data.get("protocol")

@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import F
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -87,14 +88,14 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
             licence_reference=licence_reference,
         )
 
-    sort = request.GET.get("sort", "mouse_id")
-    direction = request.GET.get("direction", "asc")
+    sort = request.GET.get("sort", "protocol_start_date")
+    direction = request.GET.get("direction", "desc")
 
     if direction not in {"asc", "desc"}:
-        direction = "asc"
+        direction = "desc"
 
     if sort not in sortable_fields():
-        sort = "mouse_id"
+        sort = "protocol_start_date"
 
     order_by_field = sort if direction == "asc" else f"-{sort}"
     filter_values = read_filter_values(request.GET, MOUSE_FILTER_SPECS)
@@ -103,6 +104,7 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
     mice = (
         Mouse.objects
         .filter(protocol=selected_protocol)
+        .select_related("protocol", "added_by")
         .prefetch_related("procedures__procedure_type")
     )
 
@@ -121,7 +123,11 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
         .order_by("name")
     )
 
-    mice = mice.order_by(order_by_field)
+    if sort == "protocol_start_date":
+        date_order = F(sort).desc(nulls_last=True) if direction == "desc" else F(sort).asc(nulls_last=True)
+        mice = mice.order_by(date_order, "mouse_id")
+    else:
+        mice = mice.order_by(order_by_field, "mouse_id")
 
     page_size = read_table_page_size(request.GET)
     paginator = Paginator(mice, page_size)
@@ -153,7 +159,7 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
             clear_url=procedure_protocol_url(selected_protocol),
         ),
         "current_year": current_year,
-        "record_count": build_record_count(page_obj, "mouse"),
+        "record_count": build_record_count(page_obj, "animal"),
         "pagination": build_pagination(page_obj, query_params),
         "page_size_control": build_table_page_size_control(
             request.GET,
@@ -196,7 +202,7 @@ def edit_mouse_procedure(request, mouse_pk, procedure_pk):
 
             messages.success(
                 request,
-                f"Procedure was updated for mouse {mouse.mouse_id}.",
+                f"Procedure was updated for animal {mouse.mouse_id}.",
             )
             return redirect(cancel_url)
     else:
@@ -236,7 +242,7 @@ def delete_mouse_procedure(request, mouse_pk, procedure_pk):
 
     messages.success(
         request,
-        f"Procedure {procedure_name} was deleted for mouse {mouse.mouse_id}.",
+        f"Procedure {procedure_name} was deleted for animal {mouse.mouse_id}.",
     )
     edit_url = reverse("lab:edit_mouse", args=[mouse.pk])
     return redirect(

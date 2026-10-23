@@ -35,7 +35,7 @@ LOCAL_IDENTIFIER_LABEL = "Local identifier"
 
 
 LOCAL_IDENTIFIER_HELP_TEXT = (
-    "Optional tattoo, ear clip or other local identifier. Leave blank for unmarked mice."
+    "Optional tattoo, ear clip or other local identifier. Leave blank for unmarked animals."
 )
 
 

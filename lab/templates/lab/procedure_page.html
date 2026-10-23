@@ -17,7 +17,7 @@
         </p>
     {% elif selected_protocol %}
         <p>
-            Mice registered under
+            Animals registered under
             <strong>{{ selected_protocol.name }}</strong>
         </p>
     {% endif %}
@@ -58,25 +58,24 @@
             {% if selected_protocol %}
                 <a
                     class="button button-primary"
+                    data-animal-action="selected-mice-form"
+                    aria-live="polite"
                     href="{% url 'lab:add_litter_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}?return_url={{ request.get_full_path|urlencode }}"
                 >
                     Add animals
                 </a>
-                <button
-                    class="button"
-                    type="submit"
-                    form="selected-mice-form"
-                >
-                    Edit selected
-                </button>
-
- 
             {% endif %}
         </div>
     </div>
 
     {% if selected_protocol %}
-        {% include "lab/components/filter_form.html" with filter_form=filter_form compact_filters=True %}
+        <details class="procedure-filters">
+            <summary>
+                <span class="procedure-filters-show">Show filters</span>
+                <span class="procedure-filters-hide">Hide filters</span>
+            </summary>
+            {% include "lab/components/filter_form.html" with filter_form=filter_form compact_filters=True %}
+        </details>
 
         <div class="table-summary">
             <div class="record-count">

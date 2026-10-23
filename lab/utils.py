@@ -37,7 +37,7 @@ def parse_mouse_numbers(value):
             raise ValueError("Enter numbers or ascending ranges separated by commas, for example 1,3,5-7.")
         start, end = match.groups()
         if len(start) > 100 or (end and len(end) > 100):
-            raise ValueError("Mouse numbers must be 100 characters or fewer.")
+            raise ValueError("Animal numbers must be 100 characters or fewer.")
         if end is None:
             values = [start]
         else:
@@ -45,14 +45,14 @@ def parse_mouse_numbers(value):
             if last < first:
                 raise ValueError("Ranges must be ascending, for example 1-3.")
             if last - first + 1 > 500 - len(numbers):
-                raise ValueError("Create at most 500 mice at a time.")
+                raise ValueError("Create at most 500 animals at a time.")
             width = max(len(start), len(end)) if start.startswith("0") and len(start) > 1 else 0
             values = [str(number).zfill(width) for number in range(first, last + 1)]
         for number in values:
             if number in seen:
-                raise ValueError(f"Mouse number {number} is listed more than once.")
+                raise ValueError(f"Animal number {number} is listed more than once.")
             seen.add(number)
             numbers.append(number)
             if len(numbers) > 500:
-                raise ValueError("Create at most 500 mice at a time.")
+                raise ValueError("Create at most 500 animals at a time.")
     return numbers

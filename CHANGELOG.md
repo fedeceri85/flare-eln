@@ -1,3 +1,8 @@
+23/10/2026
+- Improved lines and crossings page
+- Visual enhancements to the procedure tables.
+- Changed all references to "mice" in the interface to "animals". 
+
 22/10/2026
 - Upgraded Django from unsupported 4.2.30 to 5.2.18 LTS and updated deprecated HTML helpers.
 - Visual overhaul and code cleanup.
