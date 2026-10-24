@@ -14,7 +14,7 @@ def checked_name(lines):
 
 
 @transaction.atomic
-def rename_line(line, name):
+def rename_line(line, name, aliases=None):
     # All catalogue writes take the species lock first, including creation, so
     # a concurrent rename cannot leave newly-created crossing labels stale.
     Species.objects.select_for_update().get(pk=line.species_id)
@@ -33,10 +33,15 @@ def rename_line(line, name):
                 member.name = name
         updates.append((crossing, checked_name(lines)))
     # Deliberately bypass MouseLine.save's single-crossing creation hook.
-    MouseLine.objects.filter(pk=line.pk).update(name=name)
+    fields = {"name": name}
+    if aliases is not None:
+        fields["aliases"] = aliases.strip()
+    MouseLine.objects.filter(pk=line.pk).update(**fields)
     for crossing, display_name in updates:
         Crossing.objects.filter(pk=crossing.pk).update(display_name=display_name)
     line.name = name
+    if aliases is not None:
+        line.aliases = fields["aliases"]
     return line
 
 

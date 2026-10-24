@@ -9,13 +9,15 @@
 {% endblock %}
 
 {% block content %}
-    <div class="toolbar">
+<div class="experiments-page record-list-page">
+    <div class="toolbar page-action-bar" role="region" aria-label="Experiment navigation and actions" data-page-actions>
         <div class="procedure-nav">
             <nav class="protocol-tabs" aria-label="Experiment status">
                 {% for tab in experiment_tabs %}
                     <a
                         href="{{ tab.url }}"
                         class="protocol-tab{% if tab.active %} active{% endif %}"
+                        {% if tab.active %}aria-current="page"{% endif %}
                     >
                         {{ tab.label }}
                     </a>
@@ -34,15 +36,24 @@
         </div>
     </div>
 
-    {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+    <details class="procedure-filters" {% if has_active_filters %}open{% endif %}>
+        <summary>
+            <span class="procedure-filters-show">Show filters</span>
+            <span class="procedure-filters-hide">Hide filters</span>
+        </summary>
+        {% include "lab/components/filter_form.html" with filter_form=filter_form compact_filters=True %}
+    </details>
 
-    <div class="record-count">
-        Showing {{ record_count.start }}&ndash;{{ record_count.end }}
-        of {{ record_count.count }}
-        {{ record_count.noun }}{{ record_count.count|pluralize }}
+    <div class="table-summary">
+        <div class="record-count">
+            Showing {{ record_count.start }}&ndash;{{ record_count.end }}
+            of {{ record_count.count }}
+            {{ record_count.noun }}{{ record_count.count|pluralize }}
+        </div>
     </div>
 
     {% include "lab/components/table.html" with table=table %}
 
     {% include "lab/components/pagination.html" with pagination=pagination %}
+</div>
 {% endblock %}

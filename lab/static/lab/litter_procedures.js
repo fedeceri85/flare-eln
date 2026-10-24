@@ -2,6 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector("[data-litter-procedure-form]");
     const stored = document.getElementById("id_procedure_drafts");
     if (!form || !stored) return;
+    const importing = form.dataset?.procedureScope === "import";
+    const scope = importing ? "import" : "litter";
     const names = ["procedure_type", "date", "lab_member", "lab_book_page"];
     const fields = Object.fromEntries(names.map(name => [name, form.elements.namedItem("new_procedure-" + name)]));
     const rows = document.querySelector("[data-litter-procedures-rows]");
@@ -33,7 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
         button.addEventListener("click", callback);
         return button;
     }
-    function render() {
+    function render(notify = false) {
         rows.replaceChildren();
         drafts.forEach((draft, index) => {
             const row = document.createElement("tr");
@@ -53,10 +55,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 fields.procedure_type.focus();
             }));
             actions.appendChild(action("Remove", () => {
-                if (!window.confirm("Remove this procedure from the litter?")) return;
+                if (!window.confirm("Remove this procedure from the " + scope + "?")) return;
                 drafts.splice(index, 1);
                 reset();
-                render();
+                render(true);
                 status.textContent = "Procedure removed from the list.";
             }));
             row.appendChild(actions);
@@ -65,12 +67,13 @@ document.addEventListener("DOMContentLoaded", function () {
         stored.value = JSON.stringify(drafts);
         table.hidden = drafts.length === 0;
         empty.hidden = drafts.length !== 0;
+        if (notify && importing) stored.dispatchEvent(new Event("input", {bubbles: true}));
     }
     form.addEventListener("submit", event => {
         event.preventDefault();
         if (form.querySelector("[data-procedure-fieldset]").disabled || !form.reportValidity()) return;
         if (editing === null && drafts.length >= 100) {
-            status.textContent = "You can add up to 100 procedures per litter.";
+            status.textContent = "You can add up to 100 procedures per " + scope + ".";
             return;
         }
         const draft = Object.fromEntries(names.map(name => [name, fields[name].value]));
@@ -78,8 +81,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (updated) drafts[editing] = draft;
         else drafts.push(draft);
         reset();
-        render();
-        status.textContent = updated ? "Procedure updated. Save the litter to create these records." : "Procedure added. Add another, or save the litter to create these records.";
+        render(true);
+        const save = importing ? "complete the import" : "save the litter";
+        status.textContent = updated ? "Procedure updated. " + save[0].toUpperCase() + save.slice(1) + " to create these records." : "Procedure added. Add another, or " + save + " to create these records.";
     });
     cancel.querySelector("button").addEventListener("click", () => { reset(); status.textContent = "Editing cancelled."; });
     render();

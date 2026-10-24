@@ -1,3 +1,8 @@
+24/10/2026
+- Import experiments from spreadsheet - first version. 
+- Added aliases to animal lines, to favour matching in spreadsheet imports
+
+
 23/10/2026
 - Improved lines and crossings page
 - Visual enhancements to the procedure tables.

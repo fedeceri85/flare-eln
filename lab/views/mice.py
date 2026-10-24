@@ -982,7 +982,7 @@ def mouse_record(request, mouse_pk):
         .filter(mice=mouse)
         .select_related("experiment", "experiment__project", "recording_type")
         .prefetch_related("mice")
-        .order_by("recording_type__name", "-recording_date", "sequence_number")
+        .order_by("recording_type__name", "-recording_date", "recording_id")
     )
     recordings_by_type = {}
 

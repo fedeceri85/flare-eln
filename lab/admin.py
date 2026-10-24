@@ -284,7 +284,6 @@ class RecordingTypeAdmin(admin.ModelAdmin):
 #         "mice_display",
 #         "experiment",
 #         "recording_date",
-#         "sequence_number",
 #         "data_path",
 #     )
 #     list_filter = (
@@ -308,7 +307,6 @@ class RecordingTypeAdmin(admin.ModelAdmin):
 #         "mice_display",
 #         "experiment",
 #         "recording_date",
-#         "sequence_number",
 #         "data_path",
 #         "notes",
 #         "values",

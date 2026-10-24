@@ -1,9 +1,29 @@
-from datetime import date
+from datetime import date, timedelta
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils import timezone
+
+
+def import_draft_expiry():
+    return timezone.now() + timedelta(hours=24)
+
+
+class SpreadsheetImportDraft(models.Model):
+    """Reusable mapping rules and file-specific state deliberately live apart."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    experiment = models.ForeignKey("Experiment", on_delete=models.CASCADE)
+    filename = models.CharField(max_length=255)
+    source = models.JSONField(default=list)
+    configuration = models.JSONField(default=dict)
+    state = models.JSONField(default=dict)
+    expires_at = models.DateTimeField(default=import_draft_expiry, db_index=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 MAX_SEVERITY_CHOICES = [
     ("Non-recovery", "Non-recovery"),
@@ -108,6 +128,7 @@ class MouseLine(models.Model):
         related_name="lines",
     )
     name = models.CharField(max_length=200)
+    aliases = models.TextField(blank=True, default="")
     is_wild_type = models.BooleanField(default=False)
     active = models.BooleanField(default=True)
 
@@ -847,20 +868,18 @@ class Recording(models.Model):
         related_name="recordings",
     )
     recording_date = models.DateField()
-    sequence_number = models.PositiveIntegerField(default=1)
     data_paths = models.JSONField(default=list, blank=True)
     notes = models.TextField(blank=True)
     values = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["-recording_date", "sequence_number", "recording_id"]
+        ordering = ["-recording_date", "recording_id"]
 
     def __str__(self):
         return (
             f"{self.mice_label} | "
             f"{self.recording_date} | "
-            f"{self.experiment.name} | "
-            f"#{self.sequence_number}"
+            f"{self.experiment.name}"
         )
 
     @property

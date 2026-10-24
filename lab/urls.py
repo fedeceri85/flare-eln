@@ -179,6 +179,16 @@ urlpatterns = [
         name="services_page",
     ),
     path(
+        "projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/import/",
+        protected(views.import_recordings),
+        name="import_recordings",
+    ),
+    path(
+        "projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/import/<uuid:draft_id>/",
+        protected(views.import_recordings),
+        name="import_recordings_draft",
+    ),
+    path(
         (
             "projects/<int:project_pk>/experiments/<int:experiment_pk>/"
             "recordings/add/"
@@ -201,6 +211,11 @@ urlpatterns = [
         ),
         protected(views.duplicate_recording),
         name="duplicate_recording",
+    ),
+    path(
+        "projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/delete-selected/",
+        protected(views.delete_selected_recordings),
+        name="delete_selected_recordings",
     ),
     path(
         (

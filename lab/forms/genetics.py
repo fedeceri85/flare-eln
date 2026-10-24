@@ -180,6 +180,11 @@ class BulkMouseLineCreateForm(forms.Form):
         label="Line names",
         help_text="Enter one or more line names separated by commas.",
     )
+    aliases = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Alternative names, separated by commas. Applied to each new line when adding multiple lines.",
+    )
     is_wild_type = forms.BooleanField(
         required=False,
         label="These are wild-type/reference lines",
@@ -232,6 +237,7 @@ class BulkMouseLineCreateForm(forms.Form):
                 MouseLine.objects.create(
                     species=species,
                     name=name,
+                    aliases=self.cleaned_data["aliases"],
                     is_wild_type=is_wild_type,
                 )
             )
@@ -625,6 +631,11 @@ class MouseStructuredGeneticsMixin:
 
 class LineRenameForm(forms.Form):
     name = forms.CharField(max_length=200, label="Line name")
+    aliases = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Alternative names, separated by commas.",
+    )
 
 
 class CrossingOrderForm(forms.Form):

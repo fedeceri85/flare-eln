@@ -47,7 +47,7 @@ class RecordingDraftTests(TestCase):
         for url in (self.add_url, self.edit_url):
             with self.subTest(url=url):
                 data = {
-                    "recording_date": "2026-10-21", "sequence_number": "3",
+                    "recording_date": "2026-10-21",
                     "notes": "Unfinished notes", "data_paths": "/path/one\n/path/two",
                     f"value_{self.custom.pk}": "Custom entry",
                 }

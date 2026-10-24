@@ -240,6 +240,7 @@ def experiments_page(request, project_pk):
                     "active": status == "archived",
                 },
             ],
+            "has_active_filters": any(filter_values.values()),
             "table": build_experiments_table(
                 page_obj,
                 sort,

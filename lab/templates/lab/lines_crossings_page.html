@@ -21,25 +21,25 @@
     {% if line_form.errors or crossing_form.errors or editor_form.errors %}<p class="message message-error" role="alert">Please correct the errors in the open form below the table.</p>{% endif %}
     <div class="table-summary"><p class="record-count">Showing {{ catalogue_page.start_index }}–{{ catalogue_page.end_index }} of {{ catalogue_page.paginator.count }} {% if active_tab == 'lines' %}line{% else %}crossing{% endif %}{{ catalogue_page.paginator.count|pluralize }}</p>{% include 'lab/components/page_size_select.html' %}</div>
     <div class="table-card" id="catalogue-results"><div class="table-scroll"><table class="data-table procedure-matrix catalogue-table">
-        <thead><tr><th scope="col">Name</th>{% if active_tab == 'lines' %}<th scope="col" class="catalogue-kind">Wild type/reference</th>{% else %}<th scope="col" class="catalogue-kind">Type</th>{% endif %}<th scope="col" class="catalogue-state">Active</th><th scope="col">Actions</th></tr></thead>
+        <thead><tr><th scope="col">Name</th>{% if active_tab == 'lines' %}<th scope="col">Aliases</th><th scope="col" class="catalogue-kind">Wild type/reference</th>{% else %}<th scope="col" class="catalogue-kind">Type</th>{% endif %}<th scope="col" class="catalogue-state">Active</th><th scope="col">Actions</th></tr></thead>
         <tbody>{% for item in catalogue_page %}<tr>
             <td>{% if active_tab == 'lines' %}{{ item.name }}{% else %}{{ item.display_name }}{% endif %}</td>
-            {% if active_tab == 'lines' %}<td>{{ item.is_wild_type|yesno:'Yes,No' }}</td>{% else %}<td>{{ item.inferred_crossing_type }}</td>{% endif %}
+            {% if active_tab == 'lines' %}<td>{{ item.aliases|default:'—' }}</td><td>{{ item.is_wild_type|yesno:'Yes,No' }}</td>{% else %}<td>{{ item.inferred_crossing_type }}</td>{% endif %}
             <td>{{ item.active|yesno:'Yes,No' }}</td><td><div class="catalogue-row-actions">
                 {% if active_tab == 'lines' %}<a class="catalogue-row-action" href="{{ item.edit_url }}">Edit</a>{% elif item.catalogue_lines|length > 1 %}<a class="catalogue-row-action" href="{{ item.edit_url }}">Edit order</a>{% endif %}
                 <form method="post" class="inline-form" onsubmit="return confirm('Delete this {% if active_tab == 'lines' %}line{% else %}crossing{% endif %}?');">{% csrf_token %}<input type="hidden" name="action" value="{% if active_tab == 'lines' %}delete_line{% else %}delete_crossing{% endif %}"><input type="hidden" name="{% if active_tab == 'lines' %}line_id{% else %}crossing_id{% endif %}" value="{{ item.pk }}"><button class="catalogue-row-action catalogue-row-action--danger" type="submit">Delete</button></form>
             </div></td>
-        </tr>{% empty %}<tr><td colspan="4">No {% if active_tab == 'lines' %}lines{% else %}crossings{% endif %} match these filters.</td></tr>{% endfor %}</tbody>
+        </tr>{% empty %}<tr><td colspan="{% if active_tab == 'lines' %}5{% else %}4{% endif %}">No {% if active_tab == 'lines' %}lines{% else %}crossings{% endif %} match these filters.</td></tr>{% endfor %}</tbody>
     </table></div></div>
     {% include 'lab/components/pagination.html' %}
     </div>
 
-    {% if editor %}<section class="form-card catalogue-panel" id="catalogue-editor"><h2>{% if edit_kind == 'line' %}Rename line: {{ editor.name }}{% else %}Edit order: {{ editor.display_name }}{% endif %}</h2>
+    {% if editor %}<section class="form-card catalogue-panel" id="catalogue-editor"><h2>{% if edit_kind == 'line' %}Edit line: {{ editor.name }}{% else %}Edit order: {{ editor.display_name }}{% endif %}</h2>
         <form method="post" {% if edit_kind == 'crossing' %}data-crossing-order{% endif %}>{% csrf_token %}
             <input type="hidden" name="action" value="{% if edit_kind == 'line' %}rename_line{% else %}reorder_crossing{% endif %}"><input type="hidden" name="{% if edit_kind == 'line' %}line_id{% else %}crossing_id{% endif %}" value="{{ editor.pk }}">
             {% include 'lab/components/form_fields.html' with form=editor_form %}
             {% if edit_kind == 'crossing' %}<p>Only line order can change. Existing animals and genotype values are preserved.</p><ol data-order-list>{% for line in editor_lines %}<li data-line-id="{{ line.pk }}"><span>{{ line.name }}</span><button class="button" type="submit" name="move" value="{{ line.pk }}:up" aria-label="Move {{ line.name }} up" {% if forloop.first %}disabled{% endif %}>Move up</button><button class="button" type="submit" name="move" value="{{ line.pk }}:down" aria-label="Move {{ line.name }} down" {% if forloop.last %}disabled{% endif %}>Move down</button></li>{% endfor %}</ol>{% endif %}
-            <div class="actions"><button class="button button-primary" type="submit">{% if edit_kind == 'line' %}Save name{% else %}Save order{% endif %}</button><a class="button" href="{{ cancel_edit_url }}">Cancel</a></div>
+            <div class="actions"><button class="button button-primary" type="submit">{% if edit_kind == 'line' %}Save changes{% else %}Save order{% endif %}</button><a class="button" href="{{ cancel_edit_url }}">Cancel</a></div>
         </form></section>{% endif %}
 
     <details class="form-card catalogue-panel" id="add-lines" {% if line_form.errors or open_panel == 'add-lines' %}open{% endif %}><summary>Add Lines</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="add_lines">{% include 'lab/components/form_fields.html' with form=line_form %}<div class="actions"><button class="button button-primary" type="submit">Add lines</button></div></form></details>

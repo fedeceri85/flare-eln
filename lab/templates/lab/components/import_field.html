@@ -1,0 +1,8 @@
+<div class="form-field">
+    {% if hide_label %}
+        <label class="visually-hidden" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {% else %}
+        {{ field.label_tag }}
+    {% endif %}
+    {% include 'lab/components/field_control.html' with field=field hide_help=True only %}
+</div>

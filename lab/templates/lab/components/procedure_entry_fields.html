@@ -1,4 +1,4 @@
-<fieldset class="procedure-fields procedure-create-grid procedure-create-with-action" disabled {% if draft %}data-procedure-fieldset{% else %}data-new-procedure-inputs{% endif %}>
+<fieldset class="procedure-fields procedure-create-grid procedure-create-with-action" {% if not procedure_fields_enabled %}disabled{% endif %} {% if draft %}data-procedure-fieldset{% else %}data-new-procedure-inputs{% endif %}>
     {% for field in procedure_form %}
         <div class="bulk-field">{% include "lab/components/shared_mouse_input.html" with hide_help=True %}</div>
     {% endfor %}

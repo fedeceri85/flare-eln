@@ -15,7 +15,8 @@
 {% endblock %}
 
 {% block content %}
-    <div class="toolbar">
+<div class="recordings-page record-list-page">
+    <div class="toolbar page-action-bar" role="region" aria-label="Recording actions" data-page-actions>
         <div class="actions">
 
             <a
@@ -25,6 +26,8 @@
                 Add one recording
             </a>
 
+            <a class="button" href="{% url 'lab:import_recordings' project.pk experiment.pk %}">Import from spreadsheet</a>
+
             <button
                 class="button"
                 type="submit"
@@ -32,10 +35,17 @@
             >
                 Duplicate selected recording
             </button>
+            <button class="button button-danger" type="submit" form="selected-recording-form" formaction="{% url 'lab:delete_selected_recordings' project.pk experiment.pk %}">Delete selected</button>
         </div>
     </div>
 
-    {% include "lab/components/filter_form.html" with filter_form=filter_form %}
+    <details class="procedure-filters recordings-filters" {% if has_active_filters %}open{% endif %}>
+        <summary>
+            <span class="procedure-filters-show">Show filters</span>
+            <span class="procedure-filters-hide">Hide filters</span>
+        </summary>
+        {% include "lab/components/filter_form.html" with filter_form=filter_form compact_filters=True %}
+    </details>
 
     <div class="table-summary">
         <div class="record-count">
@@ -63,4 +73,5 @@
     </form>
 
     {% include "lab/components/pagination.html" with pagination=pagination %}
+</div>
 {% endblock %}

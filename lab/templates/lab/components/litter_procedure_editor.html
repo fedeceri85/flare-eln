@@ -1,13 +1,13 @@
 <h2 class="bulk-title">Add new procedure</h2>
-<p class="bulk-help">Add procedures one by one. Each listed procedure is added once to every animal when you save the litter.</p>
+<p class="bulk-help">{% if procedure_editor_scope == 'import' %}Each listed procedure is added once per resolved animal when you import.{% else %}Add procedures one by one. Each listed procedure is added once to every animal when you save the litter.{% endif %}</p>
 <noscript><p>Enable JavaScript to build the procedure list, or add procedures after saving the animals.</p></noscript>
-<p class="bulk-help" data-procedure-disabled-help>Select a protocol that allows regulated procedures before adding procedures.</p>
-<form id="litter-procedure-form" data-litter-procedure-form>
+<p class="bulk-help" data-procedure-disabled-help {% if procedure_fields_enabled %}hidden{% endif %}>Select a protocol that allows regulated procedures{% if procedure_editor_scope == 'import' %} in <a href="?step=setup">Import settings</a>{% endif %} before adding procedures.</p>
+<form id="litter-procedure-form" data-litter-procedure-form data-procedure-scope="{{ procedure_editor_scope|default:'litter' }}">
     {% include "lab/components/procedure_entry_fields.html" with procedure_form=litter_procedure_form draft=True %}
     <span hidden data-litter-procedure-cancel><button class="button" type="button">Cancel editing</button></span>
     <p role="status" aria-live="polite" data-litter-procedure-status></p>
 </form>
-<h2 class="bulk-title">Procedures for this litter</h2>
+<h2 class="bulk-title">{% if procedure_editor_scope == 'import' %}Procedures for this import{% else %}Procedures for this litter{% endif %}</h2>
 {% if form.procedure_drafts.errors %}<ul class="error-list">{% for error in form.procedure_drafts.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
 <p data-litter-procedures-empty>No procedures added.</p>
 <div class="table-scroll" data-litter-procedures-table hidden>

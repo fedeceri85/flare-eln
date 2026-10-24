@@ -223,7 +223,7 @@ def lines_crossings_page(request):
     crossing_form = CrossingCreateForm(initial={"species": species}, auto_id="crossing_%s")
     editor_lines = editor.ordered_lines() if edit_kind == "crossing" else []
     if editor:
-        editor_form = (LineRenameForm(initial={"name": editor.name}) if edit_kind == "line" else
+        editor_form = (LineRenameForm(initial={"name": editor.name, "aliases": editor.aliases}) if edit_kind == "line" else
                        CrossingOrderForm(initial={"selected_lines": ",".join(str(line.pk) for line in editor_lines)}))
     if request.method == "POST":
         if action not in {"add_lines", "create_crossing", "rename_line", "reorder_crossing", "delete_line", "delete_crossing"}:
@@ -262,7 +262,7 @@ def lines_crossings_page(request):
                 if editor_form.is_valid():
                     try:
                         if edit_kind == "line":
-                            rename_line(editor, editor_form.cleaned_data["name"])
+                            rename_line(editor, editor_form.cleaned_data["name"], editor_form.cleaned_data["aliases"])
                         else:
                             ids = editor_form.cleaned_data["selected_lines"]
                             existing_ids = {line.pk for line in editor_lines}
@@ -383,7 +383,9 @@ def crossing_lookup(request):
         crossings = crossings.filter(
             Q(display_name__icontains=query)
             | Q(species__name__icontains=query)
-        )
+            | Q(lines__name__icontains=query)
+            | Q(lines__aliases__icontains=query)
+        ).distinct()
 
     crossings = crossings.order_by("species__name", "display_name", "crossing_id")[:20]
 

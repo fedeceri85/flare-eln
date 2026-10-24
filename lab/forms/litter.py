@@ -15,7 +15,7 @@ from .genetics import (
     genotype_field_name,
     visible_field_sections_for_names,
 )
-from .procedures import BulkProcedureCreateForm
+from .procedures import BulkProcedureCreateForm, validate_procedure_drafts
 
 
 class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
@@ -104,31 +104,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
     procedure_drafts = forms.JSONField(required=False, initial=list, widget=forms.HiddenInput)
 
     def clean_procedure_drafts(self):
-        drafts = self.cleaned_data.get("procedure_drafts")
-        if drafts is None:
-            return []
-        if not isinstance(drafts, list) or len(drafts) > 100:
-            raise forms.ValidationError("Add up to 100 procedures as a list.")
-        validated = []
-        for index, draft in enumerate(drafts, 1):
-            if (not isinstance(draft, dict)
-                    or any(not isinstance(draft.get(name, ""), str)
-                           for name in ("date", "lab_member", "lab_book_page"))
-                    or not isinstance(draft.get("procedure_type", ""), (str, int))
-                    or isinstance(draft.get("procedure_type"), bool)):
-                raise forms.ValidationError(f"Procedure {index}: invalid procedure details.")
-            procedure_form = BulkProcedureCreateForm({
-                f"new_procedure-{name}": draft.get(name, "")
-                for name in ("procedure_type", "date", "lab_member", "lab_book_page")
-            })
-            if not procedure_form.is_valid():
-                errors = "; ".join(
-                    f"{procedure_form.fields[name].label or name}: {', '.join(messages)}"
-                    for name, messages in procedure_form.errors.items()
-                )
-                raise forms.ValidationError(f"Procedure {index}: {errors}")
-            validated.append(procedure_form.cleaned_data)
-        return validated
+        return validate_procedure_drafts(self.cleaned_data.get("procedure_drafts"))
 
     def clean_mouse_id_prefix(self):
         return (self.cleaned_data.get("mouse_id_prefix") or "").strip()

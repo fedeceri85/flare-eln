@@ -23,7 +23,8 @@ PAGE_TITLES = {
     "add_project": "Add project", "edit_project": "Edit project",
     "add_experiment": "Add experiment", "edit_experiment": "Edit experiment",
     "add_recording": "Add recording", "edit_recording": "Edit recording",
-    "delete_recording": "Delete recording", "select_recording_mouse": "Select animals",
+    "import_recordings": "Import from spreadsheet", "import_recordings_draft": "Import from spreadsheet",
+    "delete_recording": "Delete recording", "delete_selected_recordings": "Delete selected recordings", "select_recording_mouse": "Select animals",
     "edit_mouse": "Edit animal", "rename_mouse": "Rename animal",
     "delete_mouse": "Delete animal", "edit_mouse_procedure": "Edit procedure",
 }
@@ -40,7 +41,7 @@ CONTEXTUAL_ROUTES = {
     "mouse_record", "edit_mouse", "rename_mouse", "delete_mouse",
     "edit_selected_mice_all", "edit_selected_mice_licence_protocol", "edit_selected_mice",
     "edit_mouse_procedure", "experiments_page", "recordings_page",
-    "edit_project", "edit_experiment", "edit_recording", "delete_recording",
+    "edit_project", "edit_experiment", "edit_recording", "delete_recording", "delete_selected_recordings",
 }
 
 
@@ -145,7 +146,7 @@ def build_navigation(context):
             crumb(project.name, reverse("lab:experiments_page", args=[project.pk]))
         if experiment:
             crumb(experiment.name, reverse("lab:recordings_page", args=[project.pk, experiment.pk]))
-        if action in {"add_recording", "edit_recording", "delete_recording", "select_recording_mouse"}:
+        if action in {"add_recording", "edit_recording", "delete_recording", "delete_selected_recordings", "select_recording_mouse", "import_recordings", "import_recordings_draft"}:
             crumb("Recordings", reverse("lab:recordings_page", args=[project.pk, experiment.pk]))
         if mouse:
             crumb(mouse.mouse_id, reverse("lab:mouse_record", args=[mouse.pk]))

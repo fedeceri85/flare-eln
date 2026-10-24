@@ -63,11 +63,6 @@ class RecordingForm(forms.Form):
         ),
         label="Date",
     )
-    sequence_number = forms.IntegerField(
-        min_value=1,
-        initial=1,
-        label="Sequence",
-    )
     data_paths = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"rows": 2}),
@@ -115,9 +110,6 @@ class RecordingForm(forms.Form):
             initial_mouse_ids.extend(mouse_ids)
             self.fields["recording_date"].initial = (
                 initial_recording.recording_date
-            )
-            self.fields["sequence_number"].initial = (
-                initial_recording.sequence_number
             )
             self.fields["data_paths"].initial = "\n".join(
                 initial_recording.data_paths
@@ -472,7 +464,6 @@ class RecordingForm(forms.Form):
 
         mice = self.cleaned_data.get("mice", [])
         recording.recording_date = self.cleaned_data["recording_date"]
-        recording.sequence_number = self.cleaned_data["sequence_number"]
         recording.data_paths = self.cleaned_data["data_paths"]
         recording.notes = self.cleaned_data.get("notes", "")
         recording.values = self.recording_values()

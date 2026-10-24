@@ -1,0 +1,237 @@
+{% extends 'lab/base.html' %}{% load static %}
+{% block title %}Import recordings{% endblock %}
+{% block page_title %}Import from spreadsheet{% endblock %}
+{% block main_class %}container container-fluid{% endblock %}
+{% block page_subtitle %}<p>{{ project.name }} · {{ experiment.name }} · {{ experiment.recording_type }}</p>{% endblock %}
+{% block content %}
+<div class="spreadsheet-import" data-import-step="{{ step|default:'upload' }}">
+{% if expired %}
+    <div class="form-card"><p role="alert">This import has expired. Drafts expire after 24 hours.</p><a class="button button-primary" href="{{ base_url }}">Upload again</a></div>
+{% elif result %}
+    <div class="form-card"><h2>Import completed</h2><p>Imported {{ result.recordings }} recordings; created {{ result.created_animals }} animals and updated {{ result.updated_animals }} animals.{% if result.procedures %} Added {{ result.procedures }} procedures.{% endif %}</p><a class="button" href="{{ recordings_url }}">Back to recordings</a></div>
+{% elif upload_form %}
+    <form method="post" enctype="multipart/form-data" class="form-card">
+        {% csrf_token %}
+        <h2>Choose a spreadsheet</h2>
+        <p>Upload an Excel workbook (.xlsx) or UTF-8 CSV, then select rows and review the import.</p>
+        {% include 'lab/components/form_fields.html' with form=upload_form %}
+        <p class="import-help">Up to 10 MB, 5,000 rows and 100 columns per sheet. Formula cells use their saved Excel values.</p>
+        <div class="actions"><button class="button button-primary" type="submit">Preview spreadsheet</button><a class="button" href="{{ recordings_url }}">Cancel</a></div>
+    </form>
+{% else %}
+    <div class="toolbar page-action-bar import-action-bar">
+        <nav class="protocol-tabs import-tabs" aria-label="Spreadsheet import steps">
+            {% for tab in tabs %}<a class="protocol-tab{% if tab.active %} active{% endif %}" href="{{ tab.url }}" {% if tab.active %}aria-current="step"{% endif %}>{{ forloop.counter }}. {{ tab.label }}</a>{% endfor %}
+        </nav>
+        <div class="actions"><a class="button" href="{{ base_url }}">Start another import</a></div>
+    </div>
+    <p class="import-source-meta"><strong>{{ draft.filename }}</strong><span>Expires {{ draft.expires_at|date:'j M Y, H:i T' }}</span></p>
+    {% if draft.state.identifier_mapping_updated %}<p class="message">Animal identification has been updated. Check Animal ID and Local identifier mappings, then confirm your animal choices again.</p>{% endif %}
+    {% for error in errors %}<p class="message message-error" role="alert">{{ error }}</p>{% endfor %}
+    {% if step == 'procedures' %}
+        <section class="form-card procedure-editor import-procedure-editor">
+            {% include 'lab/components/litter_procedure_editor.html' %}
+        </section>
+    {% endif %}
+    <form method="post" data-import-form>
+        {% csrf_token %}
+        <input type="hidden" name="step" value="{{ step }}">
+        <input type="hidden" name="revision" value="{{ revision }}">
+        {% if step == 'source' %}
+            <section class="form-card">
+                <h2>Source & rows</h2>
+                <div class="import-source-controls">
+                    {% include 'lab/components/error_summary.html' %}
+                    {% include 'lab/components/import_field.html' with field=form.sheet only %}
+                    {% include 'lab/components/import_field.html' with field=form.header_row only %}
+                    <button class="button" type="submit" name="next_step" value="source">Update preview / save selection</button>
+                </div>
+                <p class="import-help">Changing the sheet or header resets mappings and animal resolutions. Flagged rows start unselected; include them if appropriate.</p>
+            </section>
+            <div class="table-summary import-selection-bar">
+                <div class="actions"><button class="button" type="button" data-import-select="data">Select data rows</button><button class="button" type="button" data-import-select="none">Clear selection</button></div>
+                <p class="record-count" data-import-row-count role="status">{{ draft.state.selected_rows|length }} selected rows</p>
+            </div>
+            <div class="table-card"><div class="table-scroll import-source-scroll">
+                <table class="data-table procedure-matrix import-source-table">
+                    <thead><tr><th scope="col" class="select-cell">Import</th><th scope="col" class="import-row-number">Row</th><th scope="col">Check</th>{% for column in table.columns %}<th scope="col">{{ column.label }}</th>{% endfor %}</tr></thead>
+                    <tbody>{% for row in source_rows %}
+                        <tr class="{% if row.flag %}import-flagged-row{% endif %}">
+                            <td><input type="checkbox" name="selected_rows" value="{{ row.number }}" aria-label="Import row {{ row.number }}" data-import-row data-flagged="{% if row.flag %}true{% else %}false{% endif %}" {% if row.selected %}checked{% endif %}></td>
+                            <th scope="row">{{ row.number }}</th><td>{{ row.flag }}</td>{% for value in row.values %}<td title="{{ value }}">{{ value }}</td>{% endfor %}
+                        </tr>
+                    {% endfor %}</tbody>
+                </table>
+            </div></div>
+        {% elif step == 'setup' %}
+            {% include 'lab/components/error_summary.html' %}
+            <section class="form-card">
+                <h2>Recording layout</h2>
+                <div class="form-grid import-shared-grid">
+                    {% include 'lab/components/import_field.html' with field=form.date_order only %}
+                    {% include 'lab/components/import_field.html' with field=form.grouping only %}
+                </div>
+                <details class="import-options" {% if form.identity_columns.value or form.identity_columns.errors %}open{% endif %}>
+                    <summary>Distinguish reused local identifiers</summary>
+                    {% include 'lab/components/form_field.html' with field=form.identity_columns only %}
+                </details>
+                <p class="import-help">Combined recordings share a date. Conflicting populated recording fields must be corrected in Excel or left unmapped.</p>
+            </section>
+            <section class="form-card">
+                <h2>Shared animal details</h2>
+                <div class="form-grid import-shared-grid">
+                    {% include 'lab/components/import_field.html' with field=form.protocol_id only %}
+                    {% include 'lab/components/import_field.html' with field=form.species_id only %}
+                    {% include 'lab/components/import_field.html' with field=form.marking_type only %}
+                </div>
+                <p class="import-help">New animals need a protocol and crossing. Existing animals change only when you approve updates in Review.</p>
+            </section>
+        {% elif step == 'mapping' %}
+            {% include 'lab/components/error_summary.html' %}
+            <section class="form-card import-table-panel">
+                <div class="import-panel-heading"><h2>Column mappings</h2><p class="import-help">Choose one per field: source column <strong>OR</strong> shared value.</p><p class="import-help">Animal ID takes precedence. When it is blank, Local identifier is used; new animals receive generated IDs.</p></div>
+                <div class="table-scroll"><table class="data-table procedure-matrix import-mapping-table import-recording-mapping-table">
+                    <colgroup><col class="import-mapping-label-col"><col><col class="import-mapping-or-col"><col></colgroup>
+                    <thead><tr><th scope="col">Field</th><th scope="col">Source column</th><th scope="col"><span class="visually-hidden">or</span></th><th scope="col">Shared value</th></tr></thead>
+                    <tbody>{% for row in form.mapping_rows %}<tr data-import-mapping-row>
+                        <th scope="row">{{ row.mode }}{{ row.label }}{% if row.required %}<span class="import-cell-note import-inline-note"> · Required</span>{% endif %}{% if row.requirement %}<span class="import-cell-note import-animal-requirement">{{ row.requirement }}</span>{% endif %}{% include 'lab/components/field_errors.html' with field=row.mode only %}</th>
+                        <td><div class="import-mapping-option" data-import-mapping-option="column" data-import-active="{% if row.mode.value == 'column' %}true{% else %}false{% endif %}">
+                            {% include 'lab/components/import_field.html' with field=row.column hide_label=True only %}
+                        </div></td>
+                        <td class="import-mapping-or" aria-hidden="true">OR</td>
+                        <td><div class="import-mapping-option" data-import-mapping-option="shared" data-import-active="{% if row.mode.value == 'shared' %}true{% else %}false{% endif %}">
+                            {% include 'lab/components/import_field.html' with field=row.default hide_label=True only %}
+                        </div></td>
+                    </tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+        {% elif step == 'animals' %}
+            {% include 'lab/components/error_summary.html' %}
+            <section class="form-card import-table-panel">
+                <div class="import-panel-heading"><h2>Resolve animals</h2><p class="import-help">Confirm local identifier matches or create new animals. Generated IDs require birth date, breeding pair, local identifier, protocol and crossing.</p></div>
+                <div class="table-scroll"><table class="data-table procedure-matrix import-animal-table">
+                    <thead><tr><th scope="col">Source animal</th><th scope="col">Action</th><th scope="col">Resulting Animal ID</th><th scope="col">Individual details</th></tr></thead>
+                    <tbody>{% for group in form.groups %}<tr data-import-animal-row>
+                        <th scope="row"><span class="import-cell-note">{% if group.animal_id %}Animal ID{% else %}Local identifier{% endif %}</span><strong>{{ group.identifier|default:'Missing identifier' }}</strong>{% if group.extra %}<span class="import-cell-note">{{ group.extra|join:' / ' }}</span>{% endif %}<span class="import-cell-note">Rows {% for row in group.rows %}{{ row.number }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></th>
+                        <td>{% include 'lab/components/import_field.html' with field=group.mode_field hide_label=True only %}</td>
+                        <td>
+                            <div class="import-identity-controls" data-import-manual-id {% if group.mode_field.value == 'generate' %}hidden{% endif %}>
+                                {% include 'lab/components/import_field.html' with field=group.mouse_id_field hide_label=True only %}
+                            </div>
+                            <p class="import-help" data-import-generated-id {% if group.mode_field.value != 'generate' %}hidden{% endif %}>{% if group.proposed_id %}Preview: <strong>{{ group.proposed_id }}</strong>{% else %}Complete animal details, then save to preview the generated ID.{% endif %}</p>
+                            {% if group.candidates %}<details class="import-options"><summary>{{ group.candidates|length }} local ID match{{ group.candidates|length|pluralize }}</summary><p class="import-help">Select the correct Animal ID to link:</p><ul class="import-candidates">{% for mouse in group.candidates %}<li><button type="button" class="button" data-import-animal-candidate="{{ mouse.mouse_id }}">{{ mouse.mouse_id }}</button> · {{ mouse.date_of_birth|default:'Birth date unknown' }} · {{ mouse.genetics_crossing_display }}</li>{% endfor %}</ul></details>{% endif %}
+                        </td>
+                        <td><details class="import-animal-overrides" {% if group.overrides_open %}open{% endif %}>
+                            <summary>Overrides{% if group.has_overrides %} <span class="import-cell-note import-inline-note">· set</span>{% endif %}</summary>
+                            {% if group.mapped %}<details class="import-options"><summary>Mapped details</summary><dl class="import-mapped-details">{% for label,value in group.mapped %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl></details>{% endif %}
+                            <div class="form-grid import-override-grid">{% for field in group.override_fields %}{% include 'lab/components/import_field.html' with field=field only %}{% endfor %}</div>
+                        </details></td>
+                    </tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+        {% elif step == 'procedures' %}
+            {{ form.procedure_drafts }}
+        {% elif step == 'genetics' %}
+            {% include 'lab/components/error_summary.html' %}
+            <section class="form-card">
+                <h2>Crossings</h2>
+                {% if form.crossing_rows %}<div class="table-scroll"><table class="data-table procedure-matrix import-crossing-table">
+                    <thead><tr><th scope="col">Source strain description</th><th scope="col">Existing crossing</th></tr></thead>
+                    <tbody>{% for row in form.crossing_rows %}<tr>
+                        <th scope="row">{{ row.raw }}{% if row.ambiguous %}<span class="import-cell-note">Several crossings match. Choose one explicitly.</span>{% endif %}</th>
+                        <td>{% include 'lab/components/import_field.html' with field=row.field hide_label=True only %}</td>
+                    </tr>{% endfor %}</tbody>
+                </table></div>{% endif %}
+                <details class="import-options import-shared-crossing" {% if form.crossing_id.errors %}open{% endif %}>
+                    <summary>Shared crossing override{% if form.crossing_id.value %} <span class="import-cell-note import-inline-note">· set</span>{% endif %}</summary>
+                    {% include 'lab/components/form_field.html' with field=form.crossing_id only %}
+                </details>
+                <p class="import-help">Create missing lines and crossings through Lines & Crossings before continuing.</p>
+                <div class="actions"><button class="button" name="next_step" value="genetics" type="submit">Save mappings and refresh genotype fields</button></div>
+            </section>
+            <section class="form-card import-table-panel">
+                <div class="import-panel-heading"><h2>1. Select genotype columns</h2><p class="import-help">Choose the source column for each line, or supply a shared result. Recognized terms are matched automatically, ignoring case.</p></div>
+                {% if form.line_rows %}<div class="table-scroll"><table class="data-table procedure-matrix import-mapping-table">
+                    <thead><tr><th scope="col">Line</th><th scope="col">Source column</th><th scope="col">Shared genotype</th></tr></thead>
+                    <tbody>{% for row in form.line_rows %}
+                        <tr><th scope="row">{{ row.line.name }}</th><td>{% include 'lab/components/import_field.html' with field=row.column hide_label=True only %}</td><td>{% include 'lab/components/import_field.html' with field=row.default hide_label=True only %}</td></tr>
+                    {% endfor %}</tbody>
+                </table></div>{% else %}<p class="import-panel-empty">Select crossings and save above to display their lines.</p>{% endif %}
+                <div class="actions import-panel-actions"><button class="button" name="next_step" value="genetics" type="submit">Save genotype columns</button></div>
+            </section>
+            {% if form.term_rows %}<details class="form-card import-table-panel import-unknown-terms" open>
+                <summary class="import-panel-heading">2. Resolve unknown terms · {{ form.term_rows|length }}</summary>
+                <p class="import-help import-panel-note">Define each unfamiliar term once for all lines. Capitalization variants share the same definition.</p>
+                <div class="table-scroll"><table class="data-table procedure-matrix import-crossing-table">
+                    <thead><tr><th scope="col">Unknown source term</th><th scope="col">System genotype</th></tr></thead>
+                    <tbody>{% for row in form.term_rows %}<tr><th scope="row">{{ row.variants|join:' / ' }}</th><td>{% include 'lab/components/import_field.html' with field=row.field hide_label=True only %}</td></tr>{% endfor %}</tbody>
+                </table></div>
+                <div class="actions import-panel-actions"><button class="button" name="next_step" value="genetics" type="submit">Save term definitions</button></div>
+            </details>{% endif %}
+            {% if form.line_rows %}<details class="form-card import-table-panel import-individual-genotypes">
+                <summary class="import-panel-heading">Individual genotype overrides</summary>
+                <p class="import-help import-panel-note">Results update animal genotype calls and are not stored as historical results on recordings.</p>
+                <div class="table-scroll"><table class="data-table procedure-matrix import-genotype-table">
+                    <thead><tr><th scope="col">Source animal</th><th scope="col">Genotype overrides</th></tr></thead>
+                    <tbody>{% for row in form.individual_rows %}<tr><th scope="row">{{ row.group.identifier|default:'Missing identifier' }}</th><td><div class="form-grid import-term-grid">{% for item in row.fields %}{% include 'lab/components/import_field.html' with field=item.field only %}{% endfor %}</div></td></tr>{% endfor %}</tbody>
+                </table></div>
+            </details>{% endif %}
+        {% elif step == 'review' %}
+            <input type="hidden" name="review_fingerprint" value="{{ draft.state.review_fingerprint }}">
+            <section class="form-card">
+                <div class="import-review-heading"><div><h2>Review import</h2><p>{{ preview.records|length }} recordings · {{ preview.animals|length }} resolved animals · {{ preview.changes|length }} proposed animal changes{% if preview.procedures %} · {{ preview.procedures|length }} procedures{% endif %}</p></div><a class="button" href="?step=review">Refresh review</a></div>
+                <p class="import-help">Nothing is saved until you select Import. Unchecked changes preserve the animal’s current value.</p>
+                {% for error in preview.errors %}<p class="message message-error" role="alert">{{ error }}</p>{% endfor %}
+            </section>
+            <section class="form-card import-table-panel">
+                <div class="import-panel-heading"><h2>Animals and proposed changes</h2></div>
+                <div class="table-scroll"><table class="data-table procedure-matrix import-review-table{% if preview.procedures %} import-review-with-procedures{% endif %}">
+                    <thead><tr><th scope="col">Action</th><th scope="col">Animal ID</th><th scope="col">Source rows</th><th scope="col">Details and changes to approve</th>{% if preview.procedures %}<th scope="col">Procedures to add</th>{% endif %}</tr></thead>
+                    <tbody>{% for animal in review_animals %}<tr>
+                        <td>{% if animal.existing %}Link existing{% elif animal.generate_id %}Create · generated ID{% else %}Create · supplied ID{% endif %}</td>
+                        <th scope="row">{{ animal.mouse_id }}{% if animal.identifier != animal.mouse_id %}<span class="import-cell-note">Source: {{ animal.identifier }}</span>{% endif %}</th>
+                        <td>{{ animal.rows|join:', ' }}</td>
+                        <td>
+                            {% if not animal.existing %}<dl class="import-inline-details">{% for label,value in animal.display_details %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl>{% endif %}
+                            {% for change in animal.changes %}<label class="import-change"><input type="checkbox" name="approve" value="{{ change.token }}"><span>Apply {{ change.label }}: {{ change.display_old|default:'Empty' }} → {{ change.display_new }}</span></label>{% if change.field == 'crossing_definition' %}<p class="import-help">Changing the crossing removes calls for lines outside the new crossing.</p>{% endif %}{% empty %}{% if animal.existing %}<span class="import-cell-note">No changes proposed.</span>{% endif %}{% endfor %}
+                        </td>
+                        {% if preview.procedures %}<td>
+                            {% if animal.procedures %}<ul class="import-review-procedures">{% for procedure in animal.procedures %}<li>
+                                <strong>{{ procedure.procedure_name }}</strong>
+                                <dl class="import-inline-details">
+                                    <div><dt>Date</dt><dd>{{ procedure.date|default:'—' }}</dd></div>
+                                    <div><dt>Lab member</dt><dd>{{ procedure.lab_member|default:'—' }}</dd></div>
+                                    <div><dt>Lab-book page</dt><dd>{{ procedure.lab_book_page|default:'—' }}</dd></div>
+                                </dl>
+                            </li>{% endfor %}</ul>{% else %}<span class="import-cell-note">No procedures to add.</span>{% endif %}
+                        </td>{% endif %}
+                    </tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+            <section class="form-card import-table-panel">
+                <div class="import-panel-heading"><h2>Recordings to create</h2></div>
+                <div class="table-scroll"><table class="data-table procedure-matrix import-recording-table">
+                    <thead><tr><th scope="col">Date</th><th scope="col">Source rows</th><th scope="col">Animals</th><th scope="col">Paths</th><th scope="col">Fields</th></tr></thead>
+                    <tbody>{% for record in preview.records %}<tr>
+                        <td>{{ record.scalars.recording_date }}</td><td>{{ record.rows|join:', ' }}</td><td>{{ record.mouse_ids|join:', ' }}</td>
+                        <td>{% for path in record.paths %}<div>{{ path }}</div>{% endfor %}</td>
+                        <td>{% for label,value in record.display_values %}<div>{{ label }}: {{ value }}</div>{% endfor %}{% if record.scalars.notes %}<div>Notes: {{ record.scalars.notes }}</div>{% endif %}</td>
+                    </tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+        {% endif %}
+        <div class="actions import-footer">
+            {% if step == 'source' %}<button class="button button-primary" name="next_step" value="setup" type="submit">Save and configure import</button>
+            {% elif step == 'setup' %}<button class="button button-primary" name="next_step" value="mapping" type="submit">Save and map fields</button>
+            {% elif step == 'mapping' %}<button class="button button-primary" name="next_step" value="animals" type="submit">Save and resolve animals</button>
+            {% elif step == 'animals' %}<button class="button button-primary" name="next_step" value="genetics" type="submit">Save and map genetics</button><button class="button" name="next_step" value="animals" type="submit">Save and refresh IDs</button>
+            {% elif step == 'genetics' %}<button class="button button-primary" name="next_step" value="procedures" type="submit">Save and add procedures</button>
+            {% elif step == 'procedures' %}<button class="button button-primary" name="next_step" value="review" type="submit">Save and review import</button>
+            {% elif step == 'review' %}<button class="button button-primary" type="submit" {% if errors or preview.errors or not preview.records %}disabled{% endif %}>Import {{ preview.records|length }} recordings</button>{% endif %}
+            <a class="button" href="{{ recordings_url }}">Back to recordings</a>
+        </div>
+    </form>
+{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'lab/spreadsheet_import.js' %}" defer></script>{% if step == 'procedures' %}<script src="{% static 'lab/litter_procedures.js' %}" defer></script>{% endif %}{% endblock %}

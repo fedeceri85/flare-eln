@@ -1,8 +1,12 @@
 from datetime import date
+import json
+from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
+from ..forms.recordings import RecordingForm
 from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingField, RecordingType
 from ._support import AuthenticatedTestCase, create_recording
 
@@ -42,8 +46,8 @@ class RecordingModelTests(AuthenticatedTestCase):
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
             data_paths=["/data/imaging/session-1"],
-            sequence_number=2,
             values={
+                "sequence_number": 2,
                 "objective": "20x",
                 "fps": 30.0,
                 "frames": 600,
@@ -56,7 +60,6 @@ class RecordingModelTests(AuthenticatedTestCase):
             recording_type=self.abr_type,
             recording_date=date(2026, 7, 21),
             data_paths=["/data/abr/session-1"],
-            sequence_number=3,
             values={
                 "click_threshold_db": 35,
                 "threshold_12khz_db": 20,
@@ -108,10 +111,70 @@ class RecordingModelTests(AuthenticatedTestCase):
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
             data_paths=["/data/imaging/orphaned-session"],
-            sequence_number=1,
+            values={"sequence_number": 1},
         )
 
         self.assertIn("No mice", str(recording))
+
+    def test_sequence_uses_configurable_fields_on_any_type_and_can_be_left_blank(self):
+        kind = RecordingType.objects.create(name="Custom acquisition", slug="custom-acquisition")
+        experiment = Experiment.objects.create(project=self.project, name="Custom experiment", recording_type=kind)
+        field = RecordingField.objects.create(
+            recording_type=kind, key="sequence_number", label="Acquisition order", data_type="integer",
+        )
+        name = f"value_{field.pk}"
+        for value, expected in [("17", {"sequence_number": 17}), ("", {})]:
+            with self.subTest(value=value):
+                form = RecordingForm(data={"recording_date": "2026-10-21", name: value}, experiment=experiment, owner=self.user)
+                self.assertNotIn("sequence_number", form.fields)
+                self.assertEqual(form.fields[name].label, "Acquisition order")
+                self.assertFalse(form.fields[name].required)
+                self.assertTrue(form.is_valid(), form.errors)
+                self.assertEqual(form.save().values, expected)
+        invalid = RecordingForm(data={"recording_date": "2026-10-21", name: "1.5"}, experiment=experiment)
+        self.assertFalse(invalid.is_valid())
+        self.assertIn(name, invalid.errors)
+        field.required = True
+        field.save()
+        required = RecordingForm(data={"recording_date": "2026-10-21"}, experiment=experiment)
+        self.assertFalse(required.is_valid())
+        self.assertIn(name, required.errors)
+
+    def test_sequence_is_absent_without_a_configured_field(self):
+        form = RecordingForm(data={"recording_date": "2026-10-21"}, experiment=self.abr_experiment, owner=self.user)
+        self.assertNotIn("sequence_number", form.fields)
+        self.assertFalse(any(field.key == "sequence_number" for _, field in form.dynamic_fields))
+        self.assertTrue(form.is_valid(), form.errors)
+        recording = form.save()
+        self.assertNotIn("sequence_number", recording.values)
+        self.assertNotIn("#", str(recording))
+
+        # Even a type named imaging has no runtime exception: its fields alone
+        # determine whether Sequence is available.
+        RecordingField.objects.filter(recording_type=self.imaging_type, key="sequence_number").delete()
+        imaging = RecordingForm(experiment=self.experiment)
+        self.assertFalse(any(field.key == "sequence_number" for _, field in imaging.dynamic_fields))
+
+    def test_standalone_import_notebook_saves_configurable_sequence_and_animal_links(self):
+        notebook = json.loads((Path(__file__).resolve().parents[2] / "import_imaging_recordings.ipynb").read_text())
+        source = next("".join(cell["source"]) for cell in notebook["cells"] if "def apply_prepared_record(" in "".join(cell.get("source", [])))
+        record = {"mouse": self.mouse, "recording_date": date(2026, 10, 21), "data_paths": ["/notebook/run"], "notes": "Imported", "values": {"sequence_number": 15}}
+        namespace = {
+            "validation_errors": [], "prepared_records": [record], "Recording": Recording,
+            "experiment": self.experiment, "recording_type": self.imaging_type, "owner": self.user,
+            "DRY_RUN": False, "ALLOW_UPDATES": False, "transaction": transaction, "print": lambda *args: None,
+        }
+        exec(compile(source, "import_imaging_recordings.ipynb", "exec"), namespace)
+        saved = self.experiment.recordings.get()
+        self.assertEqual(saved.values, {"sequence_number": 15})
+        self.assertEqual(list(saved.mice.all()), [self.mouse])
+        record["values"] = {"sequence_number": 37}
+        namespace["ALLOW_UPDATES"] = True
+        exec(compile(source, "import_imaging_recordings.ipynb", "exec"), namespace)
+        saved.refresh_from_db()
+        self.assertEqual(saved.values, {"sequence_number": 37})
+        self.assertEqual(list(saved.mice.all()), [self.mouse])
+        self.assertEqual(self.experiment.recordings.count(), 1)
 
     def test_recording_paths_allow_an_empty_list(self):
         recording = Recording(
@@ -167,7 +230,7 @@ class RecordingModelTests(AuthenticatedTestCase):
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 20),
             data_paths=["/data/imaging/owned-session"],
-            sequence_number=1,
+            values={"sequence_number": 1},
         )
 
         self.assertTrue(recording.can_be_modified_by(owner))

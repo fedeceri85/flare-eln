@@ -1,5 +1,6 @@
 from datetime import date
 from urllib.parse import parse_qs, urlsplit
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.urls import reverse
@@ -49,6 +50,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
             "lab:duplicate_recording",
             args=[self.project.pk, self.experiment.pk],
         )
+        self.delete_selected_url = reverse("lab:delete_selected_recordings", args=[self.project.pk, self.experiment.pk])
+        self.sequence_field = RecordingField.objects.get(recording_type=self.imaging_type, key="sequence_number")
         self.objective_field = RecordingField.objects.get(
             recording_type=self.imaging_type,
             key="objective",
@@ -71,10 +74,10 @@ class RecordingsPageTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 25),
-            sequence_number=2,
             data_paths=["/data/imaging/newer"],
             notes="responsive cell",
             values={
+                "sequence_number": 2,
                 "objective": "20x",
                 "fps": 30.0,
                 "frames": 600,
@@ -87,10 +90,10 @@ class RecordingsPageTests(AuthenticatedTestCase):
             experiment=self.experiment,
             recording_type=self.imaging_type,
             recording_date=date(2026, 7, 10),
-            sequence_number=1,
             data_paths=["/data/imaging/older"],
             notes="baseline run",
             values={
+                "sequence_number": 1,
                 "objective": "40x",
                 "fps": 15.0,
                 "frames": 300,
@@ -190,7 +193,9 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertContains(response, self.add_recording_url)
         self.assertContains(response, self.duplicate_recording_url)
         self.assertContains(response, self.edit_newer_recording_url)
-        self.assertContains(response, self.delete_newer_recording_url)
+        self.assertNotContains(response, self.delete_newer_recording_url)
+        self.assertContains(response, "Delete selected")
+        self.assertContains(response, f'formaction="{self.delete_selected_url}"')
         self.assertContains(response, "Select all")
         self.assertContains(response, "data-table-select-all-button")
         self.assertContains(response, 'aria-label="Select all recordings"')
@@ -207,7 +212,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 experiment=self.experiment,
                 recording_type=self.imaging_type,
                 recording_date=date(2026, 7, 11),
-                sequence_number=index + 10,
+                values={"sequence_number": index + 10},
                 data_paths=[f"/data/imaging/page-size-{index}"],
             )
 
@@ -216,6 +221,120 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["record_count"]["end"], 32)
         self.assertEqual(response.context["page_size_control"]["current"], 50)
+
+    def table_recording_ids(self, response):
+        return [int(row["id"].removeprefix("recording-")) for row in response.context["table"]["rows"]]
+
+    def test_date_headers_toggle_order_and_show_newest_first_by_default(self):
+        response = self.client.get(self.recordings_url)
+        self.assertEqual(self.table_recording_ids(response), [self.newer_recording.pk, self.older_recording.pk])
+        column = response.context["table"]["columns"][1]
+        self.assertEqual(column["sort_state"], "desc")
+        self.assertEqual(parse_qs(urlsplit(column["sort_url"]).query)["direction"], ["asc"])
+        self.assertContains(response, 'aria-sort="descending"')
+        response = self.client.get(self.recordings_url, {"sort": "recording_date", "direction": "asc"})
+        self.assertEqual(self.table_recording_ids(response), [self.older_recording.pk, self.newer_recording.pk])
+        self.assertContains(response, 'aria-sort="ascending"')
+        column = response.context["table"]["columns"][1]
+        self.assertEqual(parse_qs(urlsplit(column["sort_url"]).query)["direction"], ["desc"])
+
+    def test_configured_columns_sort_by_their_types_in_both_directions(self):
+        acquired = RecordingField.objects.create(recording_type=self.imaging_type, key="acquired", label="Acquired", data_type="date")
+        mode = RecordingField.objects.create(recording_type=self.imaging_type, key="mode", label="Mode", data_type="choice", choices=["high", "low"])
+        unusual = RecordingField.objects.create(recording_type=self.imaging_type, key="run__number", label="Run number", data_type="integer")
+        cases = [
+            (self.sequence_field, 2, 10), (self.frames_field, 2, 10), (self.fps_field, 2.5, 10.5),
+            (self.objective_field, "Alpha", "zebra"), (self.discarded_field, False, True),
+            (acquired, "2025-12-31", "2026-01-01"), (mode, "high", "low"), (unusual, 2, 10),
+        ]
+        for field, low, high in cases:
+            with self.subTest(field=field.key):
+                for recording, value in [(self.newer_recording, low), (self.older_recording, high)]:
+                    recording.values[field.key] = value
+                    recording.save(update_fields=["values"])
+                for direction, expected in [("asc", [self.newer_recording.pk, self.older_recording.pk]), ("desc", [self.older_recording.pk, self.newer_recording.pk])]:
+                    response = self.client.get(self.recordings_url, {"sort": f"field:{field.key}", "direction": direction})
+                    self.assertEqual(self.table_recording_ids(response), expected)
+
+    def test_missing_null_and_blank_values_sort_last_in_both_directions(self):
+        self.newer_recording.values["frames"] = 2
+        self.older_recording.values["frames"] = 10
+        self.newer_recording.save(update_fields=["values"])
+        self.older_recording.save(update_fields=["values"])
+        missing, null, blank = [Recording.objects.create(
+            experiment=self.experiment, recording_type=self.imaging_type,
+            recording_date=date(2026, 7, 25), values=values,
+        ) for values in ({}, {"frames": None}, {"frames": ""})]
+        for direction, populated in [("asc", [self.newer_recording.pk, self.older_recording.pk]), ("desc", [self.older_recording.pk, self.newer_recording.pk])]:
+            response = self.client.get(self.recordings_url, {"sort": "field:frames", "direction": direction})
+            self.assertEqual(self.table_recording_ids(response), [*populated, blank.pk, null.pk, missing.pk])
+
+    def test_animal_sort_uses_first_displayed_id_without_duplicating_group_recordings(self):
+        self.newer_recording.mice.add(self.mouse_2)
+        for direction, expected in [("asc", [self.newer_recording.pk, self.older_recording.pk]), ("desc", [self.older_recording.pk, self.newer_recording.pk])]:
+            response = self.client.get(self.recordings_url, {"sort": "mice", "direction": direction, "mouse": self.mouse_2.pk})
+            self.assertEqual(self.table_recording_ids(response), expected)
+            self.assertEqual(response.context["record_count"]["count"], 2)
+
+    def test_notes_and_paths_sort_case_insensitively(self):
+        self.newer_recording.notes, self.older_recording.notes = "Alpha", "zebra"
+        self.newer_recording.data_paths, self.older_recording.data_paths = ["/Alpha", "/z"], ["/zebra"]
+        self.newer_recording.save(update_fields=["notes", "data_paths"])
+        self.older_recording.save(update_fields=["notes", "data_paths"])
+        for key in ("notes", "data_paths"):
+            for direction, expected in [("asc", [self.newer_recording.pk, self.older_recording.pk]), ("desc", [self.older_recording.pk, self.newer_recording.pk])]:
+                response = self.client.get(self.recordings_url, {"sort": key, "direction": direction})
+                self.assertEqual(self.table_recording_ids(response), expected)
+
+        self.newer_recording.values["objective"] = "null"
+        self.older_recording.values["objective"] = "zebra"
+        self.newer_recording.save(update_fields=["values"])
+        self.older_recording.save(update_fields=["values"])
+        missing = Recording.objects.create(experiment=self.experiment, recording_type=self.imaging_type,
+                                           recording_date=date(2026, 7, 25), values={"objective": None})
+        for direction, expected in [("asc", [self.newer_recording.pk, self.older_recording.pk]), ("desc", [self.older_recording.pk, self.newer_recording.pk])]:
+            response = self.client.get(self.recordings_url, {"sort": "field:objective", "direction": direction})
+            self.assertEqual(self.table_recording_ids(response), [*expected, missing.pk])
+
+    def test_sort_links_preserve_filters_and_page_size_and_reset_page(self):
+        response = self.client.get(self.recordings_url, {"mouse": "REC-PAGE", "page": "2", "per_page": "50", "sort": "field:frames", "direction": "desc"})
+        for column in response.context["table"]["columns"]:
+            if "sort_url" not in column:
+                continue
+            query = parse_qs(urlsplit(column["sort_url"]).query)
+            self.assertEqual(query["mouse"], ["REC-PAGE"])
+            self.assertEqual(query["per_page"], ["50"])
+            self.assertNotIn("page", query)
+        hidden = {field["name"]: field["value"] for field in response.context["filter_form"]["hidden_fields"]}
+        self.assertEqual((hidden["sort"], hidden["direction"]), ("field:frames", "desc"))
+        hidden = {field["name"]: field["value"] for field in response.context["page_size_control"]["hidden_fields"]}
+        self.assertEqual((hidden["sort"], hidden["direction"]), ("field:frames", "desc"))
+
+    def test_invalid_or_hidden_sort_fields_fall_back_to_newest_date(self):
+        hidden = RecordingField.objects.create(recording_type=self.imaging_type, key="hidden", label="Hidden", data_type="text", display_in_table=False)
+        inactive = RecordingField.objects.create(recording_type=self.imaging_type, key="inactive", label="Inactive", data_type="text", active=False)
+        for key in ("owner__username", "field:missing", f"field:{hidden.key}", f"field:{inactive.key}"):
+            with self.subTest(sort=key):
+                response = self.client.get(self.recordings_url, {"sort": key, "direction": "asc"})
+                self.assertEqual(self.table_recording_ids(response), [self.newer_recording.pk, self.older_recording.pk])
+                self.assertContains(response, 'aria-sort="descending"')
+        response = self.client.get(self.recordings_url, {"sort": "recording_date", "direction": "invalid"})
+        self.assertEqual(self.table_recording_ids(response), [self.newer_recording.pk, self.older_recording.pk])
+
+    def test_selected_recording_page_follows_custom_order_including_missing_values(self):
+        for index in range(25):
+            create_recording(owner=self.user, experiment=self.experiment, recording_type=self.imaging_type,
+                             recording_date=date(2026, 7, 11), values={"frames": index})
+        for direction, expected_page in [("asc", 2), ("desc", 1)]:
+            response = self.client.get(self.recordings_url, {"sort": "field:frames", "direction": direction, "selected_recording": self.older_recording.pk})
+            self.assertEqual(response.context["pagination"]["number"], expected_page)
+            self.assertIn(self.older_recording.pk, self.table_recording_ids(response))
+        self.older_recording.values.pop("frames")
+        self.older_recording.save(update_fields=["values"])
+        for direction in ("asc", "desc"):
+            response = self.client.get(self.recordings_url, {"sort": "field:frames", "direction": direction, "selected_recording": self.older_recording.pk})
+            self.assertEqual(response.context["pagination"]["number"], 2)
+            self.assertIn(self.older_recording.pk, self.table_recording_ids(response))
 
     def test_recordings_page_filters(self):
         cases = [
@@ -244,6 +363,15 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 self.assertContains(response, expected.data_paths[0])
                 self.assertNotContains(response, unexpected.data_paths[0])
                 self.assertEqual(response.context["record_count"]["count"], 1)
+
+    def test_recording_filters_expand_when_filters_are_active(self):
+        for query, expanded in (({}, False), ({"per_page": 50}, False), ({"mouse": self.mouse_1.pk}, True)):
+            with self.subTest(query=query):
+                response = self.client.get(self.recordings_url, query)
+                markup = Markup(response.content.decode())
+                panel = next(node for node in markup.find("details") if "recordings-filters" in node.attrs.get("class", ""))
+                self.assertEqual("open" in panel.attrs, expanded)
+                self.assertTrue(any("filter-form--compact" in node.attrs.get("class", "") for node in markup.find("form")))
 
     def test_recordings_page_filters_filterable_text_recording_fields(self):
         self.objective_field.filterable = True
@@ -333,7 +461,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 experiment=self.experiment,
                 recording_type=self.imaging_type,
                 recording_date=date(2026, 7, 11),
-                sequence_number=index + 10,
+                values={"sequence_number": index + 10},
                 data_paths=[f"/data/imaging/filler-{index}"],
             )
 
@@ -516,7 +644,6 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-02",
-                "sequence_number": "1",
                 "data_paths": "/data/genotyping/inferred-crossing",
                 f"value_{crossing_field.pk}": "Wrong crossing",
             },
@@ -550,7 +677,6 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-02",
-                "sequence_number": "1",
                 "data_paths": "/data/genotyping/mixed-crossing",
                 f"value_{crossing_field.pk}": crossing.display_name,
             },
@@ -576,7 +702,6 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": self.mouse_1.pk,
                 "recording_date": "2026-08-02",
-                "sequence_number": "1",
                 "data_paths": "/data/genotyping/missing-crossing",
                 f"value_{crossing_field.pk}": "",
             },
@@ -632,7 +757,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": "REC-PAGE-M1",
                 "recording_date": "2026-08-01",
-                "sequence_number": "3",
+                f"value_{self.sequence_field.pk}": "3",
                 "data_paths": "/data/imaging/added",
                 "notes": "added note",
                 f"value_{self.objective_field.pk}": "60x",
@@ -651,7 +776,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(recording.recording_type, self.imaging_type)
         self.assertEqual(list(recording.mice.all()), [self.mouse_1])
         self.assertEqual(recording.recording_date, date(2026, 8, 1))
-        self.assertEqual(recording.sequence_number, 3)
+        self.assertEqual(recording.values["sequence_number"], 3)
         self.assertEqual(recording.notes, "added note")
         self.assertEqual(recording.values["objective"], "60x")
         self.assertEqual(recording.values["fps"], 45.5)
@@ -665,7 +790,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": self.mouse_1.pk,
                 "recording_date": "2026-08-03",
-                "sequence_number": "5",
+                f"value_{self.sequence_field.pk}": "5",
                 "data_paths": "",
                 "notes": "no path yet",
             },
@@ -675,7 +800,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         recording = Recording.objects.get(
             experiment=self.experiment,
             recording_date=date(2026, 8, 3),
-            sequence_number=5,
+            values__sequence_number=5,
         )
         self.assertEqual(recording.data_paths, [])
 
@@ -692,7 +817,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": self.mouse_1.pk,
                 "recording_date": "2026-08-04",
-                "sequence_number": "6",
+                f"value_{self.sequence_field.pk}": "6",
                 "data_paths": pasted_paths,
                 "notes": "Windows paste",
             },
@@ -702,7 +827,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         recording = Recording.objects.get(
             experiment=self.experiment,
             recording_date=date(2026, 8, 4),
-            sequence_number=6,
+            values__sequence_number=6,
         )
         self.assertEqual(
             recording.data_paths,
@@ -720,7 +845,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-01",
-                "sequence_number": "3",
+                f"value_{self.sequence_field.pk}": "3",
                 "data_paths": "/data/genotyping/group-gel",
                 "notes": "group gel",
             },
@@ -751,8 +876,11 @@ class RecordingsPageTests(AuthenticatedTestCase):
             response,
             reverse("lab:mouse_record", args=[self.mouse_2.pk]),
         )
-        self.assertContains(response, f">{self.mouse_1.pk}</a><br>")
-        self.assertContains(response, f">{self.mouse_2.pk}</a><br>")
+        markup = Markup(response.content.decode())
+        animal_links = next(node for node in markup.find("div", **{"class": "recording-animal-links"}) if self.mouse_1.pk in node.text and self.mouse_2.pk in node.text)
+        self.assertIn(self.mouse_1.pk, animal_links.text)
+        self.assertIn(self.mouse_2.pk, animal_links.text)
+        self.assertEqual(len([node for node in markup.find("a") if node.parent is animal_links]), 2)
 
     def test_add_recording_rejects_ambiguous_mouse_partial_match(self):
         response = self.client.post(
@@ -761,7 +889,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": "REC-PAGE",
                 "recording_date": "2026-08-01",
-                "sequence_number": "3",
+                f"value_{self.sequence_field.pk}": "3",
                 "data_paths": "/data/imaging/ambiguous-mouse",
             },
         )
@@ -798,6 +926,10 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertContains(response, "20x")
         self.assertContains(response, "30.0")
         self.assertContains(response, "600")
+
+        form = response.context["form"]
+        self.assertNotIn("sequence_number", form.fields)
+        self.assertEqual(form[f"value_{self.sequence_field.pk}"].value(), 2)
 
     def test_edit_and_duplicate_forms_join_multiple_paths_with_newlines(self):
         self.newer_recording.data_paths = [
@@ -872,7 +1004,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "return_url": self.recordings_url,
                 "mice": self.mouse_2.pk,
                 "recording_date": "2026-08-02",
-                "sequence_number": "4",
+                f"value_{self.sequence_field.pk}": "4",
                 "data_paths": "/data/imaging/edited",
                 "notes": "edited note",
                 f"value_{self.objective_field.pk}": "60x",
@@ -892,6 +1024,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
             ["/data/imaging/edited"],
         )
         self.assertEqual(self.newer_recording.values["objective"], "60x")
+        self.assertEqual(self.newer_recording.values["sequence_number"], 4)
 
         User = get_user_model()
         other_user = User.objects.create_user(
@@ -948,6 +1081,86 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertFalse(
             Recording.objects.filter(pk=self.newer_recording.pk).exists()
         )
+
+    def test_delete_selected_requires_post_and_confirmation(self):
+        self.assertEqual(self.client.get(self.delete_selected_url).status_code, 405)
+        response = self.client.post(self.delete_selected_url, {
+            "selected_recording": [self.newer_recording.pk, self.older_recording.pk],
+            "return_url": self.recordings_url + "?per_page=50&mouse=REC",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Delete 2 recordings")
+        self.assertContains(response, self.newer_recording.data_paths[0])
+        self.assertContains(response, self.older_recording.data_paths[0])
+        self.assertContains(response, 'name="confirm_delete" value="yes"')
+        self.assertEqual(Recording.objects.filter(experiment=self.experiment).count(), 2)
+
+    def test_delete_selected_only_removes_selected_recordings_and_preserves_animals(self):
+        response = self.client.post(self.delete_selected_url, {
+            "selected_recording": [self.newer_recording.pk], "confirm_delete": "yes",
+            "return_url": self.recordings_url + "?per_page=50&mouse=REC",
+        })
+        self.assertRedirects(response, self.recordings_url + "?per_page=50&mouse=REC")
+        self.assertFalse(Recording.objects.filter(pk=self.newer_recording.pk).exists())
+        self.assertTrue(Recording.objects.filter(pk=self.older_recording.pk).exists())
+        self.assertTrue(Mouse.objects.filter(pk=self.mouse_1.pk).exists())
+
+    def test_delete_selected_checks_every_owner_before_deleting_and_rechecks_after_review(self):
+        data = {"selected_recording": [self.newer_recording.pk, self.older_recording.pk]}
+        self.assertEqual(self.client.post(self.delete_selected_url, data).status_code, 200)
+        other = get_user_model().objects.create_user(username="bulk-delete-other")
+        Recording.objects.filter(pk=self.older_recording.pk).update(owner=other)
+        for confirm in (False, True):
+            with self.subTest(confirm=confirm):
+                response = self.client.post(self.delete_selected_url, {**data, **({"confirm_delete": "yes"} if confirm else {})})
+                self.assertEqual(response.status_code, 403)
+                self.assertEqual(Recording.objects.filter(experiment=self.experiment).count(), 2)
+
+    def test_staff_can_delete_multiple_recordings(self):
+        staff = get_user_model().objects.create_user(username="bulk-delete-staff", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.post(self.delete_selected_url, {
+            "selected_recording": [self.newer_recording.pk, self.older_recording.pk], "confirm_delete": "yes",
+        })
+        self.assertRedirects(response, self.recordings_url)
+        self.assertEqual(Recording.objects.filter(experiment=self.experiment).count(), 0)
+        self.assertEqual(Mouse.objects.filter(pk__in=[self.mouse_1.pk, self.mouse_2.pk]).count(), 2)
+
+    def test_delete_selected_rejects_invalid_missing_and_other_experiment_records(self):
+        other_experiment = Experiment.objects.create(project=self.project, name="Other", recording_type=self.imaging_type)
+        other = create_recording(experiment=other_experiment, recording_type=self.imaging_type, owner=self.user, recording_date=date(2026, 7, 1))
+        for invalid in ("bad", "-1", "999999", str(other.pk)):
+            with self.subTest(invalid=invalid):
+                response = self.client.post(self.delete_selected_url, {
+                    "selected_recording": [self.newer_recording.pk, invalid], "confirm_delete": "yes",
+                })
+                self.assertEqual(response.status_code, 404)
+                self.assertTrue(Recording.objects.filter(pk=self.newer_recording.pk).exists())
+                self.assertTrue(Recording.objects.filter(pk=other.pk).exists())
+
+    def test_delete_selected_handles_empty_and_duplicate_selection_and_safe_return_url(self):
+        response = self.client.post(self.delete_selected_url, {"confirm_delete": "yes", "return_url": "https://example.com/"})
+        self.assertRedirects(response, self.recordings_url)
+        self.assertEqual(Recording.objects.filter(experiment=self.experiment).count(), 2)
+        response = self.client.post(self.delete_selected_url, {"selected_recording": [self.newer_recording.pk, self.newer_recording.pk]})
+        self.assertContains(response, "Delete 1 recording")
+        self.assertEqual(len(response.context["recordings"]), 1)
+
+    def test_delete_selected_rolls_back_all_deletions_if_one_fails(self):
+        original = Recording.delete
+        calls = []
+        def fail_second(recording, *args, **kwargs):
+            calls.append(recording.pk)
+            if len(calls) == 2:
+                raise RuntimeError("Deletion failed")
+            return original(recording, *args, **kwargs)
+        with patch.object(Recording, "delete", autospec=True, side_effect=fail_second):
+            with self.assertRaisesMessage(RuntimeError, "Deletion failed"):
+                self.client.post(self.delete_selected_url, {
+                    "selected_recording": [self.newer_recording.pk, self.older_recording.pk], "confirm_delete": "yes",
+                })
+        self.assertEqual(Recording.objects.filter(experiment=self.experiment).count(), 2)
+        self.assertEqual(self.newer_recording.mice.count(), 1)
 
     def test_other_user_cannot_duplicate_recording(self):
         User = get_user_model()

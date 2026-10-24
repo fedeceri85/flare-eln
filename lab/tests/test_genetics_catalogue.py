@@ -121,6 +121,27 @@ class GeneticsCatalogueTests(TestCase):
         self.assertIn('Renamed', self.mouse.genetics_genotype_display)
         self.assertEqual(parse_qs(urlsplit(response.url).query)['q'], ['Alpha'])
 
+    def test_aliases_create_display_edit_and_clear(self):
+        response = self.client.post(self.url, {
+            'action': 'add_lines', 'species': self.species.pk,
+            'line_names': 'New line, Another line', 'aliases': 'Alternative, Alias',
+        })
+        self.assertEqual(response.status_code, 302)
+        for name in ('New line', 'Another line'):
+            self.assertEqual(MouseLine.objects.get(name=name).aliases, 'Alternative, Alias')
+        line = MouseLine.objects.get(name='New line')
+        self.assertContains(self.client.get(self.url), '<td>Alternative, Alias</td>', html=True)
+        editor = self.client.get(self.url, {'edit_line': line.pk})
+        self.assertEqual(editor.context['editor_form'].initial['aliases'], 'Alternative, Alias')
+        for aliases in ('Updated alias', ''):
+            response = self.client.post(self.url, {
+                'action': 'rename_line', 'line_id': line.pk,
+                'name': line.name, 'aliases': aliases,
+            })
+            self.assertEqual(response.status_code, 302)
+            line.refresh_from_db()
+            self.assertEqual(line.aliases, aliases)
+
     def test_rename_does_not_create_missing_single_crossing(self):
         line = MouseLine.objects.bulk_create([MouseLine(species=self.species, name='No single')])[0]
         count = Crossing.objects.count()

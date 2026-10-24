@@ -3,6 +3,8 @@
 Implementations live in feature modules; URLs continue to import this package.
 """
 
+from .spreadsheet_import import import_recordings
+
 from .common import (
     add_recording_url,
     append_text,
@@ -105,6 +107,7 @@ from .recordings import (
     add_recording,
     apply_recording_field_filter_specs,
     delete_recording,
+    delete_selected_recordings,
     discard_recording_form_draft,
     duplicate_recording,
     edit_recording,
@@ -182,6 +185,7 @@ __all__ = [
     'delete_mouse',
     'delete_mouse_procedure',
     'delete_recording',
+    'delete_selected_recordings',
     'delete_selected_mice',
     'delete_selected_mice_all',
     'delete_selected_mice_all_url',

@@ -1,6 +1,7 @@
 from datetime import date
 from urllib.parse import urlencode
 
+from django.http import QueryDict
 from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
@@ -470,7 +471,6 @@ BASE_RECORDING_COLUMN_SPECS = [
         "url": lambda recording: experiment_recordings_url(recording),
         "link_class": "mouse-link",
     },
-    {"key": "sequence_number", "label": "Sequence"},
 ]
 
 
@@ -485,14 +485,14 @@ RECORDING_PATH_COLUMN_SPEC = [
 
 
 RECORDINGS_PAGE_BASE_COLUMN_SPECS = [
-    {"key": "recording_date", "label": "Date", "format": "date"},
+    {"key": "recording_date", "sort": "recording_date", "label": "Date", "format": "date", "cell_class": "recording-date-cell"},
     {
         "key": "mice",
+        "sort": "mice",
         "label": "Animals",
         "format": "recording_mice",
-        "cell_class": "compact-text-cell",
+        "cell_class": "recording-animals-cell",
     },
-    {"key": "sequence_number", "label": "Sequence"},
 ]
 
 
@@ -500,10 +500,11 @@ RECORDINGS_PAGE_TRAILING_COLUMN_SPECS = [
     {
         "key": "data_paths",
         "label": "Recording Paths",
+        "sort": "data_paths",
         "format": "recording_paths",
         "cell_class": "path-cell",
     },
-    {"key": "notes", "label": "Notes", "format": "linebreaks", "cell_class": "notes-cell"},
+    {"key": "notes", "sort": "notes", "label": "Notes", "format": "linebreaks", "cell_class": "notes-cell"},
 ]
 
 
@@ -1005,7 +1006,7 @@ def build_experiments_table(
         )
 
     return {
-        "class": "experiments-table",
+        "class": "procedure-matrix experiments-table",
         "columns": columns,
         "rows": rows,
         "empty_message": "No experiments match these filters.",
@@ -1115,7 +1116,12 @@ def build_recordings_table(
     recording_type,
     user=None,
     selected_recording_id=None,
+    current_sort="recording_date",
+    current_direction="desc",
+    query_params=None,
 ):
+    if query_params is None:
+        query_params = QueryDict()
     display_fields = []
 
     if recording_type is not None:
@@ -1132,29 +1138,15 @@ def build_recordings_table(
                 "aria_label": "Select all recordings",
             },
         },
-        *[
-            {
-                "label": spec["label"],
-                "class": spec.get("cell_class", ""),
-            }
-            for spec in RECORDINGS_PAGE_BASE_COLUMN_SPECS
-        ],
-        *[
-            {
-                "label": recording_field_label(field),
-                "class": "compact-text-cell",
-            }
-            for field in display_fields
-        ],
-        *[
-            {
-                "label": spec["label"],
-                "class": spec.get("cell_class", ""),
-            }
-            for spec in RECORDINGS_PAGE_TRAILING_COLUMN_SPECS
-        ],
+        *build_sortable_columns(
+            [
+                *RECORDINGS_PAGE_BASE_COLUMN_SPECS,
+                *[{"label": recording_field_label(field), "sort": f"field:{field.key}", "cell_class": "recording-field-cell"} for field in display_fields],
+                *RECORDINGS_PAGE_TRAILING_COLUMN_SPECS,
+            ],
+            current_sort, current_direction, query_params,
+        ),
         {"label": "Edit", "class": "action-cell"},
-        {"label": "Delete", "class": "action-cell"},
     ]
     rows = []
 
@@ -1163,14 +1155,6 @@ def build_recordings_table(
         is_selected = recording.pk == selected_recording_id
         edit_url = reverse(
             "lab:edit_recording",
-            args=[
-                recording.experiment.project_id,
-                recording.experiment_id,
-                recording.pk,
-            ],
-        )
-        delete_url = reverse(
-            "lab:delete_recording",
             args=[
                 recording.experiment.project_id,
                 recording.experiment_id,
@@ -1205,7 +1189,7 @@ def build_recordings_table(
                                 recording.values.get(field.key),
                                 field.data_type,
                             ),
-                            "class": "compact-text-cell",
+                            "class": "recording-field-cell",
                         }
                         for field in display_fields
                     ],
@@ -1219,18 +1203,12 @@ def build_recordings_table(
                         "url": edit_url if can_modify else None,
                         "link_class": "button",
                     },
-                    {
-                        "value": "Delete" if can_modify else EMPTY_VALUE,
-                        "class": "action-cell",
-                        "url": delete_url if can_modify else None,
-                        "link_class": "button button-danger",
-                    },
                 ],
             }
         )
 
     return {
-        "class": "recordings-table",
+        "class": "procedure-matrix recordings-table",
         "columns": columns,
         "rows": rows,
         "has_selectable_rows": any(
@@ -1430,9 +1408,9 @@ def format_recording_mice_links(recording):
     if not mice:
         return EMPTY_VALUE
 
-    return format_html_join(
+    links = format_html_join(
         "",
-        '<a class="mouse-link" href="{}">{}</a><br>',
+        '<a class="mouse-link" href="{}">{}</a>',
         (
             (
                 reverse("lab:mouse_record", args=[mouse.pk]),
@@ -1441,6 +1419,7 @@ def format_recording_mice_links(recording):
             for mouse in mice
         ),
     )
+    return format_html('<div class="recording-animal-links">{}</div>', links)
 
 
 def format_crossing_type_summary(mouse):

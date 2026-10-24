@@ -6,7 +6,13 @@ from uuid import uuid4
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import (
+    BigIntegerField, DateField, F, FloatField, OuterRef,
+    Q, Subquery, TextField, Value,
+)
+from django.db.models.fields.json import KeyTextTransform, compile_json_path
+from django.db.models.functions import Cast, Lower, NullIf
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -133,24 +139,70 @@ def positive_int_or_none(value):
     return parsed if parsed > 0 else None
 
 
-def selected_recording_page_number(recordings, selected_recording_id, per_page):
+class NullableJSONTextTransform(KeyTextTransform):
+    """Match PostgreSQL's SQL NULL extraction for JSON null on SQLite too."""
+
+    def as_sqlite(self, compiler, connection):
+        sql, params = super().as_sqlite(compiler, connection)
+        lhs, lhs_params, keys = self.preprocess_lhs(compiler, connection)
+        # Inspect the JSON type so a literal string "null" stays sortable text.
+        return (
+            f"CASE WHEN JSON_TYPE({lhs}, %s) = 'null' THEN NULL ELSE {sql} END",
+            (*lhs_params, compile_json_path(keys), *params),
+        )
+
+
+def order_recordings(recordings, recording_type, sort, direction):
+    first_animal = Mouse.objects.filter(recordings=OuterRef("pk")).order_by(Lower("mouse_id"), "mouse_id").values("mouse_id")[:1]
+    expressions = {
+        "recording_date": F("recording_date"),
+        "mice": Lower(Subquery(first_animal)),
+        "data_paths": Lower(NullIf(KeyTextTransform(0, "data_paths"), Value(""), output_field=TextField())),
+        "notes": Lower(NullIf(F("notes"), Value(""), output_field=TextField())),
+    }
+    if recording_type is not None:
+        for field in recording_type.fields.all():
+            if not field.active or not field.display_in_table:
+                continue
+            value = NullableJSONTextTransform(field.key, "values")
+            value = NullIf(value, Value(""), output_field=TextField())
+            if field.data_type == RecordingField.INTEGER:
+                value = Cast(value, BigIntegerField())
+            elif field.data_type == RecordingField.FLOAT:
+                value = Cast(value, FloatField())
+            elif field.data_type == RecordingField.DATE:
+                value = Cast(value, DateField())
+            else:
+                value = Lower(value)
+            expressions[f"field:{field.key}"] = value
+    if sort not in expressions:
+        sort, direction = "recording_date", "desc"
+    if direction not in {"asc", "desc"}:
+        direction = "desc"
+    recordings = recordings.annotate(_recording_sort_value=expressions[sort])
+    ordering = F("_recording_sort_value").asc(nulls_last=True) if direction == "asc" else F("_recording_sort_value").desc(nulls_last=True)
+    return recordings.order_by(ordering, "-recording_id"), sort, direction
+
+
+def selected_recording_page_number(recordings, selected_recording_id, per_page, direction):
     selected = (
         recordings
         .filter(pk=selected_recording_id)
-        .values("recording_date", "recording_id")
+        .values("_recording_sort_value", "recording_id")
         .first()
     )
 
     if selected is None:
         return None
 
-    earlier_rows = recordings.filter(
-        Q(recording_date__gt=selected["recording_date"])
-        | Q(
-            recording_date=selected["recording_date"],
-            recording_id__gt=selected["recording_id"],
-        )
-    ).count()
+    value = selected["_recording_sort_value"]
+    tied_before = Q(_recording_sort_value=value, recording_id__gt=selected["recording_id"])
+    if value is None:
+        before = Q(_recording_sort_value__isnull=False)
+    else:
+        comparison = "lt" if direction == "asc" else "gt"
+        before = Q(**{f"_recording_sort_value__{comparison}": value})
+    earlier_rows = recordings.filter(before | tied_before).count()
 
     return earlier_rows // per_page + 1
 
@@ -304,9 +356,9 @@ def recordings_page(request, project_pk, experiment_pk):
             recording_date__lte=filter_values["date_to"],
         )
 
-    recordings = recordings.distinct().order_by(
-        "-recording_date",
-        "-recording_id",
+    recordings, sort, direction = order_recordings(
+        recordings.distinct(), experiment.recording_type,
+        request.GET.get("sort", "recording_date"), request.GET.get("direction", "desc"),
     )
 
     page_size = read_table_page_size(request.GET)
@@ -321,6 +373,7 @@ def recordings_page(request, project_pk, experiment_pk):
             recordings,
             selected_recording_id,
             paginator.per_page,
+            direction,
         )
 
     page_obj = paginator.get_page(page_number)
@@ -340,17 +393,21 @@ def recordings_page(request, project_pk, experiment_pk):
         {
             "project": project,
             "experiment": experiment,
+            "has_active_filters": any(filter_values.values()),
             "table": build_recordings_table(
                 page_obj,
                 experiment.recording_type,
                 request.user,
                 selected_recording_id=selected_recording_id,
+                current_sort=sort, current_direction=direction, query_params=query_params,
             ),
             "filter_form": build_filter_form(
                 filter_specs,
                 filter_values,
                 hidden_fields=[
                     {"name": "per_page", "value": page_size},
+                    {"name": "sort", "value": sort},
+                    {"name": "direction", "value": direction},
                 ],
                 clear_url=recordings_url,
             ),
@@ -689,6 +746,38 @@ def edit_recording(request, project_pk, experiment_pk, recording_pk):
             **mouse_workflow_urls,
         },
     )
+
+
+@require_POST
+def delete_selected_recordings(request, project_pk, experiment_pk):
+    project, experiment = experiment_for_project_or_404(project_pk, experiment_pk)
+    return_url = safe_return_url(request, experiment_recordings_url(project, experiment))
+    selected = request.POST.getlist("selected_recording")
+    if not selected:
+        messages.error(request, "Select at least one recording to delete.")
+        return redirect(return_url)
+    ids = {positive_int_or_none(value) for value in selected}
+    if None in ids:
+        raise Http404("Invalid recording selection.")
+    with transaction.atomic():
+        recordings = list(
+            experiment.recordings.select_for_update().filter(pk__in=ids)
+            .prefetch_related("mice").order_by("-recording_date", "-recording_id")
+        )
+        if len(recordings) != len(ids):
+            raise Http404("One or more selected recordings no longer belong to this experiment.")
+        for recording in recordings:
+            require_recording_modify_permission(request.user, recording)
+        if request.POST.get("confirm_delete") == "yes":
+            count = len(recordings)
+            for recording in recordings:
+                recording.delete()
+            messages.success(request, f"Deleted {count} recording{'s' if count != 1 else ''}.")
+            return redirect(return_url)
+    return render(request, "lab/delete_selected_recordings.html", {
+        "project": project, "experiment": experiment,
+        "recordings": recordings, "return_url": return_url,
+    })
 
 
 def delete_recording(request, project_pk, experiment_pk, recording_pk):

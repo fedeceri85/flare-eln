@@ -1,0 +1,28 @@
+{% extends "lab/base.html" %}
+{% block title %}Delete selected recordings{% endblock %}
+{% block page_title %}Delete selected recordings{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
+{% block page_subtitle %}<p>{{ recordings|length }} recording{{ recordings|length|pluralize }} will be permanently deleted.</p>{% endblock %}
+{% block content %}
+<div class="recordings-page record-list-page">
+    <div class="table-card"><div class="table-scroll">
+        <table class="data-table procedure-matrix recordings-table">
+            <thead><tr><th scope="col" class="recording-date-cell">Date</th><th scope="col" class="recording-animals-cell">Animals</th><th scope="col" class="path-cell">Recording Paths</th></tr></thead>
+            <tbody>{% for recording in recordings %}<tr>
+                <td class="recording-date-cell">{{ recording.recording_date|date:'d/m/Y' }}</td>
+                <td class="recording-animals-cell"><div class="recording-animal-links">{% for mouse in recording.mice.all %}<span>{{ mouse.mouse_id }}</span>{% empty %}—{% endfor %}</div></td>
+                <td class="path-cell">{% for path in recording.data_paths %}{{ path }}{% if not forloop.last %}<br>{% endif %}{% empty %}—{% endfor %}</td>
+            </tr>{% endfor %}</tbody>
+        </table>
+    </div></div>
+    <form method="post" class="toolbar">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ return_url }}">
+        {% for recording in recordings %}<input type="hidden" name="selected_recording" value="{{ recording.pk }}">{% endfor %}
+        <div class="actions">
+            <button class="button button-danger" type="submit" name="confirm_delete" value="yes">Delete {{ recordings|length }} recording{{ recordings|length|pluralize }}</button>
+            <a class="button" href="{{ return_url }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
