@@ -1,6 +1,43 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("[data-import-form]");
     if (!form) return;
+    const templateSelect = form.querySelector("[data-import-template-select]");
+    const templateAction = form.querySelector("[data-import-template-action]");
+    if (templateSelect && templateAction) {
+        templateSelect.addEventListener("change", () => {
+            if (!templateSelect.value) return;
+            const noValidate = form.noValidate;
+            templateAction.disabled = false;
+            form.noValidate = true;
+            try {
+                form.requestSubmit();
+            } finally {
+                templateAction.disabled = true;
+                form.noValidate = noValidate;
+            }
+        });
+    }
+    const openTemplate = form.querySelector("[data-import-template-open]");
+    const templateDialog = document.querySelector("[data-import-template-dialog]");
+    if (openTemplate && templateDialog) {
+        const saveForm = templateDialog.querySelector("[data-import-template-save-form]");
+        const snapshot = saveForm.querySelector("[data-import-template-snapshot]");
+        openTemplate.hidden = false;
+        openTemplate.addEventListener("click", () => templateDialog.showModal());
+        templateDialog.querySelector("[data-import-template-cancel]").addEventListener("click", () => templateDialog.close());
+        saveForm.addEventListener("submit", () => {
+            snapshot.replaceChildren();
+            for (const [name, value] of new FormData(form)) {
+                if (["csrfmiddlewaretoken", "step", "revision", "template_action"].includes(name)) continue;
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = name;
+                input.value = value;
+                snapshot.appendChild(input);
+            }
+        });
+        if (templateDialog.dataset.reopen === "true") templateDialog.showModal();
+    }
     form.querySelectorAll("[data-import-mapping-row]").forEach(row => {
         const mode = row.querySelector("[data-import-mapping-mode]");
         const options = Array.from(row.querySelectorAll("[data-import-mapping-option]"));

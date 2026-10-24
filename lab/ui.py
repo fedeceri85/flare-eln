@@ -675,15 +675,12 @@ def build_home_cards(user=None):
                 "url": reverse("lab:lines_crossings_page"),
             }
         )
-        cards.append(
-            {
-                "title": "Admin Console",
-                "description": (
-                    "Manage users and configure recording types and fields."
-                ),
-                "url": reverse("admin:index"),
-            }
-        )
+    if user and user.is_authenticated:
+        cards.append({
+            "title": "Settings",
+            "description": "Manage spreadsheet import templates and workspace settings.",
+            "url": reverse("lab:settings_page"),
+        })
 
     return cards
 

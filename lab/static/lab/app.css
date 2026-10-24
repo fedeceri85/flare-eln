@@ -1284,6 +1284,12 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .data-table.experiments-table .date-cell { width: 95px; min-width: 95px; white-space: nowrap; }
 .data-table.experiments-table .action-cell { width: 70px; }
 .experiments-table .action-cell .button { min-height: 28px; padding: 3px 8px; }
+.settings-page .data-table.procedure-matrix.settings-table { table-layout: auto; min-width: 600px; }
+.settings-page .settings-table .action-cell { width: 1%; white-space: nowrap; }
+.settings-page .settings-table .action-cell .button { min-height: 28px; padding: 3px 8px; }
+.settings-page .settings-table .actions { flex-wrap: nowrap; gap: 6px; }
+.settings-section-title { margin: 0; color: var(--ink); font-size: 14px; font-weight: 650; }
+.settings-help { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
 @media (max-width: 640px) {
     .record-list-page .page-action-bar { position: static; }
     .record-list-page .filter-form--compact .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1326,6 +1332,13 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .spreadsheet-import .import-source-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 10px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .spreadsheet-import .import-source-meta strong { color: var(--ink); font-weight: 600; }
 .import-source-controls { display: grid; grid-template-columns: minmax(180px, 360px) minmax(90px, 120px) auto; gap: 10px 16px; align-items: end; }
+.spreadsheet-import .import-template-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; }
+.import-template-toolbar label { margin: 0; }
+.import-template-toolbar select { flex: 1 1 220px; width: auto; max-width: 400px; }
+.import-template-dialog { width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 24px; border: 1px solid var(--border); border-radius: 12px; color: var(--ink); background: var(--surface, white); box-sizing: border-box; }
+.import-template-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+.import-template-dialog h2 { margin: 0 0 8px; }
+.import-template-dialog .actions { margin-top: 20px; }
 .import-source-controls > .error-summary { grid-column: 1 / -1; }
 .import-source-controls > .button { justify-self: start; }
 .spreadsheet-import .import-shared-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

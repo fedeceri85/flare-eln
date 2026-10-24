@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from ..models import Experiment, Project, Recording, RecordingType
+from ..models import Experiment, GenotypeCategory, Project, Recording, RecordingType
 
 
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost"])
@@ -40,7 +40,7 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/login/")
 
-    def test_staff_home_page_shows_admin_console_card(self):
+    def test_staff_home_page_hides_admin_console_card_and_shows_settings(self):
         User = get_user_model()
         staff_user = User.objects.create_user(
             username="staff-user",
@@ -52,7 +52,8 @@ class AuthenticationTests(TestCase):
         response = self.client.get(reverse("lab:home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Admin Console")
+        self.assertNotContains(response, "Admin Console")
+        self.assertContains(response, 'href="/settings/"')
         self.assertContains(response, 'href="/admin/"')
         self.assertContains(response, "Lines &amp; Crossings")
         self.assertContains(response, 'href="/lines-crossings/"')
@@ -127,13 +128,22 @@ class RecordingAdminTests(TestCase):
             data_paths=["/data/admin/recording"],
         )
 
-    def test_admin_can_open_recording_type_add_page_with_field_inline(self):
-        response = self.client.get(reverse("admin:lab_recordingtype_add"))
-
+    def test_admin_manages_recording_type_fields_in_settings(self):
+        response = self.client.get(reverse("lab:edit_recording_type", args=[self.recording_type.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Recording fields")
-        self.assertContains(response, 'name="fields-0-key"')
-        self.assertContains(response, 'name="fields-0-data_type"')
+        response = self.client.get(reverse("lab:add_recording_field", args=[self.recording_type.pk]))
+        self.assertContains(response, 'name="key"')
+        self.assertContains(response, 'name="data_type"')
+
+    def test_recording_types_and_genotype_categories_are_removed_from_admin(self):
+        self.assertFalse(admin.site.is_registered(RecordingType))
+        self.assertFalse(admin.site.is_registered(GenotypeCategory))
+        response = self.client.get(reverse("admin:index"))
+        for model in ("recordingtype", "genotypecategory"):
+            path = f"/admin/lab/{model}/"
+            self.assertNotContains(response, path)
+            self.assertEqual(self.client.get(path).status_code, 404)
 
     def test_recordings_are_managed_outside_django_admin(self):
         self.assertFalse(admin.site.is_registered(Recording))

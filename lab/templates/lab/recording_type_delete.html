@@ -1,0 +1,13 @@
+{% extends 'lab/settings_base.html' %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block title %}Delete recording type{% endblock %}
+{% block page_title %}Delete recording type{% endblock %}
+{% block settings_content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <p>Delete <strong>{{ recording_type.name }}</strong> and its recording field definitions and import templates?</p>
+        <p>Linked experiments and recordings prevent deletion. To retire a type instead, uncheck Active in its editor.</p>
+        {% if error %}<p class="message message-error" role="alert">{{ error }}</p>{% endif %}
+        <div class="actions"><button class="button button-danger" type="submit">Delete recording type</button><a class="button" href="{% url 'lab:edit_recording_type' recording_type.pk %}">Cancel</a></div>
+    </form>
+{% endblock %}

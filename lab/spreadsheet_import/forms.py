@@ -71,7 +71,6 @@ class SetupForm(forms.Form):
     identity_columns = forms.MultipleChoiceField(required=False, label="Additional columns distinguishing local identifiers", help_text="Use columns such as birth date or breeding pair to distinguish reused local markings. Repeated Animal IDs always refer to the same animal.")
     protocol_id = forms.ModelChoiceField(queryset=Protocol.objects.all(), required=False, label="Shared protocol for new animals / proposed updates")
     species_id = forms.ModelChoiceField(queryset=Species.objects.filter(active=True), required=False, label="Species", empty_label="Any species")
-    marking_type = forms.ChoiceField(required=False, choices=[("", "Keep existing / Other for new animals"), *Mouse.MARKING_CHOICES], label="Local identifier type (tattoo, ear clip)")
 
     def __init__(self, draft, table, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -80,7 +79,7 @@ class SetupForm(forms.Form):
         self.initial.update({k: definition[k] for k in ("date_order", "grouping")})
         self.fields["identity_columns"].choices = column_choices(table)[1:]
         self.initial["identity_columns"] = [column_initial(table, b) for b in definition.get("identity_columns", [])]
-        for name in ("protocol_id", "species_id", "marking_type"):
+        for name in ("protocol_id", "species_id"):
             self.initial[name] = definition["defaults"].get(name, "")
 
     def definition(self):
@@ -91,12 +90,13 @@ class SetupForm(forms.Form):
         for name in ("protocol_id", "species_id"):
             obj = self.cleaned_data[name]
             result["defaults"][name] = obj.pk if obj else ""
-        result["defaults"]["marking_type"] = self.cleaned_data["marking_type"]
+        result["defaults"].pop("marking_type", None)
         return result
 
 
 class MappingForm(forms.Form):
     def __init__(self, draft, table, *args, **kwargs):
+        self.require_identity = kwargs.pop("require_identity", True)
         super().__init__(*args, **kwargs)
         self.draft, self.table = draft, table
         definition = draft.configuration
@@ -167,11 +167,15 @@ class MappingForm(forms.Form):
                 "identity": key in {"animal:identifier", "animal:tattoo"},
                 "requirement": animal_requirements.get(key, ""),
             })
-        self.mapping_rows.sort(key=lambda row: 0 if row["identity"] else 1 if row["required"] else 2 if row["requirement"] else 3)
+        for row in self.mapping_rows:
+            value = row["default"].value() if row["mode"].value() == "shared" else row["column"].value()
+            row["associated"] = value not in (None, "") and (not isinstance(value, str) or bool(value.strip()))
+        # Keep configured fields out of the way without moving rows during editing.
+        self.mapping_rows.sort(key=lambda row: 2 if row["associated"] else 0 if row["required"] else 1)
 
     def clean(self):
         cleaned = super().clean()
-        if not any(cleaned.get(f"{prefix}_animal:{key}") for prefix in ("column", "default") for key in ("identifier", "tattoo")):
+        if self.require_identity and not any(cleaned.get(f"{prefix}_animal:{key}") for prefix in ("column", "default") for key in ("identifier", "tattoo")):
             self.add_error("column_animal:identifier", "Map an Animal ID or Local identifier, or supply a shared value.")
         return cleaned
 
@@ -363,8 +367,11 @@ class GeneticsForm(forms.Form):
             self.fields[default_name] = forms.ChoiceField(required=False, label=f"{line.name}: shared genotype", choices=categories)
             selected = column_initial(table, definition["bindings"].get(target))
             if not selected:
-                aliases = {normalize(line.name), *(normalize(a) for a in line.aliases.replace(";", ",").split(",") if a.strip())}
-                matches = [c for c in table["columns"] if normalize(c["heading"]) in aliases]
+                # Prefer the actual line name over aliases or punctuation variants.
+                matches = [c for c in table["columns"] if c["heading"].strip().casefold() == line.name.strip().casefold()]
+                if not matches:
+                    aliases = {normalize(line.name), *(normalize(a) for a in line.aliases.replace(";", ",").split(",") if a.strip())}
+                    matches = [c for c in table["columns"] if normalize(c["heading"]) in aliases]
                 if len(matches) == 1:
                     selected = str(matches[0]["index"])
             self.initial[column_name], self.initial[default_name] = selected, definition["defaults"].get(target, "")

@@ -24,7 +24,6 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         "date_of_birth",
         "breeding_pair",
         "crossing_search",
-        "marking_type",
         "status",
         "protocol",
         "protocol_start_date",
@@ -254,7 +253,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         return [
             {"title": title, "fields": [self[name] for name in names]}
             for title, names in (
-                ("Origin", ("date_of_birth", "breeding_pair", "marking_type")),
+                ("Origin", ("date_of_birth", "breeding_pair")),
                 ("Animal status", ("status", "severity", "cull_date")),
                 ("Protocol", ("protocol", "protocol_start_date")),
             )

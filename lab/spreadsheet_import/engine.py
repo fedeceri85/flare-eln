@@ -149,7 +149,6 @@ def group_details(draft, table, group):
             raise ValidationError(f"Map strain description {raw_crossing!r} to an existing crossing in Crossings & genotypes.")
     details["crossing_definition"] = crossing_id or ""
     details["protocol"] = definition["defaults"].get("protocol_id", "")
-    details["marking_type"] = definition["defaults"].get("marking_type", "")
     return details
 
 
@@ -190,7 +189,7 @@ def change(group_key, field, label, old, new):
 def animal_display_details(details, calls=None):
     result = []
     for key, value in details.items():
-        if value == "":
+        if value == "" or key == "marking_type":
             continue
         field = Mouse._meta.get_field(key)
         label = {"crossing_definition": "Crossing", "marking_type": "Local ID type"}.get(key, field.verbose_name.title())
@@ -244,7 +243,7 @@ def build_review(draft, approvals=None):
             if not resolution:
                 raise ValidationError(f"Resolve animal {group['identifier'] or '(missing identifier)'} in the Animals tab.")
             details = group_details(draft, table, group)
-            details.update({k: v for k, v in resolution.get("details", {}).items() if v != ""})
+            details.update({k: v for k, v in resolution.get("details", {}).items() if v != "" and k != "marking_type"})
             if details.get("protocol") and not Protocol.objects.filter(pk=details["protocol"]).exists():
                 raise ValidationError("The animal's selected protocol is no longer available.")
             mouse = None
@@ -290,7 +289,7 @@ def build_review(draft, approvals=None):
                 animal_id = mouse.pk
             else:
                 details["status"] = details.get("status") or "Alive"
-                details["marking_type"] = details.get("marking_type") or "other"
+                details["marking_type"] = "other"
                 values = {k: v for k, v in details.items() if v != ""}
                 generate = bool(resolution.get("generate_id"))
                 if generate and group["animal_id"]:

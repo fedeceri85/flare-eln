@@ -1,10 +1,9 @@
 import json
 
-from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase
 
-from .admin import GenotypeCategoryAdmin
+from .forms.settings import GenotypeCategoryForm
 from .forms import BulkMouseUpdateForm, MouseEditForm, genotype_field_name, sync_mouse_structured_genetics
 from .models import GenotypeCategory, Mouse, MouseGenotype, MouseLine, Protocol, Species, genotype_category_choices, resolve_crossing
 from .views import crossing_genotype_fields
@@ -69,7 +68,7 @@ class GenotypeCategoryTests(TestCase):
         with self.assertRaises(ValidationError):
             MouseEditForm(instance=self.mouse).fields[self.field].clean("invalid")
 
-    def test_admin_protects_codes_and_retains_unknown(self):
+    def test_settings_protect_codes_and_retain_unknown(self):
         category = GenotypeCategory.objects.get(code="unknown")
         category.active = False
         with self.assertRaises(ValidationError):
@@ -78,6 +77,4 @@ class GenotypeCategoryTests(TestCase):
         category.code = "different"
         with self.assertRaises(ValidationError):
             category.full_clean()
-        admin = GenotypeCategoryAdmin(GenotypeCategory, AdminSite())
-        self.assertEqual(admin.get_readonly_fields(None, category), ("code",))
-        self.assertFalse(admin.has_delete_permission(None, category))
+        self.assertTrue(GenotypeCategoryForm(instance=category).fields["code"].disabled)

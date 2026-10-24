@@ -4,7 +4,7 @@ import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models.functions import Lower
+from django.db.models.functions import Lower, Trim
 from django.utils import timezone
 
 
@@ -24,6 +24,33 @@ class SpreadsheetImportDraft(models.Model):
     expires_at = models.DateTimeField(default=import_draft_expiry, db_index=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class SpreadsheetImportTemplate(models.Model):
+    """Shared column associations, independent of any uploaded file or draft."""
+
+    recording_type = models.ForeignKey("RecordingType", on_delete=models.CASCADE, related_name="import_templates")
+    name = models.CharField(max_length=200)
+    mapping = models.JSONField(default=dict)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["recording_type__name", "name", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                models.F("recording_type"), Lower(Trim("name")),
+                name="unique_import_template_type_name",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.name = self.name.strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 MAX_SEVERITY_CHOICES = [
     ("Non-recovery", "Non-recovery"),

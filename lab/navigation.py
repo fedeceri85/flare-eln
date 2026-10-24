@@ -13,6 +13,7 @@ SECTIONS = (
     ("services", "Services", "services_page"),
     ("reports", "Reports", "reports_page"),
     ("genetics", "Lines & Crossings", "lines_crossings_page"),
+    ("settings", "Settings", "settings_page"),
 )
 PAGE_TITLES = {
     "home": "Home", "login": "Log in", "mice_page": "Animals",
@@ -24,6 +25,11 @@ PAGE_TITLES = {
     "add_experiment": "Add experiment", "edit_experiment": "Edit experiment",
     "add_recording": "Add recording", "edit_recording": "Edit recording",
     "import_recordings": "Import from spreadsheet", "import_recordings_draft": "Import from spreadsheet",
+    "settings_page": "Settings", "import_templates": "Import templates",
+    "rename_import_template": "Rename import template", "delete_import_template": "Delete import template",
+    "genotype_categories": "Genotype categories", "add_genotype_category": "Add genotype category", "edit_genotype_category": "Edit genotype category",
+    "recording_types": "Recording types", "add_recording_type": "Add recording type", "edit_recording_type": "Edit recording type",
+    "delete_recording_type": "Delete recording type", "add_recording_field": "Add recording field", "edit_recording_field": "Edit recording field",
     "delete_recording": "Delete recording", "delete_selected_recordings": "Delete selected recordings", "select_recording_mouse": "Select animals",
     "edit_mouse": "Edit animal", "rename_mouse": "Rename animal",
     "delete_mouse": "Delete animal", "edit_mouse_procedure": "Edit procedure",
@@ -106,6 +112,12 @@ def build_navigation(context):
 
     if name == "home":
         section = "home"
+    elif name in {
+        "settings_page", "import_templates", "rename_import_template", "delete_import_template",
+        "genotype_categories", "add_genotype_category", "edit_genotype_category",
+        "recording_types", "add_recording_type", "edit_recording_type", "delete_recording_type", "add_recording_field", "edit_recording_field",
+    }:
+        section = "settings"
     elif name == "lines_crossings_page":
         section = "genetics"
     elif name == "reports_page":
@@ -122,7 +134,7 @@ def build_navigation(context):
     links = [
         {"label": label, "url": reverse(f"lab:{view}"), "active": key == section}
         for key, label, view in SECTIONS
-        if key != "genetics" or request.user.is_staff
+        if key != "mice" and (key != "genetics" or request.user.is_staff)
     ]
     breadcrumbs = [{"label": "Home", "url": reverse("lab:home")}]
 
@@ -133,9 +145,26 @@ def build_navigation(context):
     if name == "login":
         breadcrumbs = [{"label": "Log in", "url": ""}]
         links = []
+    elif section == "settings":
+        crumb("Settings", reverse("lab:settings_page"))
+        if name in {"genotype_categories", "add_genotype_category", "edit_genotype_category"}:
+            crumb("Genotype categories", reverse("lab:genotype_categories"))
+            if name != "genotype_categories":
+                crumb(title)
+        elif name in {"recording_types", "add_recording_type", "edit_recording_type", "delete_recording_type", "add_recording_field", "edit_recording_field"}:
+            crumb("Recording types", reverse("lab:recording_types"))
+            if name in {"add_recording_field", "edit_recording_field"} and context.get("recording_type"):
+                kind = context["recording_type"]
+                crumb(kind.name, reverse("lab:edit_recording_type", args=[kind.pk]))
+            if name != "recording_types":
+                crumb(title)
+        elif name != "settings_page":
+            crumb("Import templates", reverse("lab:import_templates"))
+        if name in {"rename_import_template", "delete_import_template"}:
+            crumb(title)
     elif name != "home":
-        section_link = next(link for link in links if link["active"])
-        crumb(section_link["label"], section_link["url"])
+        _, section_label, section_view = next(item for item in SECTIONS if item[0] == section)
+        crumb(section_label, reverse(f"lab:{section_view}"))
         if section == "procedures":
             licence = context.get("selected_licence_reference") or (protocol.licence_reference if protocol else None)
             if licence:

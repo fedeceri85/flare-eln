@@ -30,7 +30,6 @@ class BulkMouseUpdateForm(forms.Form):
         ("update_crossing", "crossing_search"),
         ("update_date_of_birth", "date_of_birth"),
         ("update_breeding_pair", "breeding_pair"),
-        ("update_marking_type", "marking_type"),
     ]
 
 
@@ -152,8 +151,6 @@ class BulkMouseUpdateForm(forms.Form):
         label="Breeding pair",
     )
 
-    update_marking_type = forms.BooleanField(required=False, label="Update Local ID type")
-    marking_type = forms.ChoiceField(required=False, choices=Mouse.MARKING_CHOICES, initial="other", label="Local ID type")
 
     def __init__(self, *args, **kwargs):
         self.selected_mice = list(kwargs.pop("selected_mice", []))
@@ -526,9 +523,6 @@ class BulkMouseUpdateForm(forms.Form):
                 cleaned_data["genotype_values"] = genotype_values
 
 
-        if cleaned_data.get("update_marking_type") and not cleaned_data.get("marking_type"):
-            self.add_error("marking_type", "Select a Local ID type.")
-
         target_protocol = None
         if cleaned_data.get("update_protocol") and cleaned_data.get("protocol"):
             target_protocol = cleaned_data["protocol"]
@@ -589,7 +583,7 @@ class BulkMouseUpdateForm(forms.Form):
         return [
             {"title": title, "fields": [fields[name] for name in names]}
             for title, names in (
-                ("Origin", ("date_of_birth", "breeding_pair", "marking_type")),
+                ("Origin", ("date_of_birth", "breeding_pair")),
                 ("Animal status", ("status", "severity", "cull_date")),
                 ("Protocol", ("protocol", "protocol_start_date")),
             )

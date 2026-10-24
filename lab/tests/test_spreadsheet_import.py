@@ -214,6 +214,7 @@ class SpreadsheetImportTests(TestCase):
         self.assertIn("20260401", preview["animals"][0]["mouse_id"])
         commit_import(draft.pk, self.user, self.experiment, [])
         self.assertEqual(Mouse.objects.get(tattoo="LOCAL").id_status, Mouse.ID_TEMPORARY)
+        self.assertEqual(Mouse.objects.get(tattoo="LOCAL").marking_type, "other")
 
     def test_additional_identity_columns_split_reused_local_identifiers(self):
         draft = self.draft("Date,Local identifier\n28.04.26,LE\n30.04.26,LE\n")
@@ -229,17 +230,19 @@ class SpreadsheetImportTests(TestCase):
         response = self.client.get(self.url(draft), {"step": "setup"})
         self.assertNotContains(response, "Source animal identifier means")
         self.assertNotIn("identifier_kind", response.context["form"].fields)
-        self.assertContains(response, "Local identifier type (tattoo, ear clip)")
+        self.assertNotContains(response, "Local identifier type (tattoo, ear clip)")
         response = self.client.get(self.url(draft), {"step": "mapping"})
-        identities = response.context["form"].mapping_rows[:2]
-        self.assertEqual([row["label"] for row in identities], ["Animal ID (unique)", "Local identifier (tattoo, ear clip)"])
+        identities = [row for row in response.context["form"].mapping_rows if row["identity"]]
+        self.assertCountEqual([row["label"] for row in identities], ["Animal ID (unique)", "Local identifier (tattoo, ear clip)"])
         self.assertFalse(any(row["required"] for row in identities))
         self.assertEqual(draft.configuration["version"], 2)
         self.assertNotIn("identifier_kind", draft.configuration)
 
     def test_mixed_rows_use_supplied_animal_ids_and_generate_only_when_missing(self):
+        self.mouse.marking_type = "tattoo"
+        self.mouse.save(update_fields=["marking_type"])
         draft = self.draft("Date,Animal ID,Local identifier,Birth Date,Breeding pair\n28.04.26,OFFICIAL-1,NEW-MARK,1.4.26,PAIR\n28.04.26,SUPPLIED-ID,LOCAL-X,1.4.26,PAIR\n28.04.26,,LOCAL-Y,1.4.26,PAIR\n")
-        draft.configuration["defaults"].update(protocol_id=self.protocol.pk, crossing_id=self.crossing.pk)
+        draft.configuration["defaults"].update(protocol_id=self.protocol.pk, crossing_id=self.crossing.pk, marking_type="ear_clip")
         groups = animal_groups(draft)
         resolutions = [draft.state["animals"][group["key"]] for group in groups]
         self.assertEqual([(row["mode"], row.get("generate_id", False)) for row in resolutions], [("link", False), ("create", False), ("create", True)])
@@ -251,6 +254,8 @@ class SpreadsheetImportTests(TestCase):
         result = commit_import(draft.pk, self.user, self.experiment, [])
         self.assertEqual(result["created_animals"], 2)
         self.mouse.refresh_from_db()
+        self.assertEqual(self.mouse.marking_type, "tattoo")
+        self.assertEqual(Mouse.objects.get(pk="SUPPLIED-ID").marking_type, "other")
         self.assertEqual(self.mouse.tattoo, "LE")  # Proposed marking changes still need approval.
         self.assertEqual(Mouse.objects.get(pk="SUPPLIED-ID").tattoo, "LOCAL-X")
         self.assertEqual(Mouse.objects.get(pk=generated).tattoo, "LOCAL-Y")
@@ -410,13 +415,14 @@ class SpreadsheetImportTests(TestCase):
             self.assertEqual(str(field.widget.attrs["data-import-crossing-select"]), reverse("lab:crossing_lookup"))
 
     def test_prefilled_crossing_shows_genotype_columns_and_requires_saving(self):
-        draft = self.draft("Date,Mouse ID,Strain,Import line\n28.04.26,NEW-ID,Import lnie,Het\n")
+        draft = self.draft("Date,Mouse ID,Strain,iMpOrT LiNe\n28.04.26,NEW-ID,Import lnie,Het\n")
         draft.configuration["defaults"]["protocol_id"] = self.protocol.pk
         draft.save()
         response = self.client.get(self.url(draft), {"step": "genetics"})
         form = response.context["form"]
         self.assertEqual(form[form.crossing_rows[0]["name"]].value(), self.crossing.pk)
         self.assertEqual([row["line"] for row in form.line_rows], [self.line])
+        self.assertEqual(form[f"genotype_column_{self.line.pk}"].value(), "3")
         self.assertEqual(draft.configuration["crossing_map"], {})
         self.assertTrue(any("Map strain description" in error for error in build_review(draft)["errors"]))
         data = {name: form[name].value() if form[name].value() is not None else "" for name in form.fields}
@@ -425,8 +431,28 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         draft.refresh_from_db()
         self.assertEqual(draft.configuration["crossing_map"], {"Import lnie": self.crossing.pk})
+        self.assertEqual(draft.configuration["bindings"][f"genotype:{self.line.pk}"], binding(draft_table(draft)["columns"][3]))
         self.assertEqual(build_review(draft)["errors"], [])
         self.assertFalse(Mouse.objects.filter(pk="NEW-ID").exists())
+
+    def test_genotype_column_prefill_prefers_line_name_and_preserves_manual_choices(self):
+        draft = self.draft("Date,Mouse ID,IL,IMPORT LINE,Import-line\n28.04.26,OFFICIAL-1,Hom,Het,WT\n")
+        name = f"genotype_column_{self.line.pk}"
+        table = draft_table(draft)
+        form = GeneticsForm(draft, table)
+        self.assertEqual(form[name].value(), "3")
+        draft.configuration["bindings"][f"genotype:{self.line.pk}"] = binding(table["columns"][2])
+        form = GeneticsForm(draft, table)
+        self.assertEqual(form[name].value(), "2")
+        data = self.form_data(form)
+        data[name] = ""
+        bound = GeneticsForm(draft, table, data=data)
+        self.assertEqual(bound[name].value(), "")
+
+    def test_duplicate_line_name_headers_require_manual_column_selection(self):
+        draft = self.draft("Date,Mouse ID,Import line,IMPORT LINE,IL\n28.04.26,OFFICIAL-1,Hom,Het,WT\n")
+        form = GeneticsForm(draft, draft_table(draft))
+        self.assertEqual(form[f"genotype_column_{self.line.pk}"].value(), "")
 
     def test_crossing_suggestions_preserve_saved_choices_and_overrides(self):
         other = MouseLine.objects.create(species=self.species, name="Chosen crossing")
@@ -563,7 +589,7 @@ class SpreadsheetImportTests(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.configuration["defaults"]["protocol_id"], self.protocol.pk)
         self.assertEqual(draft.configuration["defaults"]["species_id"], self.species.pk)
-        self.assertEqual(draft.configuration["defaults"]["marking_type"], "tattoo")
+        self.assertNotIn("marking_type", draft.configuration["defaults"])
 
     def test_import_settings_is_second_tab_and_owns_layout_and_shared_animal_details(self):
         draft = self.draft()
@@ -575,7 +601,7 @@ class SpreadsheetImportTests(TestCase):
         self.assertContains(response, "Recording layout")
         self.assertContains(response, "Shared animal details")
         self.assertEqual(response.context["form"]["protocol_id"].value(), self.protocol.pk)
-        self.assertEqual(response.context["form"]["marking_type"].value(), "ear_clip")
+        self.assertNotIn("marking_type", response.context["form"].fields)
         for step in ("mapping", "animals"):
             response = self.client.get(self.url(draft), {"step": step})
             self.assertNotContains(response, "Recording layout")
@@ -612,7 +638,7 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("protocol_id", response.context["form"].errors)
         self.assertEqual(response.context["form"]["date_order"].value(), "MDY")
-        self.assertEqual(response.context["form"]["marking_type"].value(), "ear_clip")
+        self.assertNotIn("marking_type", response.context["form"].fields)
         draft.refresh_from_db()
         self.assertEqual(draft.configuration, original)
 
@@ -910,8 +936,8 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(list(form.fields["default_field:mode"].choices)[0][0], "")
         required = [row["column"].name for row in form.mapping_rows if row["required"]]
         self.assertCountEqual(required, ["column_recording_date", "column_field:flag", "column_field:mode"])
-        self.assertTrue(all(row["identity"] for row in form.mapping_rows[:2]))
-        self.assertEqual([row["required"] for row in form.mapping_rows[2:]], sorted([row["required"] for row in form.mapping_rows[2:]], reverse=True))
+        priorities = [2 if row["associated"] else 0 if row["required"] else 1 for row in form.mapping_rows]
+        self.assertEqual(priorities, sorted(priorities))
 
     def test_shared_typed_values_remain_json_serializable_and_apply_to_recordings(self):
         self.add_shared_value_fields()
@@ -991,13 +1017,13 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(MappingForm(draft, draft_table(draft))["mode_field:frames"].value(), "shared")
         self.assertFalse(any(key.startswith("mode_") for key in draft.configuration))
 
-    def test_animal_creation_requirements_precede_optional_recording_mappings(self):
+    def test_animal_creation_requirements_remain_visible_with_association_ordering(self):
         draft = self.draft()
         response = self.client.get(self.url(draft), {"step": "mapping"})
         rows = response.context["form"].mapping_rows
         conditional = {row["column"].name: row for row in rows if row["requirement"]}
         self.assertCountEqual(conditional, ["column_animal:identifier", "column_animal:crossing", "column_animal:date_of_birth", "column_animal:breeding_pair", "column_animal:tattoo"])
-        priority = [0 if row["identity"] else 1 if row["required"] else 2 if row["requirement"] else 3 for row in rows]
+        priority = [2 if row["associated"] else 0 if row["required"] else 1 for row in rows]
         self.assertEqual(priority, sorted(priority))
         self.assertContains(response, "Choose one per field:")
         self.assertNotContains(response, "Creating new animals?")

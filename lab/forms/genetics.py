@@ -345,6 +345,9 @@ class MouseStructuredGeneticsMixin:
     def configure_genetics_fields(self):
         if "marking_type" in self.fields:
             self.fields["marking_type"].required = False
+            # Preserve legacy types on edits; new instances use the model default.
+            self.fields["marking_type"].disabled = True
+            self.fields["marking_type"].widget = forms.HiddenInput()
             self.fields["marking_type"].initial = self.instance.marking_type or "other"
         self.insert_crossing_search_field()
         self.fields["crossing_definition"].required = False

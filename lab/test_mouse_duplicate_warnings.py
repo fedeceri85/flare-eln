@@ -286,7 +286,7 @@ class MouseDuplicateWarningTests(TestCase):
         self.assertEqual(set(Mouse.objects.values_list("id_status", flat=True)), {Mouse.ID_ASSIGNED})
 
     def test_automatic_litter_cannot_bypass_unresolved_identifier_uniqueness(self):
-        self.candidate(tattoo="07", marking_type="tattoo", breeding_pair="Pair 1")
+        self.candidate(tattoo="07", marking_type="other", breeding_pair="Pair 1")
         payload = self.payload(mouse_numbers="1-2", no_id_available="on", breeding_pair="Pair 1",
                                marking_type="tattoo", pup_1_marking="07", pup_2_marking="08")
         warning = self.client.post(self.litter_url, payload)

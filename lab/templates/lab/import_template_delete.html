@@ -1,0 +1,12 @@
+{% extends 'lab/settings_base.html' %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block title %}Delete import template{% endblock %}
+{% block page_title %}Delete import template{% endblock %}
+{% block settings_content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        <p>Delete <strong>{{ template.name }}</strong> for {{ template.recording_type }}?</p>
+        <p>Mappings already applied to imports will be kept.</p>
+        <div class="actions"><button class="button button-danger" type="submit">Delete template</button><a class="button" href="{% url 'lab:import_templates' %}">Cancel</a></div>
+    </form>
+{% endblock %}

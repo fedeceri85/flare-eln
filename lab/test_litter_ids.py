@@ -167,31 +167,31 @@ class LitterIdentityTests(TestCase):
         self.assertIn("listed more than once", response.json()["errors"][0])
         self.assertFalse(Mouse.objects.exists())
 
-    def test_single_mouse_can_save_other_marking(self):
-        mouse = Mouse.objects.create(mouse_id="SINGLE", protocol=self.protocol)
+    def test_single_mouse_preserves_legacy_marking_type(self):
+        mouse = Mouse.objects.create(mouse_id="SINGLE", protocol=self.protocol, marking_type="tattoo")
         form = MouseEditForm({
             "protocol": self.protocol.pk, "status": "Alive", "crossing_definition": self.crossing.pk,
             "marking_type": "other", "tattoo": "blue tag",
         }, instance=mouse)
         self.assertTrue(form.is_valid(), form.errors)
         mouse = form.save()
-        self.assertEqual((mouse.marking_type, mouse.tattoo), ("other", "blue tag"))
+        self.assertEqual((mouse.marking_type, mouse.tattoo), ("tattoo", "blue tag"))
 
-    def test_local_id_type_is_rendered_once_in_shared_details(self):
+    def test_local_id_type_is_hidden_in_shared_details(self):
         response = self.client.post(self.url, self.payload(preview_mice="1", marking_type="other"))
         html = response.content.decode()
         self.assertEqual(html.count('name="marking_type"'), 1)
         self.assertLess(html.index('name="marking_type"'), html.index('id="mouse-panel-individual"'))
-        self.assertIn("Local ID type", html)
+        self.assertNotIn("Local ID type", html)
         self.assertIn("Local identifier", html)
         self.assertNotIn('name="pup_1_marking_type"', html)
         self.assertNotIn("Marking type", html)
 
-    def test_each_local_id_type_is_applied_to_the_entire_litter(self):
+    def test_new_litters_ignore_posted_legacy_types(self):
         for index, local_id_type in enumerate(("tattoo", "ear_clip", "other")):
             with self.subTest(local_id_type=local_id_type):
                 form = self.valid_form(mouse_id_prefix=f"TYPE-{index}-", marking_type=local_id_type,
                                        pup_1_marking="01", pup_2_marking="02", breeding_pair=f"Pair {index}")
                 mice, _ = create_litter_mice(self.protocol, form)
-                self.assertEqual([mouse.marking_type for mouse in mice], [local_id_type, local_id_type])
+                self.assertEqual([mouse.marking_type for mouse in mice], ["other", "other"])
                 self.assertEqual([mouse.tattoo for mouse in mice], ["01", "02"])

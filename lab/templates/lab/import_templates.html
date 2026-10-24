@@ -1,0 +1,20 @@
+{% extends 'lab/settings_base.html' %}
+{% block title %}Import templates{% endblock %}
+{% block page_title %}Import templates{% endblock %}
+{% block page_subtitle %}<p>Templates are shared across the lab. Create them from Recording fields when importing a spreadsheet.</p>{% endblock %}
+{% block settings_content %}
+    {% regroup templates by recording_type as type_groups %}
+    {% for group in type_groups %}
+        <section class="section">
+            <div class="table-summary"><h2 class="settings-section-title">{{ group.grouper }}</h2><span class="record-count">{{ group.list|length }} template{{ group.list|length|pluralize }}</span></div>
+            <div class="table-card"><div class="table-scroll"><table class="data-table procedure-matrix settings-table">
+                <thead><tr><th scope="col">Name</th><th scope="col">Created by</th><th scope="col">Created</th><th scope="col">Actions</th></tr></thead>
+                <tbody>{% for template in group.list %}
+                    <tr><td>{{ template.name }}</td><td>{{ template.created_by|default:'Deleted user' }}</td><td>{{ template.created_at|date:'j M Y' }}</td>
+                        <td class="action-cell"><div class="actions"><a class="button" href="{% url 'lab:rename_import_template' template.pk %}" aria-label="Rename {{ template.name }}">Rename</a><a class="button" href="{% url 'lab:delete_import_template' template.pk %}" aria-label="Delete {{ template.name }}">Delete</a></div></td>
+                    </tr>
+                {% endfor %}</tbody>
+            </table></div></div>
+        </section>
+    {% empty %}<div class="form-card"><p>No import templates yet. Save column associations as a template on tab 3, Recording fields, during a spreadsheet import.</p></div>{% endfor %}
+{% endblock %}

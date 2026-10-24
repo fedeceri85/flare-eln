@@ -1,0 +1,17 @@
+{% extends 'lab/settings_base.html' %}
+{% block title %}Recording types{% endblock %}
+{% block page_title %}Recording types{% endblock %}
+{% block page_subtitle %}<p>Configure experiment types and the fields available on their recordings.</p>{% endblock %}
+{% block settings_content %}
+    <div class="toolbar page-action-bar" role="region" aria-label="Recording type actions" data-page-actions>
+        <span class="record-count">{{ recording_types|length }} recording type{{ recording_types|length|pluralize }}</span>
+        <div class="actions"><a class="button button-primary" href="{% url 'lab:add_recording_type' %}">Add recording type</a></div>
+    </div>
+    <div class="table-card"><div class="table-scroll"><table class="data-table procedure-matrix settings-table">
+        <thead><tr><th scope="col">Name</th><th scope="col">Slug</th><th scope="col">Active</th><th scope="col">Actions</th></tr></thead>
+        <tbody>{% for type in recording_types %}<tr>
+            <td>{{ type.name }}</td><td>{{ type.slug }}</td><td>{{ type.active|yesno:'Yes,No' }}</td>
+            <td class="action-cell"><a class="button" href="{% url 'lab:edit_recording_type' type.pk %}" aria-label="Edit {{ type.name }}">Edit type and fields</a></td>
+        </tr>{% empty %}<tr><td colspan="4">No recording types yet.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+{% endblock %}

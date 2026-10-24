@@ -80,6 +80,7 @@ class NavigationTests(TestCase):
             ("home", (), "Home"), ("mice_page", (), "Animals"),
             ("procedure_page", (), "Procedures"), ("projects_page", (), "Projects"),
             ("services_page", (), "Services"), ("reports_page", (), "Reports"),
+            ("settings_page", (), "Settings"), ("import_templates", (), "Settings"),
             ("add_mouse_all", (), "Animals"), ("add_litter_all", (), "Animals"),
             ("add_mouse_licence_protocol", (self.protocol.licence_reference, 17), "Procedures"),
             ("mouse_record", (self.mouse.pk,), "Animals"), ("edit_mouse", (self.mouse.pk,), "Procedures"),
@@ -99,7 +100,9 @@ class NavigationTests(TestCase):
             with self.subTest(page=name):
                 _, html = self.page(name, args)
                 main_links = [node for node in html.find("a") if node.within("nav", **{"aria-label": "Main navigation"})]
-                self.assertEqual([node.text.strip() for node in main_links if node.attrs.get("aria-current")], [section])
+                self.assertEqual([node.text.strip() for node in main_links if node.attrs.get("aria-current")], [] if section == "Animals" else [section])
+                self.assertNotIn("Animals", [node.text.strip() for node in main_links])
+                self.assertEqual(main_links[-1].text.strip(), "Settings")
                 self.assertEqual(len([node for node in main_links if node.text.strip() == "Home"]), 1)
                 self.assertEqual(len(html.find("span", **{"aria-current": "page"})), 1)
 
@@ -158,7 +161,7 @@ class NavigationTests(TestCase):
         self.assertEqual(html.find("a", **{"class": "back-link"})[0].attrs["href"], record_url)
         crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Animals")
         self.assertEqual(crumb.attrs["href"], destination)
-        self.assertEqual(html.find("a", **{"aria-current": "true"})[0].text, "Animals")
+        self.assertEqual(html.find("a", **{"aria-current": "true"}), [])
 
     def test_procedure_context_has_licence_and_protocol_without_extra_queries(self):
         destination = reverse("lab:procedure_page_licence_protocol", args=[self.protocol.licence_reference, 17]) + "?status=Alive&page=2"

@@ -202,7 +202,7 @@ class MicePageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["selected_protocol"])
         self.assertContains(response, "Select a protocol before saving.")
-        self.assertContains(response, "Local ID type")
+        self.assertNotContains(response, "Local ID type")
         self.assertIsNone(response.context["form"].fields["protocol"].initial)
 
         response = self.client.post(

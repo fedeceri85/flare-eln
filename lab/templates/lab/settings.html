@@ -1,0 +1,7 @@
+{% extends 'lab/settings_base.html' %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}<p>Manage shared workspace settings.</p>{% endblock %}
+{% block settings_content %}
+    {% include 'lab/components/card_grid.html' with cards=cards %}
+{% endblock %}

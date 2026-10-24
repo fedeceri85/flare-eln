@@ -3,7 +3,6 @@ from django.contrib.admin.models import LogEntry
 from django.core.exceptions import PermissionDenied
 
 from .models import (
-    GenotypeCategory,
     Crossing,
     CrossingLine,
     Experiment,
@@ -16,8 +15,6 @@ from .models import (
     Project,
     Protocol,
     Recording,
-    RecordingField,
-    RecordingType,
     SERVICES_PROJECT_NAME,
     Species,
 )
@@ -246,36 +243,6 @@ class ProcedureInline(admin.TabularInline):
 #     search_fields = ("mouse__mouse_id", "procedure_type__name")
 
 
-class RecordingFieldInline(admin.TabularInline):
-    model = RecordingField
-    extra = 1
-    fields = (
-        "key",
-        "label",
-        "data_type",
-        "required",
-        "choices",
-        "units",
-        "default_value",
-        "active",
-        "display_in_table",
-        "filterable",
-        "order",
-    )
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
-@admin.register(RecordingType)
-class RecordingTypeAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "active")
-    list_filter = ("active",)
-    search_fields = ("name", "slug")
-    prepopulated_fields = {"slug": ("name",)}
-    inlines = [RecordingFieldInline]
-
-
 # @admin.register(Recording)
 # class RecordingAdmin(admin.ModelAdmin):
 #     list_display = (
@@ -327,18 +294,3 @@ class RecordingTypeAdmin(admin.ModelAdmin):
 #     @admin.display(description="Mice")
 #     def mice_display(self, obj):
 #         return obj.mice_label
-
-
-@admin.register(GenotypeCategory)
-class GenotypeCategoryAdmin(admin.ModelAdmin):
-    list_display = ("label", "code", "position", "active")
-    list_filter = ("active",)
-    search_fields = ("label", "code")
-    list_editable = ("position", "active")
-
-    def get_readonly_fields(self, request, obj=None):
-        return ("code",) if obj else ()
-
-    def has_delete_permission(self, request, obj=None):
-        # Retire categories so historical results keep their meaning.
-        return False

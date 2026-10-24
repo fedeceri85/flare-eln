@@ -4,6 +4,11 @@ Implementations live in feature modules; URLs continue to import this package.
 """
 
 from .spreadsheet_import import import_recordings
+from .settings import (
+    settings_page, import_templates, rename_import_template, delete_import_template,
+    genotype_categories, edit_genotype_category, recording_types, edit_recording_type,
+    edit_recording_field, delete_recording_type,
+)
 
 from .common import (
     add_recording_url,

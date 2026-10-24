@@ -130,10 +130,12 @@ class UnifiedMouseEditorTests(TestCase):
         self.assertEqual(ajax.json()["mouse_count"], 3)
         self.assertFalse(Mouse.objects.filter(pk__startswith="Range-").exists())
 
-    def test_local_id_type_can_be_changed_for_one_mouse(self):
+    def test_local_id_type_cannot_be_changed_for_one_mouse(self):
         mouse = self.mice[0]
+        mouse.marking_type = "tattoo"
+        mouse.save(update_fields=["marking_type"])
         response = self.client.post(self.url, {"selected_mouse": [mouse.pk], "apply_bulk_edit": "1",
-            "update_marking_type": "on", "marking_type": "ear_clip"})
+            "update_status": "on", "status": "Alive", "update_marking_type": "on", "marking_type": "ear_clip"})
         self.assertEqual(response.status_code, 302)
         mouse.refresh_from_db()
-        self.assertEqual(mouse.marking_type, "ear_clip")
+        self.assertEqual(mouse.marking_type, "tattoo")

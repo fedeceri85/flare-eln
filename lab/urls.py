@@ -15,6 +15,19 @@ def protected(view):
 
 
 urlpatterns = [
+    path("settings/", protected(views.settings_page), name="settings_page"),
+    path("settings/genotype-categories/", protected(views.genotype_categories), name="genotype_categories"),
+    path("settings/genotype-categories/new/", protected(views.edit_genotype_category), name="add_genotype_category"),
+    path("settings/genotype-categories/<int:pk>/edit/", protected(views.edit_genotype_category), name="edit_genotype_category"),
+    path("settings/recording-types/", protected(views.recording_types), name="recording_types"),
+    path("settings/recording-types/new/", protected(views.edit_recording_type), name="add_recording_type"),
+    path("settings/recording-types/<int:pk>/edit/", protected(views.edit_recording_type), name="edit_recording_type"),
+    path("settings/recording-types/<int:pk>/delete/", protected(views.delete_recording_type), name="delete_recording_type"),
+    path("settings/recording-types/<int:pk>/fields/new/", protected(views.edit_recording_field), name="add_recording_field"),
+    path("settings/recording-types/<int:pk>/fields/<int:field_pk>/edit/", protected(views.edit_recording_field), name="edit_recording_field"),
+    path("settings/import-templates/", protected(views.import_templates), name="import_templates"),
+    path("settings/import-templates/<int:pk>/rename/", protected(views.rename_import_template), name="rename_import_template"),
+    path("settings/import-templates/<int:pk>/delete/", protected(views.delete_import_template), name="delete_import_template"),
     path(
         "login/",
         auth_views.LoginView.as_view(

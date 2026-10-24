@@ -1,0 +1,30 @@
+{% extends 'lab/settings_base.html' %}
+{% block main_class %}container {% if show_recording_fields %}container-fluid{% else %}container-narrow{% endif %}{% endblock %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_subtitle %}{% if recording_type %}<p>{{ recording_type.name }}</p>{% endif %}{% endblock %}
+{% block settings_content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        {% if help_note %}<p>{{ help_note }}</p>{% endif %}
+        {% include 'lab/components/form_fields.html' %}
+        <div class="actions"><button class="button button-primary" type="submit">Save changes</button><a class="button" href="{{ parent_url }}">Cancel</a></div>
+    </form>
+    {% if show_recording_fields %}
+        <section class="section">
+            <div class="toolbar page-action-bar" role="region" aria-label="Recording field actions" data-page-actions>
+                <h2 class="settings-section-title">Recording fields</h2>
+                <div class="actions"><a class="button" href="{% url 'lab:add_recording_field' recording_type.pk %}">Add recording field</a></div>
+            </div>
+            <p class="settings-help">Deactivate fields to keep historical values while removing them from new recordings.</p>
+            <div class="table-card"><div class="table-scroll"><table class="data-table procedure-matrix settings-table">
+                <thead><tr><th scope="col">Label</th><th scope="col">Key</th><th scope="col">Type</th><th scope="col">Required</th><th scope="col">Active</th><th scope="col">Order</th><th scope="col">Actions</th></tr></thead>
+                <tbody>{% for field in recording_fields %}<tr>
+                    <td>{{ field.label }}</td><td>{{ field.key }}</td><td>{{ field.get_data_type_display }}</td><td>{{ field.required|yesno:'Yes,No' }}</td><td>{{ field.active|yesno:'Yes,No' }}</td><td>{{ field.order }}</td>
+                    <td class="action-cell"><a class="button" href="{% url 'lab:edit_recording_field' recording_type.pk field.pk %}" aria-label="Edit {{ field.label }}">Edit</a></td>
+                </tr>{% empty %}<tr><td colspan="7">No recording fields yet.</td></tr>{% endfor %}</tbody>
+            </table></div></div>
+        </section>
+        <p class="record-danger"><a href="{% url 'lab:delete_recording_type' recording_type.pk %}">Delete recording type</a></p>
+    {% endif %}
+{% endblock %}

@@ -82,12 +82,22 @@
                 <div class="form-grid import-shared-grid">
                     {% include 'lab/components/import_field.html' with field=form.protocol_id only %}
                     {% include 'lab/components/import_field.html' with field=form.species_id only %}
-                    {% include 'lab/components/import_field.html' with field=form.marking_type only %}
                 </div>
                 <p class="import-help">New animals need a protocol and crossing. Existing animals change only when you approve updates in Review.</p>
             </section>
         {% elif step == 'mapping' %}
             {% include 'lab/components/error_summary.html' %}
+            <section class="form-card import-template-toolbar" aria-label="Column templates">
+                <label for="id_import_template">Template</label>
+                <select id="id_import_template" name="import_template" data-import-template-select>
+                    <option value="">Choose a template</option>
+                    {% for template in import_templates %}<option value="{{ template.pk }}">{{ template.name }}</option>{% endfor %}
+                </select>
+                <input type="hidden" name="template_action" value="apply" disabled data-import-template-action>
+                <button class="button" type="button" data-import-template-open aria-haspopup="dialog" aria-controls="import-template-dialog" hidden>Save as template</button>
+                <a href="{% url 'lab:import_templates' %}" target="_blank" rel="noopener">Manage templates</a>
+                <noscript><p class="import-help">Enable JavaScript to select or save templates.</p></noscript>
+            </section>
             <section class="form-card import-table-panel">
                 <div class="import-panel-heading"><h2>Column mappings</h2><p class="import-help">Choose one per field: source column <strong>OR</strong> shared value.</p><p class="import-help">Animal ID takes precedence. When it is blank, Local identifier is used; new animals receive generated IDs.</p></div>
                 <div class="table-scroll"><table class="data-table procedure-matrix import-mapping-table import-recording-mapping-table">
@@ -150,7 +160,7 @@
                 <div class="actions"><button class="button" name="next_step" value="genetics" type="submit">Save mappings and refresh genotype fields</button></div>
             </section>
             <section class="form-card import-table-panel">
-                <div class="import-panel-heading"><h2>1. Select genotype columns</h2><p class="import-help">Choose the source column for each line, or supply a shared result. Recognized terms are matched automatically, ignoring case.</p></div>
+                <div class="import-panel-heading"><h2>1. Select genotype columns</h2><p class="import-help">Columns matching a line name are prefilled, ignoring case. Choose another column or supply a shared result if needed. Recognized terms are matched automatically, ignoring case.</p></div>
                 {% if form.line_rows %}<div class="table-scroll"><table class="data-table procedure-matrix import-mapping-table">
                     <thead><tr><th scope="col">Line</th><th scope="col">Source column</th><th scope="col">Shared genotype</th></tr></thead>
                     <tbody>{% for row in form.line_rows %}
@@ -231,6 +241,25 @@
             <a class="button" href="{{ recordings_url }}">Back to recordings</a>
         </div>
     </form>
+    {% if step == 'mapping' %}
+        <dialog id="import-template-dialog" class="import-template-dialog" aria-labelledby="import-template-dialog-title" data-import-template-dialog data-reopen="{{ template_dialog_open|yesno:'true,false' }}">
+            <form method="post" data-import-template-save-form>
+                {% csrf_token %}
+                <input type="hidden" name="step" value="mapping">
+                <input type="hidden" name="revision" value="{{ revision }}">
+                <input type="hidden" name="template_action" value="save">
+                <h2 id="import-template-dialog-title">Save column template</h2>
+                <p class="import-help">Save the current column associations for {{ experiment.recording_type }}. Shared values and other import settings are excluded.</p>
+                {% for error in template_save_errors %}<p class="message message-error" role="alert">{{ error }}</p>{% endfor %}
+                {% include 'lab/components/form_field.html' with field=template_name_form.name only %}
+                <div data-import-template-snapshot hidden></div>
+                <div class="actions">
+                    <button class="button button-primary" type="submit">Save template</button>
+                    <button class="button" type="button" data-import-template-cancel>Cancel</button>
+                </div>
+            </form>
+        </dialog>
+    {% endif %}
 {% endif %}
 </div>
 {% endblock %}

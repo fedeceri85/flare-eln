@@ -1,0 +1,12 @@
+{% extends 'lab/settings_base.html' %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block title %}Rename import template{% endblock %}
+{% block page_title %}Rename import template{% endblock %}
+{% block page_subtitle %}<p>{{ template.recording_type }}</p>{% endblock %}
+{% block settings_content %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        {% include 'lab/components/form_fields.html' %}
+        <div class="actions"><button class="button button-primary" type="submit">Save name</button><a class="button" href="{% url 'lab:import_templates' %}">Cancel</a></div>
+    </form>
+{% endblock %}
