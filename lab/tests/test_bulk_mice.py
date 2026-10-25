@@ -140,6 +140,164 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertNotContains(response, "Set procedure protocol")
         self.assertNotContains(response, "Procedure protocol")
 
+    def post_detail_overrides(self, overrides, **shared):
+        stem = individual_mouse_field_prefix(self.mouse_1)
+        data = {
+            "apply_bulk_edit": "1", "return_url": self.return_url,
+            "selected_mouse": [self.mouse_1.pk, self.mouse_2.pk], **shared,
+        }
+        for field, value in overrides.items():
+            data[f"{stem}_override_{field}_enabled"] = "on"
+            data[f"{stem}_override_{field}"] = value
+        return self.client.post(self.edit_selected_url, data)
+
+    def test_individual_detail_overrides_start_collapsed_and_only_show_for_multiple_animals(self):
+        response = self.client.get(self.edit_selected_url, {"selected_mouse": [self.mouse_1.pk, self.mouse_2.pk]})
+        markup = Markup(response.content.decode())
+        outer = markup.find("details", **{"class": "individual-animal-overrides"})[0]
+        self.assertNotIn("open", outer.attrs)
+        self.assertTrue(outer.within("section", **{"data-mouse-tab-panel": "shared"}))
+        self.assertEqual(len(markup.find("details", **{"class": "individual-animal-override"})), 2)
+        stem = individual_mouse_field_prefix(self.mouse_1)
+        self.assertEqual(markup.find("input", name=f"{stem}_override_date_of_birth")[0].attrs["type"], "date")
+        response = self.client.get(self.edit_selected_url, {"selected_mouse": [self.mouse_1.pk]})
+        self.assertNotContains(response, 'class="individual-animal-overrides"')
+
+    def test_individual_details_override_common_values_and_allow_clearing(self):
+        response = self.post_detail_overrides({
+            "date_of_birth": "2026-01-02", "breeding_pair": "", "status": "Alive",
+            "severity": "Moderate", "cull_date": "", "protocol": self.other_protocol.pk,
+            "protocol_start_date": "2026-02-03", "notes": "Individual note",
+        }, update_date_of_birth="on", date_of_birth="2026-01-01",
+            update_breeding_pair="on", breeding_pair="Shared pair",
+            update_status="on", status="Culled", update_severity="on", severity="Mild",
+            update_cull_date="on", cull_date="2026-03-01",
+            update_protocol="on", protocol=self.protocol.pk,
+            update_protocol_start_date="on", protocol_start_date="2026-02-01",
+            notes_action="append", notes="Shared note")
+        self.assertEqual(response.status_code, 302, getattr(response, "context", None))
+        self.mouse_1.refresh_from_db()
+        self.mouse_2.refresh_from_db()
+        self.assertEqual(self.mouse_1.date_of_birth, date(2026, 1, 2))
+        self.assertEqual(self.mouse_2.date_of_birth, date(2026, 1, 1))
+        self.assertEqual(self.mouse_1.breeding_pair, "")
+        self.assertEqual(self.mouse_2.breeding_pair, "Shared pair")
+        self.assertEqual(self.mouse_1.status, "Alive")
+        self.assertEqual(self.mouse_2.status, "Culled")
+        self.assertEqual(self.mouse_1.severity, "Moderate")
+        self.assertEqual(self.mouse_2.severity, "Mild")
+        self.assertIsNone(self.mouse_1.cull_date)
+        self.assertEqual(self.mouse_2.cull_date, date(2026, 3, 1))
+        self.assertEqual(self.mouse_1.protocol_id, self.other_protocol.pk)
+        self.assertEqual(self.mouse_2.protocol_id, self.protocol.pk)
+        self.assertEqual(self.mouse_1.protocol_start_date, date(2026, 2, 3))
+        self.assertEqual(self.mouse_2.protocol_start_date, date(2026, 2, 1))
+        self.assertEqual(self.mouse_1.notes, "Individual note")
+        self.assertEqual(self.mouse_2.notes, "Shared note")
+
+    def test_unchecked_individual_values_are_ignored(self):
+        stem = individual_mouse_field_prefix(self.mouse_1)
+        response = self.post_detail_overrides({}, update_breeding_pair="on", breeding_pair="Common",
+            **{f"{stem}_override_breeding_pair": "Ignored", f"{stem}_override_date_of_birth": "invalid"})
+        self.assertEqual(response.status_code, 302)
+        self.mouse_1.refresh_from_db()
+        self.assertEqual(self.mouse_1.breeding_pair, "Common")
+        self.assertIsNone(self.mouse_1.date_of_birth)
+
+    def test_individual_only_notes_override_can_clear_notes(self):
+        response = self.post_detail_overrides({"notes": ""})
+        self.assertEqual(response.status_code, 302)
+        self.mouse_1.refresh_from_db()
+        self.assertEqual(self.mouse_1.notes, "")
+
+    def test_invalid_individual_fields_reopen_overrides_and_do_not_save_common_changes(self):
+        stem = individual_mouse_field_prefix(self.mouse_1)
+        for overrides in ({"date_of_birth": "invalid"}, {"protocol": ""}, {"status": ""}, {"crossing_definition": ""}):
+            with self.subTest(overrides=overrides):
+                response = self.post_detail_overrides(overrides, update_breeding_pair="on", breeding_pair="Not saved")
+                self.assertEqual(response.status_code, 200)
+                field = next(iter(overrides))
+                self.assertIn(f"{stem}_override_{field}", response.context["form"].errors)
+                markup = Markup(response.content.decode())
+                self.assertIn("open", markup.find("details", **{"class": "individual-animal-overrides"})[0].attrs)
+                self.assertIn("open", markup.find("details", **{"class": "individual-animal-override"})[0].attrs)
+                self.mouse_1.refresh_from_db()
+                self.mouse_2.refresh_from_db()
+                self.assertEqual(self.mouse_1.breeding_pair, "")
+                self.assertEqual(self.mouse_2.breeding_pair, "")
+
+    def test_individual_protocol_override_respects_existing_procedures(self):
+        Procedure.objects.create(mouse=self.mouse_1, procedure_type=self.procedure_type)
+        response = self.post_detail_overrides({"protocol": self.non_regulated_protocol.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Remove existing procedures")
+        self.mouse_1.refresh_from_db()
+        self.assertEqual(self.mouse_1.protocol_id, self.protocol.pk)
+        # An individual override can also keep an animal on a regulated protocol.
+        response = self.post_detail_overrides({"protocol": self.protocol.pk},
+            update_protocol="on", protocol=self.non_regulated_protocol.pk)
+        self.assertEqual(response.status_code, 302)
+        self.mouse_2.refresh_from_db()
+        self.assertEqual(self.mouse_2.protocol_id, self.non_regulated_protocol.pk)
+
+    def test_individual_crossing_overrides_shared_crossing_and_saves_matching_genotypes(self):
+        shared_crossing, shared_lines = create_test_crossing(("Common line",))
+        individual_crossing, individual_lines = create_test_crossing(("Individual line",))
+        stem = individual_mouse_field_prefix(self.mouse_1)
+        response = self.post_detail_overrides({"crossing_definition": individual_crossing.pk},
+            update_crossing="on", **crossing_post_data(shared_crossing, shared_lines),
+            **{f"{stem}_genotype_line_{individual_lines[0].pk}": "hom"})
+        self.assertEqual(response.status_code, 302)
+        self.mouse_1.refresh_from_db()
+        self.mouse_2.refresh_from_db()
+        self.assertEqual(self.mouse_1.crossing_definition_id, individual_crossing.pk)
+        self.assertEqual(self.mouse_2.crossing_definition_id, shared_crossing.pk)
+        self.assertEqual(list(self.mouse_1.genotype_calls.values_list("mouse_line_id", "zygosity")), [(individual_lines[0].pk, "hom")])
+        self.assertEqual(list(self.mouse_2.genotype_calls.values_list("mouse_line_id", "zygosity")), [(shared_lines[0].pk, "het")])
+
+    def test_individual_crossing_preview_refreshes_only_affected_genotype_rows(self):
+        crossing, lines = create_test_crossing(("Preview individual line",))
+        stem = individual_mouse_field_prefix(self.mouse_1)
+        response = self.client.post(self.edit_selected_url, {
+            "apply_bulk_edit": "1", "preview_individual_mice": "1",
+            "selected_mouse": [self.mouse_1.pk, self.mouse_2.pk],
+            f"{stem}_override_crossing_definition_enabled": "on",
+            f"{stem}_override_crossing_definition": crossing.pk,
+        }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        markup = Markup(response.json()["html"])
+        self.assertTrue(markup.find("select", name=f"{stem}_genotype_line_{lines[0].pk}"))
+        other_stem = individual_mouse_field_prefix(self.mouse_2)
+        self.assertFalse(markup.find("select", name=f"{other_stem}_genotype_line_{lines[0].pk}"))
+        self.mouse_1.refresh_from_db()
+        self.assertIsNone(self.mouse_1.crossing_definition_id)
+
+    def test_individual_crossing_only_preserves_matching_calls_and_removes_obsolete_calls(self):
+        original, original_lines = create_test_crossing(("Kept line", "Removed line"))
+        replacement, replacement_lines = create_test_crossing(("Kept line", "New line"))
+        sync_mouse_structured_genetics(self.mouse_1, original, {line.pk: "het" for line in original_lines})
+        response = self.post_detail_overrides({"crossing_definition": replacement.pk})
+        self.assertEqual(response.status_code, 302)
+        self.mouse_1.refresh_from_db()
+        self.assertEqual(self.mouse_1.crossing_definition_id, replacement.pk)
+        self.assertEqual(dict(self.mouse_1.genotype_calls.values_list("mouse_line_id", "zygosity")), {
+            replacement_lines[0].pk: "het", replacement_lines[1].pk: "unknown",
+        })
+
+    def test_individual_origin_override_checks_final_local_identifier_uniqueness(self):
+        crossing, _ = create_test_crossing(("Identity line",))
+        for mouse, dob in ((self.mouse_1, date(2026, 1, 1)), (self.other_mouse, date(2026, 1, 2))):
+            mouse.crossing_definition = crossing
+            mouse.date_of_birth = dob
+            mouse.tattoo = "LE"
+            mouse.breeding_pair = "Pair"
+            mouse.save()
+        response = self.post_detail_overrides({"date_of_birth": "2026-01-02"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This local identifier is already used")
+        self.mouse_1.refresh_from_db()
+        self.assertEqual(self.mouse_1.date_of_birth, date(2026, 1, 1))
+
     def test_multi_selection_links_to_service_recording_with_selected_mice(self):
         response = self.client.get(
             self.edit_selected_url,

@@ -123,6 +123,9 @@
                     {% endif %}
                 </div>
             </div>
+            {% if not form.single_mouse_mode %}
+                {% include "lab/components/individual_animal_overrides.html" %}
+            {% endif %}
         </section>
 
         {% if not form.single_mouse_mode %}

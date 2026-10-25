@@ -391,7 +391,14 @@ def build_review(draft, approvals=None):
                     dynamic[field.key] = value.isoformat() if isinstance(value, date) else value
             current_label = mapped_label(definition, table, "data_paths", "Recording paths")
             paths = parse_recording_paths(str(mapped_value(definition, table, row, "data_paths")))
-            key = values["recording_date"] if definition["grouping"] == "date" else str(row["number"])
+            # Keep the saved "date" option compatible with existing drafts and templates.
+            # Animal crossings already reflect individual overrides and review approvals.
+            animal = by_row.get(row["number"])
+            key = (
+                (values["recording_date"], animal["crossing_id"] if animal else None)
+                if definition["grouping"] == "date"
+                else str(row["number"])
+            )
             record = grouped.setdefault(key, {"rows": [], "scalars": {}, "values": {}, "paths": [], "animal_keys": []})
             for field, value in values.items():
                 if field in record["scalars"] and record["scalars"][field] != value:

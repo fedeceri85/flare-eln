@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window.MouseRowEditor.create({
         form, rows, button, status, retryContainer,
         previewAction: "preview_individual_mice",
-        watchFields: ["update_crossing", "crossing_definition"],
+        watchFields: ["update_crossing", "crossing_definition", ...Array.from(form.querySelectorAll('[data-individual-crossing]'), field => field.name)],
         delay: 250,
         afterRefresh() { genotypes.replay(); },
         successMessage() { return "Animal rows updated. The displayed genotype values will be saved."; },

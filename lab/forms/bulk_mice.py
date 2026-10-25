@@ -1,6 +1,7 @@
 """Shared and individual changes for existing mouse selections."""
 
 from collections import OrderedDict
+from copy import deepcopy
 
 from django import forms
 
@@ -226,7 +227,61 @@ class BulkMouseUpdateForm(forms.Form):
 
             self.fields.update(genotype_form_fields)
 
+        self.configure_individual_detail_overrides()
         self.configure_individual_rows()
+
+    def configure_individual_detail_overrides(self):
+        self.individual_detail_rows = []
+        self.individual_detail_fields = {}
+        if self.single_mouse_mode:
+            return
+        names = [name for _, fields in self.MOUSE_UPDATE_GROUPS for name in fields]
+        names += ["crossing_definition", "notes"]
+        for mouse in self.selected_mice:
+            stem = individual_mouse_field_prefix(mouse)
+            items = []
+            for name in names:
+                field_name = f"{stem}_override_{name}"
+                toggle_name = f"{field_name}_enabled"
+                self.fields[toggle_name] = forms.BooleanField(required=False, label=f"Override {name}")
+                field = deepcopy(self.fields[name])
+                field.disabled = self.is_bound and not self.data.get(self.add_prefix(toggle_name))
+                field.initial = getattr(mouse, name)
+                field.required = name in {"status", "protocol", "crossing_definition"} and not field.disabled and self.is_bound
+                if name == "crossing_definition":
+                    field.widget = forms.Select(attrs={"data-individual-crossing": "true"})
+                    field.queryset = Crossing.objects.filter(active=True) | Crossing.objects.filter(pk=mouse.crossing_definition_id)
+                    self.fields[toggle_name].widget.attrs["data-individual-crossing"] = "true"
+                if isinstance(field, forms.DateField):
+                    field.widget.format = "%Y-%m-%d"
+                if name == "notes":
+                    field.widget.attrs["rows"] = 2
+                    field.help_text = "Replaces this animal’s notes, including any shared notes change. Leave blank to clear."
+                field.widget.attrs["aria-label"] = f"{mouse.pk}: {field.label} override"
+                if name == "status" and field.initial not in dict(Mouse.STATUS_CHOICES):
+                    field.initial = self.fields["status"].initial
+                self.fields[field_name] = field
+                items.append({"checkbox": self[toggle_name], "field": self[field_name]})
+            self.individual_detail_rows.append({"mouse_id": mouse.pk, "fields": items})
+            self.individual_detail_fields[mouse.pk] = items
+
+    @property
+    def individual_detail_errors(self):
+        for row in self.individual_detail_rows:
+            row["has_errors"] = any(item["field"].errors for item in row["fields"])
+        return any(row["has_errors"] for row in self.individual_detail_rows)
+
+    def individual_crossing_override(self, mouse):
+        if self.single_mouse_mode:
+            return None
+        stem = individual_mouse_field_prefix(mouse)
+        name = f"{stem}_override_crossing_definition"
+        if self.is_bound and self.data.get(self.add_prefix(f"{name}_enabled")):
+            try:
+                return self.fields[name].queryset.get(pk=self.data.get(self.add_prefix(name)))
+            except (Crossing.DoesNotExist, ValueError, TypeError):
+                pass
+        return None
 
     def configure_individual_rows(self):
         self.individual_rows = []
@@ -251,6 +306,7 @@ class BulkMouseUpdateForm(forms.Form):
             )
             self.identity_rows.append({"mouse_id": mouse.pk, "field": self[f"{stem}_mouse_id"]})
             crossing = self.selected_crossing if change_crossing and self.selected_crossing else crossings.get(mouse.crossing_definition_id)
+            crossing = self.individual_crossing_override(mouse) or crossing
             if crossing and crossing.pk not in lines_by_crossing:
                 lines_by_crossing[crossing.pk] = crossing.ordered_lines()
             lines = lines_by_crossing.get(crossing.pk, []) if crossing else []
@@ -296,6 +352,12 @@ class BulkMouseUpdateForm(forms.Form):
         updates = {}
         for mouse, stem, crossing, lines, calls in self.individual_row_details:
             fields = {}
+            for item in self.individual_detail_fields.get(mouse.pk, []):
+                name = item["field"].name
+                if cleaned_data.get(item["checkbox"].name) and name in cleaned_data:
+                    target = name.removeprefix(f"{stem}_override_")
+                    if target != "crossing_definition":
+                        fields[target] = cleaned_data[name]
             sex_name = f"{stem}_sex"
             if self.add_prefix(sex_name) in self.data and sex_name in cleaned_data:
                 if cleaned_data[sex_name] != mouse.sex:
@@ -321,9 +383,11 @@ class BulkMouseUpdateForm(forms.Form):
                     value = cleaned_data.get(uncertainty_name, False)
                     if value != (call.is_uncertain if call else False):
                         uncertainty_values[line.pk] = value
-            if fields or genotype_values or uncertainty_values:
+            crossing_override = self.individual_crossing_override(mouse)
+            if fields or genotype_values or uncertainty_values or crossing_override:
                 updates[mouse.pk] = {
                     "fields": fields, "crossing": crossing,
+                    "crossing_override": crossing_override is not None,
                     "genotype_values": genotype_values, "uncertainty_values": uncertainty_values,
                 }
         return updates
@@ -362,9 +426,10 @@ class BulkMouseUpdateForm(forms.Form):
                 continue
             updates = cleaned_data["individual_updates"].get(mouse.pk, {}).get("fields", {})
             identifier = updates.get("tattoo", mouse.tattoo)
-            dob = cleaned_data.get("date_of_birth") if cleaned_data.get("update_date_of_birth") else mouse.date_of_birth
-            pair = cleaned_data.get("breeding_pair", "") if cleaned_data.get("update_breeding_pair") else mouse.breeding_pair
+            dob = updates.get("date_of_birth", cleaned_data.get("date_of_birth") if cleaned_data.get("update_date_of_birth") else mouse.date_of_birth)
+            pair = updates.get("breeding_pair", cleaned_data.get("breeding_pair", "") if cleaned_data.get("update_breeding_pair") else mouse.breeding_pair)
             crossing = cleaned_data.get("crossing_definition") if cleaned_data.get("update_crossing") else None
+            crossing = self.individual_crossing_override(mouse) or crossing
             crossing_id = crossing.pk if crossing else mouse.crossing_definition_id
             if identifier and dob is not None and crossing_id is not None:
                 candidates.append((stem, (dob, pair, crossing_id, identifier, cleaned_data.get("marking_type") if cleaned_data.get("update_marking_type") else mouse.marking_type)))
@@ -529,26 +594,18 @@ class BulkMouseUpdateForm(forms.Form):
                 cleaned_data["genotype_values"] = genotype_values
 
 
-        target_protocol = None
-        if cleaned_data.get("update_protocol") and cleaned_data.get("protocol"):
-            target_protocol = cleaned_data["protocol"]
-
-        if (
-            target_protocol is not None
-            and not target_protocol.allows_regulated_procedures
-        ):
-            mice_with_procedures = [
-                mouse.mouse_id
-                for mouse in self.selected_mice
-                if mouse.procedures.exists()
-            ]
-
-            if mice_with_procedures:
-                raise forms.ValidationError(
-                    "Remove existing procedures before moving these animals to a "
-                    "protocol that does not allow regulated procedures: "
-                    + ", ".join(mice_with_procedures[:5])
-                )
+        mice_with_procedures = []
+        for mouse in self.selected_mice:
+            individual = cleaned_data["individual_updates"].get(mouse.pk, {}).get("fields", {})
+            target_protocol = individual.get("protocol", cleaned_data.get("protocol") if cleaned_data.get("update_protocol") else None)
+            if target_protocol is not None and not target_protocol.allows_regulated_procedures and mouse.procedures.exists():
+                mice_with_procedures.append(mouse.mouse_id)
+        if mice_with_procedures:
+            raise forms.ValidationError(
+                "Remove existing procedures before moving these animals to a "
+                "protocol that does not allow regulated procedures: "
+                + ", ".join(mice_with_procedures[:5])
+            )
 
         if cleaned_data.get("notes_action") == "append" and not cleaned_data.get("notes", "").strip():
             self.add_error(

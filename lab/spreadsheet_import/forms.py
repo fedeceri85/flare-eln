@@ -67,7 +67,7 @@ class SourceForm(forms.Form):
 
 class SetupForm(forms.Form):
     date_order = forms.ChoiceField(label="Text date format", choices=[("DMY", "Day / month / year"), ("MDY", "Month / day / year"), ("YMD", "Year / month / day")])
-    grouping = forms.ChoiceField(label="Create recordings", choices=[("rows", "One recording per selected row"), ("date", "Combine selected rows by date")])
+    grouping = forms.ChoiceField(label="Create recordings", choices=[("rows", "One recording per selected row"), ("date", "Combine selected rows by date + crossing")])
     identity_columns = forms.MultipleChoiceField(required=False, label="Additional columns distinguishing local identifiers", help_text="Use columns such as birth date or breeding pair to distinguish reused local markings. Repeated Animal IDs always refer to the same animal.")
     protocol_id = forms.ModelChoiceField(queryset=Protocol.objects.all(), required=False, label="Shared protocol for new animals / proposed updates")
     protocol_start_date = forms.DateField(required=False, label="Shared protocol start date", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))

@@ -114,7 +114,7 @@ def apply_bulk_mouse_updates(mice, form):
             setattr(mouse, field_name, value)
             changed_mouse_fields.append(field_name)
 
-        if notes_action in {"append", "replace"}:
+        if notes_action in {"append", "replace"} and "notes" not in individual.get("fields", {}):
             mouse.notes = (
                 append_text(mouse.notes, notes)
                 if notes_action == "append"
@@ -127,13 +127,16 @@ def apply_bulk_mouse_updates(mice, form):
 
         individual_genotypes = individual.get("genotype_values", {})
         individual_uncertainty = individual.get("uncertainty_values", {})
-        if structured_genetics_update is not None or individual_genotypes or individual_uncertainty:
+        if structured_genetics_update is not None or individual_genotypes or individual_uncertainty or individual.get("crossing_override"):
             if structured_genetics_update is not None:
                 crossing, genotype_values, preserve_missing = structured_genetics_update
                 uncertainty_values = form.cleaned_data.get("uncertainty_values", {})
             else:
                 crossing = individual["crossing"]
                 genotype_values, uncertainty_values, preserve_missing = {}, {}, True
+            if individual.get("crossing_override"):
+                crossing = individual["crossing"]
+                preserve_missing = True
             sync_mouse_structured_genetics(
                 mouse, crossing, {**genotype_values, **individual_genotypes},
                 preserve_missing=preserve_missing,

@@ -1,0 +1,17 @@
+<details class="individual-animal-overrides" {% if form.individual_detail_errors %}open{% endif %}>
+    <summary>Individual animal overrides</summary>
+    <p class="bulk-help">Set common values above, then check any fields below to override them for an individual animal. Unchecked fields follow the common changes. Checked blank values will be cleared.</p>
+    {% for row in form.individual_detail_rows %}
+        <details class="individual-animal-override" {% if row.has_errors %}open{% endif %}>
+            <summary>{{ row.mouse_id }} — Overrides</summary>
+            <div class="individual-override-grid">
+                {% for item in row.fields %}
+                    <div>
+                        {% include "lab/components/shared_bulk_update_field.html" %}
+                        {% if item.field.help_text %}<small>{{ item.field.help_text }}</small>{% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </details>
+    {% endfor %}
+</details>

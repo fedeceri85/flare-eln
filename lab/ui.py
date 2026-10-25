@@ -1332,7 +1332,16 @@ def format_recording_mice_links(recording):
             for mouse in mice
         ),
     )
-    return format_html('<div class="recording-animal-links">{}</div>', links)
+    animal_links = format_html('<div class="recording-animal-links">{}</div>', links)
+
+    if len(mice) > 1:
+        return format_html(
+            '<details class="recording-animals"><summary>{} animals</summary>{}</details>',
+            len(mice),
+            animal_links,
+        )
+
+    return animal_links
 
 
 def format_crossing_type_summary(mouse):

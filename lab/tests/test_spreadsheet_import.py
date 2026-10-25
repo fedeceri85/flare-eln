@@ -654,14 +654,44 @@ class SpreadsheetImportTests(TestCase):
         response = self.client.post(self.url(draft), {"step": "source", "revision": "old"})
         self.assertContains(response, "changed in another tab")
 
-    def test_genotyping_mixed_crossings_rejected(self):
+    def test_genotyping_groups_by_date_and_crossing_and_preserves_shared_values(self):
         self.experiment.recording_type = RecordingType.objects.get(slug="genotyping")
         self.experiment.save()
         other_line = MouseLine.objects.create(species=self.species, name="Other genotype line")
         Mouse.objects.create(mouse_id="SECOND", protocol=self.protocol, crossing_definition=other_line.crossings.get())
+        draft = self.draft("Date,Mouse ID,Folder\n28.04.26,OFFICIAL-1,/first\n28.04.26,SECOND,/second\n28.04.26,OFFICIAL-1,/extra\n29.04.26,SECOND,/later\n")
+        draft.configuration["grouping"] = "date"
+        draft.configuration["defaults"]["notes"] = "Shared batch notes"
+        preview = self.reviewed(draft)
+        self.assertEqual(len(preview["records"]), 3)
+        response = self.client.get(self.url(draft), {"step": "setup"})
+        self.assertContains(response, "Combine selected rows by date + crossing")
+        result = commit_import(draft.pk, self.user, self.experiment, [])
+        self.assertEqual(result["recordings"], 3)
+        records = list(self.experiment.recordings.order_by("pk"))
+        self.assertEqual([record.data_paths for record in records], [["/first", "/extra"], ["/second"], ["/later"]])
+        self.assertEqual([record.recording_date for record in records], [date(2026, 4, 28), date(2026, 4, 28), date(2026, 4, 29)])
+        self.assertEqual([list(record.mice.values_list("pk", flat=True)) for record in records], [["OFFICIAL-1"], ["SECOND"], ["SECOND"]])
+        self.assertEqual([record.values["crossing"] for record in records], [self.crossing.display_name, other_line.name, other_line.name])
+        self.assertTrue(all(record.notes == "Shared batch notes" for record in records))
+
+    def test_date_crossing_grouping_uses_approved_individual_crossing_override(self):
+        other_line = MouseLine.objects.create(species=self.species, name="Individual override line")
+        other_crossing = other_line.crossings.get()
+        Mouse.objects.create(mouse_id="SECOND", protocol=self.protocol, crossing_definition=self.crossing)
         draft = self.draft("Date,Mouse ID\n28.04.26,OFFICIAL-1\n28.04.26,SECOND\n")
         draft.configuration["grouping"] = "date"
-        self.assertTrue(any("one crossing" in e for e in build_review(draft)["errors"]))
+        second = next(group for group in animal_groups(draft) if group["identifier"] == "SECOND")
+        draft.state["animals"][second["key"]]["details"] = {"crossing_definition": other_crossing.pk}
+        preview = self.reviewed(draft)
+        self.assertEqual(len(preview["records"]), 2)
+        unapproved = build_review(draft, approvals=[])
+        self.assertEqual(unapproved["errors"], [])
+        self.assertEqual(len(unapproved["records"]), 1)
+        approvals = [change["token"] for change in preview["changes"]]
+        commit_import(draft.pk, self.user, self.experiment, approvals)
+        self.assertEqual(self.experiment.recordings.count(), 2)
+        self.assertEqual(Mouse.objects.get(pk="SECOND").crossing_definition_id, other_crossing.pk)
 
     def test_full_wizard_round_trip_preserves_inputs_and_saves(self):
         response = self.client.post(self.url(), {"spreadsheet": SimpleUploadedFile("data.csv", b"Date,Mouse ID,Frames\n28.04.26,OFFICIAL-1,15\n")})

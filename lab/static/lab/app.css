@@ -1084,6 +1084,12 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .shared-mouse-details .shared-notes > .bulk-toggle { margin-bottom: 8px; }
 .shared-notes > summary { cursor: pointer; font-size: 13px; font-weight: 650; margin-bottom: 8px; }
 [data-shared-notes-content][hidden] { display: none; }
+.individual-animal-overrides { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.individual-animal-overrides summary { cursor: pointer; color: var(--blue); font-weight: 600; }
+.individual-animal-overrides summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.individual-animal-override { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.individual-override-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; margin-top: 16px; }
+.individual-override-grid .bulk-field { min-width: 0; }
 @media (max-width: 800px) {
     .shared-detail-groups { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 20px; }
 }
@@ -1292,6 +1298,9 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .data-table.recordings-table th { overflow-wrap: normal; word-break: normal; vertical-align: bottom; }
 .data-table.recordings-table .recording-date-cell { width: 90px; min-width: 90px; white-space: nowrap; }
 .data-table.recordings-table .recording-animals-cell { width: 200px; min-width: 160px; max-width: 260px; }
+.recording-animals > summary { cursor: pointer; color: var(--blue); }
+.recording-animals > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
+.recording-animals[open] > summary { margin-bottom: 6px; }
 .recording-animal-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 260px; max-width: 100%; min-width: 0; }
 .recording-animal-links .mouse-link { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .data-table.recordings-table .recording-field-cell { min-width: 95px; max-width: 260px; }
