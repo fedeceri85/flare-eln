@@ -1,12 +1,21 @@
-{% if service_recording_actions %}
-    <section class="{% if service_recording_actions_bulk_layout %}bulk-section{% else %}section{% endif %}">
-        <h2 class="{% if hide_service_title %}visually-hidden{% elif service_recording_actions_bulk_layout %}bulk-title{% else %}section-title{% endif %}">Services</h2>
+{% if service_recording_actions or recording_destination_form %}
+    <section class="{% if service_recording_actions_bulk_layout %}bulk-section{% else %}section{% endif %}{% if recording_destination_form %} animal-recording-creator{% endif %}" {% if recording_destination_form %}data-new-animal-recording{% endif %}>
+        <h2 class="{% if hide_service_title %}visually-hidden{% elif service_recording_actions_bulk_layout %}bulk-title{% else %}section-title{% endif %}">{% if recording_destination_form %}Add services &amp; recordings{% else %}Services{% endif %}</h2>
         {% if service_recording_actions_bulk_layout %}
             <p class="bulk-help">
-                Add a service record for the selected animals.
+                {% if recording_destination_form %}Add a service record or choose a recording type and project experiment for the selected animals.{% else %}Add a service record for the selected animals.{% endif %}
             </p>
         {% endif %}
 
+        {% if recording_destination_form %}
+        <form method="post" id="new-animal-recording-form">
+            {% csrf_token %}
+            <input type="hidden" name="select_recording_destination" value="1">
+            <input type="hidden" name="return_url" value="{{ return_url }}">
+            <input type="hidden" name="mouse_editor_tab" value="services">
+            {% for mouse in selected_mice %}<input type="hidden" name="selected_mouse" value="{{ mouse.pk }}">{% endfor %}
+            {% include "lab/components/error_summary.html" with form=recording_destination_form %}
+        {% endif %}
         {% if not service_recording_actions_bulk_layout %}
         <div class="table-card">
         {% endif %}
@@ -14,7 +23,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th scope="col">Service</th>
+                            <th scope="col">{% if recording_destination_form %}Service / recording{% else %}Service{% endif %}</th>
                             <th scope="col">Details</th>
                             <th scope="col">Actions</th>
                         </tr>
@@ -35,11 +44,19 @@
                                 </td>
                             </tr>
                         {% endfor %}
+                        {% if recording_destination_form %}
+                            {% include "lab/components/new_animal_recording.html" %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
         {% if not service_recording_actions_bulk_layout %}
         </div>
+        {% endif %}
+        {% if recording_destination_form %}
+        </form>
+        <noscript><p>Enable JavaScript to select a project and compatible experiment.</p></noscript>
+        {{ recording_destination_options|json_script:"animal-recording-destinations" }}
         {% endif %}
     </section>
 {% endif %}

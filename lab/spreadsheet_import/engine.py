@@ -117,15 +117,20 @@ def group_details(draft, table, group):
             details[key] = overrides[key]
         else:
             convert = None
-            if key == "date_of_birth":
+            if key in {"date_of_birth", "cull_date"}:
                 convert = lambda value: parse_date(value, definition["date_order"]).isoformat()
             elif key == "sex":
                 convert = lambda value: {"m": "M", "male": "M", "f": "F", "female": "F"}.get(str(value).casefold(), value)
             elif key == "status":
                 convert = lambda value: {s.casefold(): s for s, _ in Mouse.STATUS_CHOICES}.get(str(value).casefold(), value)
+            elif key == "severity":
+                convert = lambda value: typed_value(str(value).strip(), MouseEditForm.base_fields["severity"], definition["date_order"])
             details[key] = consistent_value(draft, table, group["rows"], f"animal:{key}", convert=convert)
-    if details["date_of_birth"]:
-        details["date_of_birth"] = parse_date(details["date_of_birth"], definition["date_order"]).isoformat()
+    for key in ("date_of_birth", "cull_date"):
+        if details[key]:
+            details[key] = parse_date(details[key], definition["date_order"]).isoformat()
+    if details["severity"]:
+        details["severity"] = typed_value(str(details["severity"]).strip(), MouseEditForm.base_fields["severity"], definition["date_order"])
     if details["sex"]:
         sex = str(details["sex"]).casefold()
         if sex not in {"m", "male", "f", "female"}:
@@ -149,6 +154,8 @@ def group_details(draft, table, group):
             raise ValidationError(f"Map strain description {raw_crossing!r} to an existing crossing in Crossings & genotypes.")
     details["crossing_definition"] = crossing_id or ""
     details["protocol"] = definition["defaults"].get("protocol_id", "")
+    start_date = definition["defaults"].get("protocol_start_date", "")
+    details["protocol_start_date"] = parse_date(start_date, definition["date_order"]).isoformat() if start_date else ""
     return details
 
 
@@ -192,7 +199,7 @@ def animal_display_details(details, calls=None):
         if value == "" or key == "marking_type":
             continue
         field = Mouse._meta.get_field(key)
-        label = {"crossing_definition": "Crossing", "marking_type": "Local ID type"}.get(key, field.verbose_name.title())
+        label = {"crossing_definition": "Crossing", "marking_type": "Local ID type", "severity": "Severity experienced"}.get(key, field.verbose_name.title())
         if key in {"protocol", "crossing_definition"}:
             model = Protocol if key == "protocol" else Crossing
             obj = model.objects.filter(pk=value).first()
@@ -270,7 +277,7 @@ def build_review(draft, approvals=None):
                     old = getattr(mouse, field + "_id" if field in {"protocol", "crossing_definition"} else field)
                     old = old.isoformat() if isinstance(old, date) else old
                     if str(old) != str(value):
-                        label = "Crossing" if field == "crossing_definition" else Mouse._meta.get_field(field).verbose_name.title()
+                        label = {"crossing_definition": "Crossing", "severity": "Severity experienced"}.get(field, Mouse._meta.get_field(field).verbose_name.title())
                         display_old, display_new = old, value
                         if field in {"protocol", "crossing_definition"}:
                             model = Protocol if field == "protocol" else Crossing

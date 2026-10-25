@@ -77,7 +77,7 @@ class RecordingModelTests(AuthenticatedTestCase):
         self.assertEqual(abr_recording.values["click_threshold_db"], 35)
 
         response = self.client.get(
-            reverse("lab:mouse_record", args=[self.mouse.pk]),
+            reverse("lab:animal_summary", args=[self.mouse.pk]),
         )
         project_url = reverse("lab:experiments_page", args=[self.project.pk])
         experiment_url = reverse(

@@ -81,6 +81,7 @@
                 <h2>Shared animal details</h2>
                 <div class="form-grid import-shared-grid">
                     {% include 'lab/components/import_field.html' with field=form.protocol_id only %}
+                    {% include 'lab/components/import_field.html' with field=form.protocol_start_date only %}
                     {% include 'lab/components/import_field.html' with field=form.species_id only %}
                 </div>
                 <p class="import-help">New animals need a protocol and crossing. Existing animals change only when you approve updates in Review.</p>

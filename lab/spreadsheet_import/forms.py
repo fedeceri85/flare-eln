@@ -5,7 +5,7 @@ from django import forms
 from django.urls import reverse, reverse_lazy
 
 from ..forms.recordings import RecordingForm
-from ..models import Crossing, GenotypeCategory, Mouse, MouseLine, Protocol, Species
+from ..models import Crossing, GenotypeCategory, MAX_SEVERITY_CHOICES, Mouse, MouseLine, Protocol, Species
 from .engine import animal_display_details, animal_groups, build_review, digest, group_details, initial_resolution
 from .mapping import crossing_candidates, crossing_suggestion, genotype_suggestion, genotype_term_key, mapped_value, normalize, parse_date, resolve_genotype_term, targets, typed_value
 from .source import binding
@@ -70,6 +70,7 @@ class SetupForm(forms.Form):
     grouping = forms.ChoiceField(label="Create recordings", choices=[("rows", "One recording per selected row"), ("date", "Combine selected rows by date")])
     identity_columns = forms.MultipleChoiceField(required=False, label="Additional columns distinguishing local identifiers", help_text="Use columns such as birth date or breeding pair to distinguish reused local markings. Repeated Animal IDs always refer to the same animal.")
     protocol_id = forms.ModelChoiceField(queryset=Protocol.objects.all(), required=False, label="Shared protocol for new animals / proposed updates")
+    protocol_start_date = forms.DateField(required=False, label="Shared protocol start date", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
     species_id = forms.ModelChoiceField(queryset=Species.objects.filter(active=True), required=False, label="Species", empty_label="Any species")
 
     def __init__(self, draft, table, *args, **kwargs):
@@ -79,7 +80,7 @@ class SetupForm(forms.Form):
         self.initial.update({k: definition[k] for k in ("date_order", "grouping")})
         self.fields["identity_columns"].choices = column_choices(table)[1:]
         self.initial["identity_columns"] = [column_initial(table, b) for b in definition.get("identity_columns", [])]
-        for name in ("protocol_id", "species_id"):
+        for name in ("protocol_id", "protocol_start_date", "species_id"):
             self.initial[name] = definition["defaults"].get(name, "")
 
     def definition(self):
@@ -90,6 +91,8 @@ class SetupForm(forms.Form):
         for name in ("protocol_id", "species_id"):
             obj = self.cleaned_data[name]
             result["defaults"][name] = obj.pk if obj else ""
+        start_date = self.cleaned_data["protocol_start_date"]
+        result["defaults"]["protocol_start_date"] = start_date.isoformat() if start_date else ""
         result["defaults"].pop("marking_type", None)
         return result
 
@@ -110,6 +113,8 @@ class MappingForm(forms.Form):
                 required_targets.add(key)
         value_fields.update({
             "animal:date_of_birth": forms.DateField(),
+            "animal:cull_date": forms.DateField(),
+            "animal:severity": forms.ChoiceField(choices=MAX_SEVERITY_CHOICES),
             "animal:sex": forms.ChoiceField(choices=Mouse.SEX_CHOICES),
             "animal:status": forms.ChoiceField(choices=Mouse.STATUS_CHOICES),
             "animal:notes": forms.CharField(widget=forms.Textarea()),
@@ -217,6 +222,8 @@ class AnimalsForm(forms.Form):
                 "breeding_pair": forms.CharField(required=False, max_length=100, label="Breeding pair override"),
                 "sex": forms.ChoiceField(required=False, choices=[("", "Use mapped value"), *Mouse.SEX_CHOICES], label="Sex override"),
                 "status": forms.ChoiceField(required=False, choices=[("", "Use mapped value / Alive for new animals"), *Mouse.STATUS_CHOICES], label="Status override"),
+                "cull_date": forms.DateField(required=False, label="Cull date override", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})),
+                "severity": forms.ChoiceField(required=False, choices=[("", "Use mapped value / leave unchanged"), *MAX_SEVERITY_CHOICES], label="Severity experienced override"),
                 "protocol": forms.ModelChoiceField(queryset=Protocol.objects.all(), required=False, label="Protocol override"),
                 "crossing_definition": forms.ModelChoiceField(queryset=Crossing.objects.filter(active=True).select_related("species"), required=False, label="Crossing override", widget=crossing_select()),
             }
@@ -275,7 +282,7 @@ class AnimalsForm(forms.Form):
             action = self.cleaned_data[f"{key}_mode"]
             result = {"mode": "link" if action == "link" else "create", "mouse_id": self.cleaned_data.get(f"{key}_mouse_id", "") if action != "generate" else "", "generate_id": action == "generate"}
             details = {}
-            for name in ("date_of_birth", "tattoo", "breeding_pair", "sex", "status", "protocol", "crossing_definition"):
+            for name in ("date_of_birth", "tattoo", "breeding_pair", "sex", "status", "cull_date", "severity", "protocol", "crossing_definition"):
                 value = self.cleaned_data.get(f"{key}_{name}", "")
                 if value is None:
                     value = ""

@@ -373,6 +373,105 @@ class SpreadsheetImportTests(TestCase):
         self.mouse.refresh_from_db()
         self.assertEqual(self.mouse.sex, "F")
 
+    def test_protocol_start_date_is_saved_in_import_settings_next_to_protocol(self):
+        draft = self.draft()
+        response = self.client.get(self.url(draft), {"step": "setup"})
+        markup = Markup(response.content.decode())
+        protocol = markup.find("select", name="protocol_id")[0]
+        start_date = markup.find("input", name="protocol_start_date")[0]
+        self.assertIs(protocol.parent.parent, start_date.parent.parent)
+        self.assertEqual(start_date.attrs["type"], "date")
+        data = self.form_data(response.context["form"])
+        data.update(step="setup", revision=response.context["revision"], protocol_id=self.protocol.pk, protocol_start_date="2026-02-01")
+        response = self.client.post(self.url(draft), data)
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.configuration["defaults"]["protocol_start_date"], "2026-02-01")
+        response = self.client.get(self.url(draft), {"step": "setup"})
+        self.assertContains(response, 'value="2026-02-01"')
+        data.update(revision=response.context["revision"], protocol_start_date="2026-02-30")
+        response = self.client.post(self.url(draft), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("protocol_start_date", response.context["form"].errors)
+        draft.refresh_from_db()
+        self.assertEqual(draft.configuration["defaults"]["protocol_start_date"], "2026-02-01")
+
+    def test_new_animals_receive_shared_protocol_start_and_mapped_cull_date_and_severity(self):
+        draft = self.draft("Date,Animal ID,Cull date,Severity experienced\n28.04.26,NEW-STATUS,28.04.26,moderate\n")
+        draft.configuration["defaults"].update(protocol_id=self.protocol.pk, crossing_id=self.crossing.pk, protocol_start_date="2026-02-01")
+        preview = self.reviewed(draft)
+        details = preview["animals"][0]["details"]
+        self.assertEqual(details["protocol_start_date"], "2026-02-01")
+        self.assertEqual(details["cull_date"], "2026-04-28")
+        self.assertEqual(details["severity"], "Moderate")
+        self.assertIn(("Severity experienced", "Moderate"), preview["animals"][0]["display_details"])
+        commit_import(draft.pk, self.user, self.experiment, [])
+        animal = Mouse.objects.get(pk="NEW-STATUS")
+        self.assertEqual(animal.protocol_start_date, date(2026, 2, 1))
+        self.assertEqual(animal.cull_date, date(2026, 4, 28))
+        self.assertEqual(animal.severity, "Moderate")
+
+    def test_imported_dates_and_severity_only_update_existing_animals_when_approved(self):
+        for approved in (set(), {"severity"}, {"severity", "cull_date", "protocol_start_date"}):
+            with self.subTest(approved=approved):
+                Mouse.objects.filter(pk=self.mouse.pk).update(protocol_start_date=date(2026, 2, 1), cull_date=date(2026, 3, 1), severity="Mild")
+                draft = self.draft("Date,Mouse ID,Cull date,Severity\n28.04.26,OFFICIAL-1,28.04.26,Moderate\n")
+                draft.configuration["defaults"]["protocol_start_date"] = "2026-02-02"
+                preview = self.reviewed(draft)
+                self.assertEqual({entry["field"] for entry in preview["changes"]}, {"protocol_start_date", "cull_date", "severity"})
+                commit_import(draft.pk, self.user, self.experiment, [entry["token"] for entry in preview["changes"] if entry["field"] in approved])
+                self.mouse.refresh_from_db()
+                self.assertEqual(self.mouse.protocol_start_date, date(2026, 2, 2) if "protocol_start_date" in approved else date(2026, 2, 1))
+                self.assertEqual(self.mouse.cull_date, date(2026, 4, 28) if "cull_date" in approved else date(2026, 3, 1))
+                self.assertEqual(self.mouse.severity, "Moderate" if "severity" in approved else "Mild")
+        draft = self.draft("Date,Mouse ID,Cull date,Severity\n28.04.26,OFFICIAL-1,,\n")
+        self.assertEqual(self.reviewed(draft)["changes"], [])
+        commit_import(draft.pk, self.user, self.experiment, [])
+        self.mouse.refresh_from_db()
+        self.assertEqual(self.mouse.protocol_start_date, date(2026, 2, 2))
+        self.assertEqual(self.mouse.cull_date, date(2026, 4, 28))
+        self.assertEqual(self.mouse.severity, "Moderate")
+
+    def test_cull_date_and_severity_overrides_replace_mapped_values_and_round_trip(self):
+        draft = self.draft("Date,Mouse ID,Cull date,Severity\n28.04.26,OFFICIAL-1,invalid date,invalid severity\n")
+        form = AnimalsForm(draft, draft_table(draft))
+        key = form.groups[0]["key"]
+        data = self.form_data(form)
+        data.update({f"{key}_cull_date": "2026-04-29", f"{key}_severity": "Severe"})
+        bound = AnimalsForm(draft, draft_table(draft), data=data)
+        self.assertTrue(bound.is_valid(), bound.errors)
+        bound.apply(draft)
+        self.assertEqual(draft.state["animals"][key]["details"]["cull_date"], "2026-04-29")
+        self.assertEqual(AnimalsForm(draft, draft_table(draft))[f"{key}_severity"].value(), "Severe")
+        preview = self.reviewed(draft)
+        commit_import(draft.pk, self.user, self.experiment, [change["token"] for change in preview["changes"]])
+        self.mouse.refresh_from_db()
+        self.assertEqual(self.mouse.cull_date, date(2026, 4, 29))
+        self.assertEqual(self.mouse.severity, "Severe")
+
+    def test_invalid_mapped_dates_and_severity_or_overrides_cannot_be_imported(self):
+        for cull_date, severity in (("2026-02-30", "Mild"), ("28.04.26", "Extreme")):
+            with self.subTest(cull_date=cull_date, severity=severity):
+                draft = self.draft(f"Date,Mouse ID,Cull date,Severity\n28.04.26,OFFICIAL-1,{cull_date},{severity}\n")
+                self.assertTrue(build_review(draft)["errors"])
+                form = AnimalsForm(draft, draft_table(draft))
+                key = form.groups[0]["key"]
+                data = self.form_data(form)
+                data.update({f"{key}_cull_date": "2026-02-30", f"{key}_severity": "Extreme"})
+                bound = AnimalsForm(draft, draft_table(draft), data=data)
+                self.assertFalse(bound.is_valid())
+                self.assertIn(f"{key}_cull_date", bound.errors)
+                self.assertIn(f"{key}_severity", bound.errors)
+        self.assertFalse(Recording.objects.exists())
+
+    def test_repeated_animal_rows_normalize_dates_and_severity_but_reject_conflicts(self):
+        draft = self.draft("Date,Mouse ID,Cull date,Severity\n28.04.26,OFFICIAL-1,28.04.26,moderate\n28.04.26,OFFICIAL-1,2026-04-28,MODERATE\n")
+        self.assertEqual(build_review(draft)["errors"], [])
+        for cull_date, severity in (("29.04.26", "Moderate"), ("28.04.26", "Severe")):
+            with self.subTest(cull_date=cull_date, severity=severity):
+                conflicting = self.draft(f"Date,Mouse ID,Cull date,Severity\n28.04.26,OFFICIAL-1,28.04.26,Moderate\n28.04.26,OFFICIAL-1,{cull_date},{severity}\n")
+                self.assertTrue(any("disagree" in error for error in build_review(conflicting)["errors"]))
+
     def test_alias_matching_and_ambiguous_aliases(self):
         self.assertEqual([c.pk for c in crossing_candidates("legacy LINE")], [self.crossing.pk])
         another = MouseLine.objects.create(species=self.species, name="Another", aliases="Legacy line")
@@ -919,7 +1018,7 @@ class SpreadsheetImportTests(TestCase):
         form = response.context["form"]
         markup = Markup(response.content.decode())
         for name, input_type in (
-            ("recording_date", "date"), ("animal:date_of_birth", "date"), ("field:acquired", "date"),
+            ("recording_date", "date"), ("animal:date_of_birth", "date"), ("animal:cull_date", "date"), ("field:acquired", "date"),
             ("field:frames", "number"), ("field:temperature", "number"),
         ):
             node = markup.find("input", name=f"default_{name}")[0]
@@ -927,7 +1026,7 @@ class SpreadsheetImportTests(TestCase):
             self.assertNotIn("required", node.attrs)
         self.assertEqual(markup.find("input", name="default_recording_date")[0].attrs["value"], "2026-04-28")
         self.assertEqual(markup.find("input", name="default_field:acquired")[0].attrs["value"], "2026-04-27")
-        for key in ("animal:status", "animal:sex", "field:mode", "field:flag"):
+        for key in ("animal:status", "animal:sex", "animal:severity", "field:mode", "field:flag"):
             self.assertEqual(len(markup.find("select", name=f"default_{key}")), 1)
         self.assertEqual(form["default_field:flag"].value(), "false")
         self.assertEqual(form["default_field:mode"].value(), "high")

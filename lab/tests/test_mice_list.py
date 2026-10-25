@@ -139,7 +139,7 @@ class MicePageTests(AuthenticatedTestCase):
             self.assertContains(response, f'value="{page_size}"')
         self.assertContains(
             response,
-            reverse("lab:mouse_record", args=[self.recent_mouse.pk]),
+            reverse("lab:animal_summary", args=[self.recent_mouse.pk]),
         )
 
     def test_mice_page_honours_page_size(self):

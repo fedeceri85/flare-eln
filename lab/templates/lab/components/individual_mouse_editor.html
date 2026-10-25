@@ -1,5 +1,5 @@
-<section class="{% if embedded %}single-mouse-rows{% else %}bulk-section{% endif %}" {% if embedded %}id="mouse-individual-details"{% else %}id="mouse-panel-individual" data-mouse-tab-panel="individual"{% endif %}>
-    <h2 class="visually-hidden">Individual animals</h2>
+<section class="{% if embedded %}single-mouse-rows single-animal-genotype{% else %}bulk-section{% endif %}" {% if embedded %}id="mouse-individual-details" aria-labelledby="single-animal-genotype-title"{% else %}id="mouse-panel-individual" data-mouse-tab-panel="individual"{% endif %}>
+    {% if embedded %}<h3 class="single-animal-genotype-title" id="single-animal-genotype-title">Genotype details</h3>{% else %}<h2 class="visually-hidden">Genotype details</h2>{% endif %}
     <p class="bulk-help">{% if embedded %}Set this animal’s{% else %}Set each animal’s{% endif %} local identifier, sex and genotype. Check Uncertain beside any doubtful result.</p>
     {% if not embedded %}
         <details class="individual-mouse-help">

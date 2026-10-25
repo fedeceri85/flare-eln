@@ -159,7 +159,7 @@ class BulkIndividualMouseTests(TestCase):
     def test_rows_render_current_values_for_each_mouse(self):
         response = self.client.get(self.url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Individual animals")
+        self.assertContains(response, "Genotype details")
         self.assertContains(response, f'name="{self.name(0, "sex")}"')
         form = response.context["form"]
         self.assertEqual([row["sex"].value() for row in form.individual_rows], ["M", "F"])

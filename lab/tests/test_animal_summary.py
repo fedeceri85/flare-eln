@@ -62,6 +62,58 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertNotContains(response, "Unrelated animal")
         self.assertNotContains(response, "Save changes")
 
+    def test_animal_name_and_single_selection_use_the_same_summary(self):
+        mouse = self.mice[0]
+        view_url = reverse("lab:view_selected_mice_licence_protocol", args=[
+            self.protocol.licence_reference, self.protocol.protocol_number,
+        ])
+        direct_url = reverse("lab:animal_summary", args=[mouse.pk])
+        params = {"return_url": self.list_state, "mouse_editor_tab": "services"}
+        direct = self.client.get(direct_url, params)
+        selected = self.client.get(view_url, {**params, "selected_mouse": mouse.pk})
+        for response in (direct, selected):
+            self.assertEqual(response.status_code, 200)
+            self.assertTemplateUsed(response, "lab/animal_summary.html")
+            self.assertTrue(response.context["single_mouse_mode"])
+            self.assertEqual(response.context["selected_mice"], [mouse])
+            self.assertEqual(response.context["active_tab"], "services")
+            self.assertNotContains(response, "General information")
+        direct_markup, selected_markup = [Markup(response.content.decode()) for response in (direct, selected)]
+        for key in ("shared", "procedures", "services"):
+            direct_panel = direct_markup.find("section", **{"data-mouse-tab-panel": key})[0]
+            selected_panel = selected_markup.find("section", **{"data-mouse-tab-panel": key})[0]
+            self.assertEqual(direct_panel.text, selected_panel.text)
+        direct_edit = direct_markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        selected_edit = selected_markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        self.assertEqual(urlsplit(direct_edit).path, urlsplit(selected_edit).path)
+        self.assertEqual(parse_qs(urlsplit(direct_edit).query)["selected_mouse"], [mouse.pk])
+
+    def test_single_animal_summary_rejects_missing_animals_and_requires_login(self):
+        url = reverse("lab:animal_summary", args=[self.mice[0].pk])
+        self.assertEqual(self.client.get(reverse("lab:animal_summary", args=["Missing animal"])).status_code, 404)
+        self.assertEqual(self.client.post(url, {"status": "Culled"}).status_code, 405)
+        self.mice[0].refresh_from_db()
+        self.assertEqual(self.mice[0].status, "Alive")
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_renaming_from_single_animal_summary_returns_to_the_new_animal_url(self):
+        mouse = self.mice[0]
+        url = reverse("lab:animal_summary", args=[mouse.pk])
+        response = self.client.get(url, {"return_url": self.list_state})
+        edit_link = Markup(response.content.decode()).find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        summary_return = parse_qs(urlsplit(edit_link).query)["return_url"][0]
+        result = self.client.post(urlsplit(edit_link).path, {
+            "apply_bulk_edit": "1", "selected_mouse": [mouse.pk],
+            "return_url": summary_return, "confirm_mouse_ids": "on",
+            individual_mouse_field_prefix(mouse) + "_mouse_id": "Renamed single animal",
+        })
+        self.assertEqual(result.status_code, 302)
+        new_summary_url = parse_qs(urlsplit(result.url).query)["return_url"][0]
+        self.assertEqual(urlsplit(new_summary_url).path, reverse("lab:animal_summary", args=["Renamed single animal"]))
+        self.assertEqual(parse_qs(urlsplit(new_summary_url).query)["return_url"], [self.list_state])
+        self.assertContains(self.client.get(new_summary_url), "Renamed single animal")
+
     def test_shared_values_and_per_animal_differences_include_blank_values(self):
         response, markup = self.summary()
         self.assertContains(response, "02/01/2026")
@@ -86,7 +138,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertIn("Female", individual.text)
         self.assertContains(response, self.crossing.display_name)
         self.assert_contextual_link(
-            response, reverse("lab:mouse_record", args=[self.mice[0].pk]),
+            response, reverse("lab:animal_summary", args=[self.mice[0].pk]),
             url_with_query_params(self.url, return_url=self.list_url, mouse_editor_tab="individual"),
         )
 

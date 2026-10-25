@@ -62,8 +62,8 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
             protocol=self.protocol_a1,
             protocol_start_date=date(self.current_year, 1, 13),
         )
-        mouse_record_url = reverse(
-            "lab:mouse_record",
+        animal_summary_url = reverse(
+            "lab:animal_summary",
             args=[imported_mouse.pk],
         )
 
@@ -79,7 +79,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, imported_mouse.mouse_id)
-        self.assertContains(response, mouse_record_url)
+        self.assertContains(response, animal_summary_url)
 
     def test_procedure_root_redirects_to_first_licence(self):
         response = self.client.get(reverse("lab:procedure_page"))

@@ -83,7 +83,7 @@ class NavigationTests(TestCase):
             ("settings_page", (), "Settings"), ("import_templates", (), "Settings"),
             ("add_mouse_all", (), "Animals"), ("add_litter_all", (), "Animals"),
             ("add_mouse_licence_protocol", (self.protocol.licence_reference, 17), "Procedures"),
-            ("mouse_record", (self.mouse.pk,), "Animals"), ("edit_mouse", (self.mouse.pk,), "Procedures"),
+            ("animal_summary", (self.mouse.pk,), "Animals"), ("edit_mouse", (self.mouse.pk,), "Procedures"),
             ("rename_mouse", (self.mouse.pk,), "Procedures"), ("delete_mouse", (self.mouse.pk,), "Procedures"),
             ("edit_mouse_procedure", (self.mouse.pk, self.procedure.pk), "Procedures"),
             ("add_project", (), "Projects"), ("edit_project", (self.project.pk,), "Projects"),
@@ -149,18 +149,21 @@ class NavigationTests(TestCase):
         crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Animals")
         self.assertEqual(crumb.attrs["href"], url)
 
-    def test_record_to_edit_to_list_keeps_original_context(self):
+    def test_summary_to_edit_to_list_keeps_original_context(self):
         destination = reverse("lab:mice_page") + "?mouse_id=UI&sort=date_of_birth&page=2"
-        record_url = reverse("lab:mouse_record", args=[self.mouse.pk]) + "?" + urlencode({"return_url": destination})
+        record_url = reverse("lab:animal_summary", args=[self.mouse.pk]) + "?" + urlencode({"return_url": destination})
         response = self.client.get(record_url)
         html = Markup(response.content.decode())
-        edit = next(node for node in html.find("a") if node.text.strip() == "Edit animal")
-        self.assertEqual(parse_qs(urlsplit(edit.attrs["href"]).query)["return_url"], [record_url])
+        edit = html.find("a", **{"data-mouse-summary-edit": None})[0]
+        summary_return = parse_qs(urlsplit(edit.attrs["href"]).query)["return_url"][0]
+        self.assertEqual(urlsplit(summary_return).path, urlsplit(record_url).path)
+        self.assertEqual(parse_qs(urlsplit(summary_return).query)["return_url"], [destination])
         response = self.client.get(edit.attrs["href"], follow=True)
         html = Markup(response.content.decode())
-        self.assertEqual(html.find("a", **{"class": "back-link"})[0].attrs["href"], record_url)
-        crumb = next(node for node in html.find("a") if node.within("nav", **{"aria-label": "Breadcrumb"}) and node.text.strip() == "Animals")
-        self.assertEqual(crumb.attrs["href"], destination)
+        self.assertEqual(html.find("a", **{"class": "back-link"})[0].attrs["href"], summary_return)
+        response = self.client.get(summary_return)
+        html = Markup(response.content.decode())
+        self.assertEqual(html.find("a", **{"class": "back-link"})[0].attrs["href"], destination)
         self.assertEqual(html.find("a", **{"aria-current": "true"}), [])
 
     def test_procedure_context_has_licence_and_protocol_without_extra_queries(self):

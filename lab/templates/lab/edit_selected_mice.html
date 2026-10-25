@@ -71,10 +71,11 @@
         {% include "lab/components/mouse_ids_editor.html" %}
 
         <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared" data-shared-bulk-editor>
+            <h2 class="visually-hidden">Animal details</h2>
             {% if form.single_mouse_mode %}
                 {% include "lab/components/individual_mouse_editor.html" with embedded=True %}
+                <h3 class="single-animal-details-title">Animal information</h3>
             {% endif %}
-            <h2 class="visually-hidden">Animal details</h2>
             <p class="bulk-help">Check the fields you want to change. Checked blank values will be cleared.</p>
             <div class="shared-detail-groups">
                 {% for group in form.mouse_update_groups %}
@@ -140,11 +141,8 @@
     </section>
 
     <section id="mouse-panel-services" data-mouse-tab-panel="services">
+        {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 %}
         {% include "lab/components/animal_recordings.html" %}
-        {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 hide_service_title=True %}
-        {% if not service_recording_actions %}
-            <div class="bulk-section"><h2 class="visually-hidden">Services</h2><p>No services are available for the selected animals.</p></div>
-        {% endif %}
     </section>
     </div>
 
@@ -155,6 +153,7 @@
     <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
     <script src="{% static 'lab/existing_procedures.js' %}"></script>
     <script src="{% static 'lab/new_procedures.js' %}"></script>
+    <script src="{% static 'lab/new_animal_recording.js' %}"></script>
     {% include "lab/components/crossing_selector_assets.html" %}
     <script src="{% static 'lab/mouse_row_editor.js' %}"></script>
     <script src="{% static 'lab/mouse_genotype_editor.js' %}"></script>

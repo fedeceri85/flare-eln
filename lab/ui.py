@@ -26,7 +26,7 @@ MOUSE_TABLE_COLUMN_SPECS = [
         "key": "mouse_id",
         "label": "Animal ID",
         "sort": "mouse_id",
-        "url": lambda mouse: reverse("lab:mouse_record", args=[mouse.pk]),
+        "url": lambda mouse: reverse("lab:animal_summary", args=[mouse.pk]),
         "link_class": "mouse-link",
         "cell_class": "mouse-id-cell",
     },
@@ -108,7 +108,7 @@ MICE_PAGE_TABLE_COLUMN_SPECS = [
         "key": "mouse_id",
         "label": "Animal ID",
         "sort": "mouse_id",
-        "url": lambda mouse: reverse("lab:mouse_record", args=[mouse.pk]),
+        "url": lambda mouse: reverse("lab:animal_summary", args=[mouse.pk]),
         "link_class": "mouse-link",
         "cell_class": "mouse-id-cell",
     },
@@ -419,35 +419,6 @@ def build_mice_page_filter_specs():
     ]
 
 
-MOUSE_DETAIL_FIELD_SPECS = [
-    {"key": "mouse_id", "label": "Animal ID"},
-    {"key": "added_by__get_username", "label": "Added by"},
-    {"key": "date_of_birth", "label": "Date of birth", "format": "date"},
-    {"key": "breeding_pair", "label": "Breeding pair"},
-    {"key": "genetics_genotype_display", "label": "Genotype"},
-    {"key": "genetics_crossing_display", "label": "Crossing"},
-    {"key": "tattoo", "label": "Local identifier"},
-    {"key": "protocol", "label": "Protocol"},
-    {
-        "key": "protocol_start_date",
-        "label": "Protocol start date",
-        "format": "date",
-    },
-    {"key": "get_severity_display", "label": "Max severity"},
-    {"key": "get_sex_display", "label": "Sex"},
-    {"key": "notes", "label": "Notes", "format": "linebreaks"},
-    {"key": "cull_date", "label": "Cull date", "format": "date"},
-]
-
-
-PROCEDURE_RECORDING_COLUMN_SPECS = [
-    {"key": "date", "label": "Date", "format": "date"},
-    {"key": "procedure_type", "label": "Procedure type"},
-    {"key": "lab_member", "label": "Lab member"},
-    {"key": "lab_book_page", "label": "Lab-book page"},
-]
-
-
 BASE_RECORDING_COLUMN_SPECS = [
     {
         "key": "recording_date",
@@ -684,42 +655,6 @@ def build_home_cards(user=None):
         })
 
     return cards
-
-
-def build_detail_rows(obj, field_specs):
-    return [
-        {
-            "label": spec["label"],
-            "value": format_value(resolve_attr(obj, spec["key"]), spec.get("format")),
-        }
-        for spec in field_specs
-    ]
-
-
-def build_object_table(objects, column_specs, empty_message, table_class=""):
-    columns = [
-        {
-            "label": spec["label"],
-            "class": spec.get("header_class", spec.get("cell_class", "")),
-        }
-        for spec in column_specs
-    ]
-    rows = [
-        {
-            "cells": [
-                build_cell(obj, spec)
-                for spec in column_specs
-            ],
-        }
-        for obj in objects
-    ]
-
-    return {
-        "class": table_class,
-        "columns": columns,
-        "rows": rows,
-        "empty_message": empty_message,
-    }
 
 
 def build_procedure_matrix_table(
@@ -1256,39 +1191,6 @@ def format_recording_field_value(value, data_type):
     return value
 
 
-def build_mouse_record_sections(mouse, procedures, recording_groups):
-    sections = [
-        {
-            "title": "General information",
-            "details": {
-                "rows": build_detail_rows(mouse, MOUSE_DETAIL_FIELD_SPECS),
-            },
-        },
-        {
-            "title": "Procedures",
-            "table": build_object_table(
-                procedures,
-                PROCEDURE_RECORDING_COLUMN_SPECS,
-                "No procedures recorded.",
-            ),
-        },
-    ]
-
-    for group in recording_groups:
-        recording_type = group["recording_type"]
-        sections.append(
-            {
-                "title": recording_type.display_plural_name,
-                "table": build_recording_type_table(
-                    recording_type,
-                    group["recordings"],
-                ),
-            },
-        )
-
-    return sections
-
-
 def build_record_count(page_obj, noun):
     return {
         "start": page_obj.start_index(),
@@ -1424,7 +1326,7 @@ def format_recording_mice_links(recording):
         '<a class="mouse-link" href="{}">{}</a>',
         (
             (
-                reverse("lab:mouse_record", args=[mouse.pk]),
+                reverse("lab:animal_summary", args=[mouse.pk]),
                 mouse.mouse_id,
             )
             for mouse in mice

@@ -1,0 +1,16 @@
+<tr class="animal-recording-row">
+    <td>Add recording</td>
+    <td>
+        {% include "lab/components/form_field.html" with field=recording_destination_form.recording_type %}
+        <div class="animal-recording-destination-grid" data-recording-destination>
+            {% include "lab/components/form_field.html" with field=recording_destination_form.project %}
+            <div data-recording-experiment>
+                {% include "lab/components/form_field.html" with field=recording_destination_form.experiment %}
+            </div>
+        </div>
+        <p class="bulk-help" role="status" aria-live="polite" data-recording-destination-status></p>
+    </td>
+    <td class="action-cell">
+        <button type="submit" class="table-row-action" data-recording-continue aria-label="Add recording for the selected animals">Add record</button>
+    </td>
+</tr>

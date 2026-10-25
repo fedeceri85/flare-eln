@@ -12,7 +12,7 @@ from django.core import signing
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError, transaction
-from django.db.models import Model, Q
+from django.db.models import Model
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -30,13 +30,13 @@ from ..forms import (
     genotype_field_name,
     sync_mouse_structured_genetics,
 )
+from ..forms.recordings import RecordingDestinationForm
 from ..models import (
     Crossing,
     Mouse,
     Procedure,
     Protocol,
     Recording,
-    RecordingType,
 )
 from ..procedure_bulk import (
     creation_context,
@@ -49,7 +49,6 @@ from ..ui import (
     build_filter_form,
     build_mice_page_filter_specs,
     build_mice_table,
-    build_mouse_record_sections,
     build_pagination,
     build_record_count,
     build_table_page_size_control,
@@ -59,6 +58,7 @@ from ..ui import (
 )
 from ..utils import generate_mouse_id
 from .common import (
+    add_recording_url,
     animal_summary_context,
     append_text,
     delete_selected_mice_all_url,
@@ -530,6 +530,12 @@ def view_selected_mice(request, protocol_number, licence_reference):
     summary_url = url_with_query_params(request.path, selected_mouse=mouse_ids, return_url=return_url)
     if request.method == "POST":
         return redirect(summary_url)
+    return _render_animal_summary(
+        request, mice, protocol, summary_url=summary_url, return_url=return_url,
+    )
+
+
+def _render_animal_summary(request, mice, protocol, *, summary_url, return_url):
     return render(request, "lab/animal_summary.html", {
         **animal_summary_context(
             request, mice, summary_url=summary_url, edit_url=edit_selected_mice_url(protocol),
@@ -590,8 +596,23 @@ def _edit_selected_mice(request, selected_protocol=None):
 
     bulk_url = edit_selected_mice_url(selected_protocol) if scoped else edit_selected_mice_all_url()
     delete_url = delete_selected_mice_url(selected_protocol) if scoped else delete_selected_mice_all_url()
+    bulk_return_url = url_with_query_params(
+        bulk_url, return_url=return_url, selected_mouse=mouse_ids,
+    )
+    recording_return_url = url_with_query_params(bulk_return_url, mouse_editor_tab="services")
+    selecting_recording = request.method == "POST" and "select_recording_destination" in request.POST
+    recording_destination_form = RecordingDestinationForm(
+        request.POST if selecting_recording else None, prefix="recording",
+    )
+    if selecting_recording and recording_destination_form.is_valid():
+        experiment = recording_destination_form.cleaned_data["experiment"]
+        return redirect(url_with_query_params(
+            add_recording_url(experiment.project, experiment),
+            return_url=recording_return_url,
+            mice=recording_mice_query_value([mouse.pk for mouse in selected_mice]),
+        ))
 
-    if request.method == "POST" and "apply_bulk_edit" not in request.POST:
+    if request.method == "POST" and "apply_bulk_edit" not in request.POST and not selecting_recording:
         query_params = [
             ("return_url", return_url),
             *[
@@ -601,7 +622,7 @@ def _edit_selected_mice(request, selected_protocol=None):
         ]
         return redirect(f"{bulk_url}?{urlencode(query_params)}")
 
-    if request.method == "POST":
+    if request.method == "POST" and not selecting_recording:
         form = BulkMouseUpdateForm(request.POST, selected_mice=selected_mice)
 
         if "preview_individual_mice" in request.POST:
@@ -632,8 +653,8 @@ def _edit_selected_mice(request, selected_protocol=None):
                 if renames:
                     parts = urlsplit(return_url)
                     for old_id, new_id in renames.items():
-                        if parts.path == reverse("lab:mouse_record", args=[old_id]):
-                            return_url = urlunsplit(parts._replace(path=reverse("lab:mouse_record", args=[new_id])))
+                        if parts.path == reverse("lab:animal_summary", args=[old_id]):
+                            return_url = urlunsplit(parts._replace(path=reverse("lab:animal_summary", args=[new_id])))
                     return redirect(url_with_query_params(
                         bulk_url, selected_mouse=[renames.get(mouse.pk, mouse.pk) for mouse in selected_mice],
                         return_url=return_url, mouse_editor_tab=request.POST.get("mouse_editor_tab", "ids"),
@@ -644,11 +665,6 @@ def _edit_selected_mice(request, selected_protocol=None):
         if len(selected_mice) == 1 and request.GET.get("new_mouse_id"):
             form.identity_rows[0]["field"].field.initial = request.GET["new_mouse_id"]
 
-    bulk_return_url = url_with_query_params(
-        bulk_url,
-        return_url=return_url,
-        selected_mouse=mouse_ids,
-    )
     return render(
         request,
         "lab/edit_selected_mice.html",
@@ -663,9 +679,11 @@ def _edit_selected_mice(request, selected_protocol=None):
             "return_url": return_url,
             "can_add_bulk_procedure": can_add_bulk_procedure,
             "animal_recording_sections": build_animal_recording_sections(selected_mice),
+            "recording_destination_form": recording_destination_form,
+            "recording_destination_options": recording_destination_form.destination_options,
             "service_recording_actions": service_recording_actions_for_mice(
                 selected_mice,
-                url_with_query_params(bulk_return_url, mouse_editor_tab="services"),
+                recording_return_url,
             ),
             "crossing_lookup_url": reverse("lab:crossing_lookup"),
             "crossing_genotype_fields_url": reverse(
@@ -1013,58 +1031,12 @@ def mouse_lookup(request):
     )
 
 
-def mouse_record(request, mouse_pk):
-    mouse = get_object_or_404(Mouse.objects.select_related("added_by"), pk=mouse_pk)
-
-    procedures = (
-        mouse.procedures
-        .select_related("procedure_type")
-        .all()
-    )
-
-    recordings = (
-        Recording.objects
-        .filter(mice=mouse)
-        .select_related("experiment", "experiment__project", "recording_type")
-        .prefetch_related("mice")
-        .order_by("recording_type__name", "-recording_date", "recording_id")
-    )
-    recordings_by_type = {}
-
-    for recording in recordings:
-        recordings_by_type.setdefault(recording.recording_type_id, []).append(
-            recording
-        )
-
-    recording_types = (
-        RecordingType.objects
-        .prefetch_related("fields")
-        .filter(
-            Q(active=True)
-            | Q(recordings__mice=mouse)
-        )
-        .distinct()
-        .order_by("name")
-    )
-    recording_groups = [
-        {
-            "recording_type": recording_type,
-            "recordings": recordings_by_type.get(recording_type.pk, []),
-        }
-        for recording_type in recording_types
-    ]
-
-    return render(
-        request,
-        "lab/mouse_record.html",
-        {
-            "mouse": mouse,
-            "sections": build_mouse_record_sections(
-                mouse,
-                procedures,
-                recording_groups,
-            ),
-            "status": mouse.status or "Unknown",
-            "edit_mouse_url": url_with_query_params(edit_selected_mice_all_url(), selected_mouse=[mouse.pk]),
-        },
+@require_http_methods(["GET", "HEAD"])
+def animal_summary(request, mouse_pk):
+    mouse = get_object_or_404(Mouse.objects.select_related("protocol"), pk=mouse_pk)
+    return_url = safe_return_url(request, procedure_protocol_url(mouse.protocol))
+    return _render_animal_summary(
+        request, [mouse], mouse.protocol,
+        summary_url=url_with_query_params(request.path, return_url=return_url),
+        return_url=return_url,
     )

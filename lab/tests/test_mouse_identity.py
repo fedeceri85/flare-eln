@@ -119,7 +119,7 @@ class MouseIdentityAndDeletionTests(AuthenticatedTestCase):
         )
 
         urls = [
-            reverse("lab:mouse_record", args=[imported_mouse.pk]),
+            reverse("lab:animal_summary", args=[imported_mouse.pk]),
             reverse("lab:edit_mouse", args=[imported_mouse.pk]),
             reverse("lab:rename_mouse", args=[imported_mouse.pk]),
             reverse("lab:delete_mouse", args=[imported_mouse.pk]),

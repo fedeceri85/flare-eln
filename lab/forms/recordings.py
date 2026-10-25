@@ -8,7 +8,9 @@ from django import forms
 from django.db.models import Q
 
 from ..models import (
+    Experiment,
     Mouse,
+    Project,
     Recording,
     RecordingField,
     RecordingType,
@@ -44,6 +46,59 @@ def recording_type_choices_for_instance(instance=None):
         )
 
     return queryset.order_by("name")
+
+
+class RecordingDestinationForm(forms.Form):
+    recording_type = forms.ModelChoiceField(
+        label="Recording type",
+        queryset=RecordingType.objects.filter(active=True),
+        empty_label="Select a recording type",
+    )
+    project = forms.ModelChoiceField(
+        queryset=Project.objects.none(),
+        empty_label="Select a project",
+    )
+    experiment = forms.ModelChoiceField(
+        queryset=Experiment.objects.none(),
+        empty_label="Select an experiment",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        experiments = list(
+            Experiment.objects.select_related("project")
+            .filter(
+                archived=False, project__active=True, project__is_service=False,
+                recording_type__active=True,
+            )
+            .order_by("project__name", "project_id", "name", "pk")
+        )
+        self.destination_options = [
+            {
+                "recording_type": str(experiment.recording_type_id),
+                "project": str(experiment.project_id),
+                "project_name": experiment.project.name,
+                "experiment": str(experiment.pk),
+                "experiment_name": experiment.name,
+            }
+            for experiment in experiments
+        ]
+        recording_type_id = str(self["recording_type"].value() or "")
+        project_id = str(self["project"].value() or "")
+        compatible = [
+            experiment for experiment in experiments
+            if str(experiment.recording_type_id) == recording_type_id
+        ]
+        self.fields["project"].queryset = Project.objects.filter(
+            pk__in={experiment.project_id for experiment in compatible},
+        )
+        self.fields["experiment"].queryset = Experiment.objects.filter(
+            pk__in=[
+                experiment.pk for experiment in compatible
+                if str(experiment.project_id) == project_id
+            ],
+        ).order_by("name", "pk")
+        self.fields["experiment"].label_from_instance = lambda experiment: experiment.name
 
 
 class RecordingForm(forms.Form):

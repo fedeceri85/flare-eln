@@ -20,7 +20,7 @@ PAGE_TITLES = {
     "procedure_page": "Procedures", "projects_page": "Projects",
     "experiments_page": "Experiments", "recordings_page": "Recordings",
     "services_page": "Services", "reports_page": "Reports",
-    "lines_crossings_page": "Lines & Crossings", "mouse_record": "Animal record",
+    "lines_crossings_page": "Lines & Crossings", "animal_summary": "Animal summary",
     "add_project": "Add project", "edit_project": "Edit project",
     "add_experiment": "Add experiment", "edit_experiment": "Edit experiment",
     "add_recording": "Add recording", "edit_recording": "Edit recording",
@@ -46,7 +46,7 @@ PRIMARY_ACTIONS = {
     "select_recording_mouse": "Add selected animals",
 }
 CONTEXTUAL_ROUTES = {
-    "mouse_record", "edit_mouse", "rename_mouse", "delete_mouse",
+    "animal_summary", "edit_mouse", "rename_mouse", "delete_mouse",
     "edit_selected_mice_all", "edit_selected_mice_licence_protocol", "edit_selected_mice",
     "edit_mouse_procedure", "experiments_page", "recordings_page",
     "edit_project", "edit_experiment", "edit_recording", "delete_recording", "delete_selected_recordings",
@@ -182,11 +182,11 @@ def build_navigation(context):
         if action in {"add_recording", "edit_recording", "delete_recording", "delete_selected_recordings", "select_recording_mouse", "import_recordings", "import_recordings_draft"}:
             crumb("Recordings", reverse("lab:recordings_page", args=[project.pk, experiment.pk]))
         if mouse:
-            crumb(mouse.mouse_id, reverse("lab:mouse_record", args=[mouse.pk]))
+            crumb(mouse.mouse_id, reverse("lab:animal_summary", args=[mouse.pk]))
         if name == "reports_page" and context.get("selected_report") == "home_office_return":
             title = "Home Office Return"
             crumb(title)
-        elif not (name in {"mice_page", "projects_page", "services_page", "lines_crossings_page", "reports_page", "mouse_record", "experiments_page", "recordings_page"} or action == "procedure_page"):
+        elif not (name in {"mice_page", "projects_page", "services_page", "lines_crossings_page", "reports_page", "experiments_page", "recordings_page"} or action == "procedure_page"):
             crumb(title)
 
     # Keep a safe return chain's list state on matching ancestor links.

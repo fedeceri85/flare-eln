@@ -17,7 +17,7 @@
                 {% with mouse=row.mouse %}
                     <li class="duplicate-candidate">
                         <p>
-                            <a href="{% url 'lab:mouse_record' mouse.pk %}"><strong>{{ mouse.mouse_id }}</strong></a>
+                            <a href="{% url 'lab:animal_summary' mouse.pk %}"><strong>{{ mouse.mouse_id }}</strong></a>
                             — {{ mouse.get_id_status_display }} ID{% if mouse.id_status == "unknown" %} (ID origin not recorded){% endif %}
                         </p>
                         <dl class="duplicate-candidate-details">

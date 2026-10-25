@@ -288,8 +288,8 @@ urlpatterns = [
     ),
     path(
         "mice/<mousepk:mouse_pk>/",
-        protected(views.mouse_record),
-        name="mouse_record",
+        protected(views.animal_summary),
+        name="animal_summary",
     ),
     path(
         "mice/<mousepk:mouse_pk>/edit/",

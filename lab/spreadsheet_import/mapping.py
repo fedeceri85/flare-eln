@@ -19,6 +19,8 @@ ANIMAL_FIELDS = [
     ("crossing", "Strain / crossing", ["strain", "crossing"]),
     ("notes", "Animal notes", ["animal notes"]),
     ("status", "Animal status", ["status"]),
+    ("cull_date", "Cull date", ["cull date", "culling date", "date culled", "date of cull", "date of culling"]),
+    ("severity", "Severity experienced", ["severity", "severity experienced", "severity experienced by the animal", "actual severity"]),
 ]
 
 
@@ -74,7 +76,7 @@ def validate_definition(definition, experiment, columns):
             default = definition.get("defaults", {}).get(key)
             if default and not GenotypeCategory.objects.filter(code=default, active=True).exists():
                 raise ValidationError("A shared genotype category is no longer available.")
-        elif key not in valid_targets | {"protocol_id", "crossing_id", "species_id", "marking_type"}:
+        elif key not in valid_targets | {"protocol_id", "protocol_start_date", "crossing_id", "species_id", "marking_type"}:
             raise ValidationError(f"Mapped field {key!r} is no longer available.")
     for definition_binding in [*definition.get("bindings", {}).values(), *definition.get("identity_columns", [])]:
         resolve_binding(columns, definition_binding)

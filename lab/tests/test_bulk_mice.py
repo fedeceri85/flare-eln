@@ -728,7 +728,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(legacy_mouse.genotype, "Legacy genotype")
         self.assertEqual(legacy_mouse.status, "Culled")
 
-        response = self.client.get(reverse("lab:mouse_record", args=[legacy_mouse.pk]))
+        response = self.client.get(reverse("lab:animal_summary", args=[legacy_mouse.pk]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Legacy line")
@@ -916,7 +916,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(other_procedure.lab_member, "EF")
         self.assertEqual(other_procedure.lab_book_page, "88")
 
-    def test_mouse_record_renders_procedure_date(self):
+    def test_animal_summary_renders_procedure_date(self):
         Procedure.objects.create(
             mouse=self.mouse_1,
             procedure_type=self.procedure_type,
@@ -926,7 +926,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         )
 
         response = self.client.get(
-            reverse("lab:mouse_record", args=[self.mouse_1.pk]),
+            reverse("lab:animal_summary", args=[self.mouse_1.pk]),
         )
 
         self.assertEqual(response.status_code, 200)

@@ -1,5 +1,7 @@
 25/10/2026
 - Added page for simultaneous view of multiple animals
+- Added the possibility to add an experiment from edit animal view.
+
 
 24/10/2026
 - Import experiments from spreadsheet - first version. 

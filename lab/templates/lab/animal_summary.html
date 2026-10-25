@@ -20,9 +20,13 @@
         <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared">
             <h2 class="visually-hidden">Animal details</h2>
             {% if single_mouse_mode %}
-                <div class="single-mouse-rows litter-rows-scroll">
-                    {% include "lab/components/individual_mouse_table.html" with rows=individual_rows %}
-                </div>
+                <section class="single-mouse-rows single-animal-genotype" aria-labelledby="single-animal-genotype-title">
+                    <h3 class="single-animal-genotype-title" id="single-animal-genotype-title">Genotype details</h3>
+                    <div class="litter-rows-scroll">
+                        {% include "lab/components/individual_mouse_table.html" with rows=individual_rows %}
+                    </div>
+                </section>
+                <h3 class="single-animal-details-title">Animal information</h3>
             {% else %}
                 <p class="bulk-help">Shared values are shown below. Expand differing values to see each animal’s details.</p>
             {% endif %}
@@ -47,7 +51,7 @@
 
         {% if not single_mouse_mode %}
         <section class="bulk-section" id="mouse-panel-individual" data-mouse-tab-panel="individual">
-            <h2 class="visually-hidden">Individual animals</h2>
+            <h2 class="visually-hidden">Genotype details</h2>
             <p class="bulk-help">Each animal’s local identifier, sex and genotype. Select an Animal ID to open its complete record.</p>
             <div class="litter-rows-scroll">
                 {% regroup individual_rows by crossing as crossing_groups %}
@@ -59,7 +63,6 @@
         {% endif %}
 
         <section class="bulk-section procedure-editor" id="mouse-panel-procedures" data-mouse-tab-panel="procedures">
-            <h2 class="bulk-title">Existing procedures</h2>
             {% if procedures %}
                 <div class="table-card"><div class="table-scroll"><table class="data-table">
                     <thead><tr><th scope="col">Animal ID</th><th scope="col">Procedure type</th><th scope="col">Date</th><th scope="col">Lab member</th><th scope="col">Lab-book page</th><th scope="col">Notes</th></tr></thead>
@@ -78,7 +81,7 @@
             {% endif %}
         </section>
         <section id="mouse-panel-services" data-mouse-tab-panel="services">
-            {% include "lab/components/animal_recordings.html" %}
+            {% include "lab/components/animal_recordings.html" with hide_recordings_title=True %}
         </section>
     </div>
     {% else %}

@@ -870,11 +870,11 @@ class RecordingsPageTests(AuthenticatedTestCase):
         response = self.client.get(self.recordings_url)
         self.assertContains(
             response,
-            reverse("lab:mouse_record", args=[self.mouse_1.pk]),
+            reverse("lab:animal_summary", args=[self.mouse_1.pk]),
         )
         self.assertContains(
             response,
-            reverse("lab:mouse_record", args=[self.mouse_2.pk]),
+            reverse("lab:animal_summary", args=[self.mouse_2.pk]),
         )
         markup = Markup(response.content.decode())
         animal_links = next(node for node in markup.find("div", **{"class": "recording-animal-links"}) if self.mouse_1.pk in node.text and self.mouse_2.pk in node.text)

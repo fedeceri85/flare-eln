@@ -108,7 +108,7 @@ def build_animal_summary(mice):
         genotypes.append(genotype or "—")
         individual_rows.append({
             "mouse_id": mouse.pk,
-            "record_url": reverse("lab:mouse_record", args=[mouse.pk]),
+            "record_url": reverse("lab:animal_summary", args=[mouse.pk]),
             "local_identifier": mouse.tattoo or "—",
             "sex": mouse.get_sex_display() or "Unknown",
             "crossing": mouse.genetics_crossing_display,

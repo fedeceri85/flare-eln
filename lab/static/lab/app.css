@@ -725,18 +725,6 @@ button.button {
     color: #713f12;
 }
 
-.status-pill {
-    display: inline-block;
-    padding: 6px 10px;
-    border: 1px solid #bcccdc;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-
-
 @media (max-width: 1000px) {
     .filter-grid {
         grid-template-columns: repeat(3, minmax(130px, 1fr));
@@ -896,7 +884,6 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .bulk-help { color: var(--muted); line-height: 1.6; }
 .selected-list-items { display: flex; flex-wrap: wrap; gap: 7px; padding: 0; list-style: none; }
 .selected-list-item { background: var(--blue-soft); color: #2c527c; border: 1px solid #d9e7f8; border-radius: 6px; padding: 5px 10px; font-size: 12px; overflow-wrap: anywhere; }
-.status-pill { border-color: #d5e2ef; background: #f1f6fc; color: #365d83; }
 .error-summary { border: 1px solid #dfa6a3; border-left: 4px solid #b42318; border-radius: 8px; background: #fff7f6; padding: 18px 20px; margin-bottom: 24px; }
 .error-summary h2 { font-size: 15px; margin: 0 0 8px; color: #8f241c; }
 .error-summary ul { margin: 0; padding-left: 20px; }
@@ -1115,6 +1102,16 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .procedure-editor .bulk-input label { margin-bottom: 6px; }
 .procedure-editor .bulk-input :is(input, select, textarea):disabled { background: #f3f5f7; color: #748393; border-color: #e0e5eb; opacity: 1; }
 .procedure-editor > .procedure-after-save { margin: 14px 0 0; }
+.animal-recording-row > td { vertical-align: top; }
+.animal-recording-row .form-field { margin: 0; min-width: 0; max-width: 360px; }
+.animal-recording-row select { width: 100%; min-height: 34px; padding: 6px 8px; }
+.animal-recording-destination-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.animal-recording-creator [hidden] { display: none; }
+.animal-recording-creator [role="status"] { white-space: normal; }
+.animal-recording-creator [role="status"]:empty { display: none; }
+@media (max-width: 600px) {
+    .animal-recording-destination-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .procedure-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; font-size: 13px; }
 .procedure-actions { margin-top: 16px; }
 [data-existing-procedure-section] [hidden] { display: none; }
@@ -1228,6 +1225,10 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .individual-mouse-table + .individual-mouse-table { margin-top: 16px; }
 
 .single-mouse-rows { margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
+.shared-mouse-details .single-animal-genotype { margin: 0 0 24px; padding: 18px; border: 1px solid var(--border); border-radius: 8px; background: #f5f8fc; }
+.single-animal-genotype-title,
+.single-animal-details-title { margin: 0 0 14px; color: #244768; font-size: 15px; font-weight: 650; }
+.single-animal-genotype > .bulk-help { margin: 0 0 12px; }
 .shared-genetics.shared-genetics-single { grid-template-columns: minmax(0, 1fr); }
 
 /* Lines & Crossings: reuse procedure controls, scope only layout adjustments. */
