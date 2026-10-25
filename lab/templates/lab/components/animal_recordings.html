@@ -1,0 +1,12 @@
+<section class="bulk-section animal-recordings">
+    <h2 class="bulk-title">Existing services &amp; recordings</h2>
+    <p class="bulk-help">Recordings linked to any selected animal. Shared recordings appear once.</p>
+    {% for section in animal_recording_sections %}
+        <section class="section">
+            <h3 class="section-title">{{ section.title }}</h3>
+            {% include "lab/components/table.html" with table=section.table %}
+        </section>
+    {% empty %}
+        <p>No service records or recordings are linked to the selected animals.</p>
+    {% endfor %}
+</section>

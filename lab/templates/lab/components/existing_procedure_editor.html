@@ -14,7 +14,7 @@
                 <span data-procedure-selection-count>0 records selected</span>
             </div>
             <div class="table-card"><div class="table-scroll"><table class="data-table">
-                <thead><tr><th hidden data-procedure-js-only>Select</th><th>Animal ID</th><th>Procedure type</th><th>Date</th><th>Lab member</th><th>Lab-book page</th><th>Action</th></tr></thead>
+                <thead><tr><th hidden data-procedure-js-only>Select</th><th>Animal ID</th><th>Procedure type</th><th>Date</th><th>Lab member</th><th>Lab-book page</th><th>Actions</th></tr></thead>
                 <tbody>
                     {% for row in existing_procedure_rows %}
                         {% ifchanged row.record.mouse_id %}<tr><th colspan="7">Animal {{ row.record.mouse_id }}</th></tr>{% endifchanged %}
@@ -24,7 +24,7 @@
                                 <input type="checkbox" data-procedure-row-checkbox name="{{ existing_procedure_form.selected_procedures.html_name }}" value="{{ row.record.pk }}" aria-label="Select {{ row.record.procedure_type }} ({{ row.record.date|date:'d/m/Y'|default:'undated' }}) for animal {{ row.record.mouse_id }}" {% if row.selected %}checked{% endif %}></td>
                             <td>{{ row.record.mouse_id }}</td><td>{{ row.record.procedure_type }}</td>
                             <td>{{ row.record.date|date:"d/m/Y"|default:"—" }}</td><td>{{ row.record.lab_member|default:"—" }}</td><td>{{ row.record.lab_book_page|default:"—" }}</td>
-                            <td><a href="{{ row.edit_url }}">Edit</a></td>
+                            <td class="action-cell"><a class="table-row-action" href="{{ row.edit_url }}">Edit</a></td>
                         </tr>
                     {% endfor %}
                 </tbody>

@@ -21,7 +21,7 @@
                 <thead><tr><th scope="col">Label</th><th scope="col">Key</th><th scope="col">Type</th><th scope="col">Required</th><th scope="col">Active</th><th scope="col">Order</th><th scope="col">Actions</th></tr></thead>
                 <tbody>{% for field in recording_fields %}<tr>
                     <td>{{ field.label }}</td><td>{{ field.key }}</td><td>{{ field.get_data_type_display }}</td><td>{{ field.required|yesno:'Yes,No' }}</td><td>{{ field.active|yesno:'Yes,No' }}</td><td>{{ field.order }}</td>
-                    <td class="action-cell"><a class="button" href="{% url 'lab:edit_recording_field' recording_type.pk field.pk %}" aria-label="Edit {{ field.label }}">Edit</a></td>
+                    <td class="action-cell"><a class="table-row-action" href="{% url 'lab:edit_recording_field' recording_type.pk field.pk %}" aria-label="Edit {{ field.label }}">Edit</a></td>
                 </tr>{% empty %}<tr><td colspan="7">No recording fields yet.</td></tr>{% endfor %}</tbody>
             </table></div></div>
         </section>

@@ -1,0 +1,381 @@
+from datetime import date
+from urllib.parse import parse_qs, urlsplit
+
+from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+
+from ..forms import individual_mouse_field_prefix
+from ..models import Experiment, GenotypeCategory, Mouse, MouseGenotype, Procedure, ProcedureType, Project, Protocol, RecordingType
+from ..test_navigation import Markup
+from ..views.common import url_with_query_params
+from ._support import AuthenticatedTestCase, create_recording, create_test_crossing
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"])
+class AnimalSummaryTests(AuthenticatedTestCase):
+    def setUp(self):
+        self.protocol = Protocol.objects.create(protocol_number=81, licence_reference="SUMMARY", name="Summary protocol")
+        self.crossing, self.lines = create_test_crossing(("Summary gene", "Other gene"))
+        self.mice = [Mouse.objects.create(
+            mouse_id=f"Summary-{index}", protocol=self.protocol,
+            date_of_birth=date(2026, 1, 2), crossing_definition=self.crossing,
+            sex="F" if index == 0 else "M", tattoo=f"Local-{index}",
+            notes="First animal notes" if index == 0 else "",
+            added_by=self.user,
+        ) for index in range(2)]
+        self.other_mouse = Mouse.objects.create(mouse_id="Unrelated animal", protocol=self.protocol)
+        self.kind = RecordingType.objects.get(slug="imaging")
+        self.project = Project.objects.create(name="Summary project")
+        self.experiment = Experiment.objects.create(project=self.project, name="Summary experiment", recording_type=self.kind)
+        self.recording = create_recording(
+            experiment=self.experiment, recording_type=self.kind, owner=self.user,
+            recording_date=date(2026, 3, 4), mice=self.mice,
+        )
+        self.url = reverse("lab:recording_animals", args=[self.project.pk, self.experiment.pk, self.recording.pk])
+        self.list_url = reverse("lab:recordings_page", args=[self.project.pk, self.experiment.pk])
+        self.list_state = self.list_url + "?sort=recording_date&direction=asc&per_page=50&page=2"
+        self.edit_url = reverse("lab:edit_selected_mice_all")
+        procedure_type = ProcedureType.objects.create(name="Summary procedure")
+        self.procedure = Procedure.objects.create(
+            mouse=self.mice[0], procedure_type=procedure_type, date=date(2026, 2, 3),
+            lab_member="Scientist", lab_book_page="Page 15", notes="Procedure notes",
+        )
+        Procedure.objects.create(mouse=self.other_mouse, procedure_type=procedure_type, lab_member="Unrelated scientist")
+
+    def summary(self, **params):
+        response = self.client.get(self.url, params)
+        self.assertEqual(response.status_code, 200)
+        return response, Markup(response.content.decode())
+
+    def test_summary_uses_familiar_tabs_and_has_no_editable_fields(self):
+        response, markup = self.summary()
+        self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")],
+                         ["shared", "individual", "procedures", "services"])
+        content = [node for node in markup.elements if node.within("div", **{"data-mouse-editor": None})]
+        self.assertFalse([node for node in content if node.tag in {"form", "input", "select", "textarea"}])
+        self.assertContains(response, "Origin")
+        self.assertContains(response, "Animal status")
+        self.assertContains(response, "Protocol")
+        self.assertNotContains(response, "Unrelated animal")
+        self.assertNotContains(response, "Save changes")
+
+    def test_shared_values_and_per_animal_differences_include_blank_values(self):
+        response, markup = self.summary()
+        self.assertContains(response, "02/01/2026")
+        self.assertContains(response, "Alive")
+        self.assertContains(response, "Varies between animals")
+        differences = [node for node in markup.find("details") if "animal-summary-differences" in node.attrs.get("class", "")]
+        self.assertEqual(len(differences), 1)  # Only notes differ; both animals have unknown genotype results.
+        notes = next(node for node in differences if "First animal notes" in node.text)
+        self.assertIn(self.mice[0].pk, notes.text)
+        self.assertIn(self.mice[1].pk, notes.text)
+        self.assertIn("—", notes.text)
+
+    def test_genotype_results_show_uncertainty_unknown_and_retired_labels(self):
+        category = GenotypeCategory.objects.create(code="retired", label="Historical result", active=False)
+        MouseGenotype.objects.create(mouse=self.mice[0], mouse_line=self.lines[0], zygosity=category.code, is_uncertain=True)
+        response, markup = self.summary()
+        individual = next(node for node in markup.find("section") if node.attrs.get("id") == "mouse-panel-individual")
+        self.assertIn("Historical result", individual.text)
+        self.assertIn("Uncertain", individual.text)
+        self.assertIn("Unknown", individual.text)
+        self.assertIn("Local-0", individual.text)
+        self.assertIn("Female", individual.text)
+        self.assertContains(response, self.crossing.display_name)
+        self.assert_contextual_link(
+            response, reverse("lab:mouse_record", args=[self.mice[0].pk]),
+            url_with_query_params(self.url, return_url=self.list_url, mouse_editor_tab="individual"),
+        )
+
+    def test_legacy_genotypes_and_different_crossings_are_retained(self):
+        self.mice[1].crossing_definition = None
+        self.mice[1].crossing = "Historical crossing"
+        self.mice[1].genotype = "Historical genotype"
+        self.mice[1].save()
+        response, _ = self.summary()
+        self.assertContains(response, "Historical crossing")
+        self.assertContains(response, "Historical genotype")
+        self.assertEqual(len({row["crossing"] for row in response.context["individual_rows"]}), 2)
+
+    def test_procedures_only_include_linked_animals_and_preserve_notes(self):
+        response, markup = self.summary(mouse_editor_tab="procedures")
+        panel = next(node for node in markup.find("section") if node.attrs.get("id") == "mouse-panel-procedures")
+        for text in (self.mice[0].pk, "Summary procedure", "03/02/2026", "Scientist", "Page 15", "Procedure notes"):
+            self.assertIn(text, panel.text)
+        self.assertNotContains(response, "Unrelated scientist")
+        self.assertEqual(list(response.context["procedures"]), [self.procedure])
+
+    def test_edit_selection_active_tab_and_return_chain_are_preserved(self):
+        response, markup = self.summary(return_url=self.list_state, mouse_editor_tab="procedures")
+        edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        edit_query = parse_qs(urlsplit(edit_link).query)
+        self.assertEqual(edit_query["selected_mouse"], [mouse.pk for mouse in self.mice])
+        self.assertEqual(edit_query["mouse_editor_tab"], ["procedures"])
+        summary_return = edit_query["return_url"][0]
+        self.assertEqual(parse_qs(urlsplit(summary_return).query), {
+            "return_url": [self.list_state], "mouse_editor_tab": ["procedures"],
+        })
+        self.assertEqual(markup.find("a", **{"class": "back-link"})[0].attrs["href"], self.list_state)
+        editor = self.client.get(edit_link)
+        self.assertEqual(editor.status_code, 200)
+        editor_markup = Markup(editor.content.decode())
+        self.assertEqual(editor_markup.find("input", name="mouse_editor_tab")[0].attrs["value"], "procedures")
+        result = self.client.post(self.edit_url, {
+            "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
+            "return_url": summary_return, "mouse_editor_tab": "procedures",
+            "update_status": "on", "status": "Culled",
+        })
+        self.assertRedirects(result, summary_return)
+        self.assertEqual(list(Mouse.objects.filter(pk__in=[mouse.pk for mouse in self.mice]).values_list("status", flat=True)), ["Culled", "Culled"])
+
+    def test_renaming_in_editor_keeps_summary_link_valid(self):
+        response, markup = self.summary(mouse_editor_tab="individual")
+        summary_return = parse_qs(urlsplit(markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]).query)["return_url"][0]
+        result = self.client.post(self.edit_url, {
+            "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
+            "return_url": summary_return, "mouse_editor_tab": "individual", "confirm_mouse_ids": "on",
+            individual_mouse_field_prefix(self.mice[0]) + "_mouse_id": "Renamed summary animal",
+        })
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(parse_qs(urlsplit(result.url).query)["mouse_editor_tab"], ["individual"])
+        returned_summary = self.client.get(summary_return)
+        self.assertContains(returned_summary, "Renamed summary animal")
+        self.assertNotContains(returned_summary, ">Summary-0<")
+
+    def test_single_animal_is_embedded_in_details_and_unknown_tabs_fall_back(self):
+        self.recording.mice.set(self.mice[:1])
+        for tab in ("individual", "ids", "invalid"):
+            with self.subTest(tab=tab):
+                response, markup = self.summary(mouse_editor_tab=tab)
+                self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")], ["shared", "procedures", "services"])
+                self.assertEqual(response.context["active_tab"], "shared")
+                local_value = next(node for node in markup.find("td") if "Local-0" in node.text)
+                self.assertTrue(local_value.within("section", id="mouse-panel-shared"))
+
+    def test_empty_recording_and_no_procedures_have_clear_empty_states(self):
+        Procedure.objects.filter(mouse__in=self.mice).delete()
+        response, _ = self.summary()
+        self.assertContains(response, "No existing procedures belong to the selected animals.")
+        self.recording.mice.clear()
+        response, markup = self.summary()
+        self.assertContains(response, "No animals are linked to this recording.")
+        self.assertFalse(markup.find("a", **{"data-mouse-summary-edit": None}))
+        self.assertFalse(markup.find("div", role="tablist"))
+
+    def test_return_url_is_sanitized_and_summary_cannot_be_posted(self):
+        response, markup = self.summary(return_url="https://example.com/unsafe")
+        self.assertEqual(response.context["return_url"], self.list_url)
+        self.assertNotContains(response, "https://example.com/unsafe")
+        result = self.client.post(self.url, {"update_status": "on", "status": "Culled"})
+        self.assertEqual(result.status_code, 405)
+        self.mice[0].refresh_from_db()
+        self.assertEqual(self.mice[0].status, "Alive")
+
+    def test_authentication_scope_and_viewing_another_owners_recording(self):
+        other_user = get_user_model().objects.create_user(username="summary-viewer")
+        self.client.force_login(other_user)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "View animals (2)")
+        self.assert_contextual_link(response, self.url, self.list_url)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        self.assertEqual(self.client.get(reverse("lab:recording_animals", args=[self.project.pk, self.experiment.pk + 1000, self.recording.pk])).status_code, 404)
+        different_experiment = Experiment.objects.create(project=self.project, name="Other experiment", recording_type=self.kind)
+        self.assertEqual(self.client.get(reverse("lab:recording_animals", args=[self.project.pk, different_experiment.pk, self.recording.pk])).status_code, 404)
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlsplit(response.url).path, reverse("lab:login"))
+
+    def test_recording_button_preserves_list_filters_and_pagination(self):
+        response = self.client.get(self.list_state)
+        self.assertContains(response, "View animals (2)")
+        self.assert_contextual_link(response, self.url, self.list_state)
+
+    def test_summary_escapes_notes_and_query_count_does_not_grow_per_animal(self):
+        self.mice[0].notes = "<script>alert('notes')</script>\nSecond line"
+        self.mice[0].save()
+        with CaptureQueriesContext(connection) as small:
+            response, _ = self.summary()
+        self.assertContains(response, "&lt;script&gt;")
+        self.assertNotContains(response, "<script>alert(")
+        for index in range(10):
+            self.recording.mice.add(Mouse.objects.create(
+                mouse_id=f"Extra-summary-{index}", protocol=self.protocol, crossing_definition=self.crossing,
+            ))
+        with CaptureQueriesContext(connection) as large:
+            self.summary()
+        self.assertEqual(len(small), len(large))
+
+    def genotyping_recording(self, mice, notes="Selected genotyping record"):
+        experiment = Experiment.objects.get(project__is_service=True, recording_type__slug="genotyping")
+        return create_recording(
+            experiment=experiment, recording_type=experiment.recording_type,
+            owner=self.user, recording_date=date(2026, 4, 5), mice=mice,
+            values={"lab_member": "Genotyping scientist"}, data_paths=["/genotyping/gel.png"], notes=notes,
+        )
+
+    def services_panel(self, response):
+        markup = Markup(response.content.decode())
+        panel = markup.find("section", id="mouse-panel-services")[0]
+        tab = markup.find("button", **{"data-mouse-tab": "services"})[0]
+        self.assertIn("Services & recordings", tab.text)
+        return markup, panel
+
+    def test_services_lists_all_linked_recording_types_once_and_excludes_unrelated_records(self):
+        self.genotyping_recording(self.mice)
+        self.genotyping_recording(self.mice[:1], notes="Single animal genotyping")
+        self.genotyping_recording([self.other_mouse], notes="Unrelated genotyping record")
+        response, _ = self.summary(mouse_editor_tab="services")
+        _, panel = self.services_panel(response)
+        for text in ("Imaging", "Genotyping", "Genotyping scientist", "/genotyping/gel.png", "Animals", "Notes"):
+            self.assertIn(text, panel.text)
+        self.assertEqual(panel.text.count("Selected genotyping record"), 1)
+        self.assertEqual(panel.text.count("Single animal genotyping"), 1)
+        self.assertNotIn("Unrelated genotyping record", panel.text)
+        self.assertEqual(sum(len(section["table"]["rows"]) for section in response.context["animal_recording_sections"]), 3)
+
+    def test_both_edit_routes_show_the_same_recordings_and_keep_service_creation(self):
+        self.genotyping_recording(self.mice)
+        for url in (
+            self.edit_url,
+            reverse("lab:edit_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number]),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url, {"selected_mouse": [mouse.pk for mouse in self.mice], "mouse_editor_tab": "services"})
+                self.assertEqual(response.status_code, 200)
+                markup, panel = self.services_panel(response)
+                self.assertEqual(panel.text.count("Selected genotyping record"), 1)
+                self.assertIn("Add record", panel.text)
+                add_links = [node for node in markup.find("a") if node.text.strip() == "Add record"]
+                self.assertTrue(add_links)
+                for link in add_links:
+                    query = parse_qs(urlsplit(link.attrs["href"]).query)
+                    self.assertEqual(query["mice"], [",".join(mouse.pk for mouse in self.mice)])
+                    return_query = parse_qs(urlsplit(query["return_url"][0]).query)
+                    self.assertEqual(return_query["mouse_editor_tab"], ["services"])
+                    self.assertEqual(return_query["selected_mouse"], [mouse.pk for mouse in self.mice])
+
+    def test_summary_services_are_read_only_and_edit_opens_the_corresponding_tab(self):
+        self.genotyping_recording(self.mice)
+        response, markup = self.summary(mouse_editor_tab="services", return_url=self.list_state)
+        _, panel = self.services_panel(response)
+        self.assertNotIn("Add record", panel.text)
+        self.assertNotIn("Delete", panel.text)
+        self.assertFalse([node for node in markup.elements if node.tag in {"input", "select", "textarea", "form"} and node.within("section", id="mouse-panel-services")])
+        self.assertEqual(response.context["active_tab"], "services")
+        edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        query = parse_qs(urlsplit(edit_link).query)
+        self.assertEqual(query["mouse_editor_tab"], ["services"])
+        self.assertEqual(parse_qs(urlsplit(query["return_url"][0]).query)["mouse_editor_tab"], ["services"])
+        editor = self.client.get(edit_link)
+        _, editor_panel = self.services_panel(editor)
+        self.assertIn("Add record", editor_panel.text)
+        self.assertIn("Selected genotyping record", editor_panel.text)
+
+    def test_historical_recordings_remain_visible_after_type_and_experiment_are_archived(self):
+        record = self.genotyping_recording(self.mice)
+        record.recording_type.active = False
+        record.recording_type.save()
+        record.experiment.archived = True
+        record.experiment.save()
+        response, _ = self.summary()
+        _, panel = self.services_panel(response)
+        self.assertIn("Selected genotyping record", panel.text)
+
+    def test_recording_list_has_a_clear_empty_state_but_service_creation_remains_available(self):
+        self.recording.mice.clear()
+        response = self.client.get(self.edit_url, {"selected_mouse": self.mice[0].pk, "mouse_editor_tab": "services"})
+        _, panel = self.services_panel(response)
+        self.assertIn("No service records or recordings are linked to the selected animals.", panel.text)
+        self.assertIn("Add record", panel.text)
+
+    def test_procedure_selection_opens_read_only_summary_then_scoped_editor(self):
+        view_url = reverse("lab:view_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        procedure_url = reverse("lab:procedure_page_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        list_state = procedure_url + "?show_current_year=0&sex=F&sort=mouse_id&direction=asc&page=2"
+        selection = [mouse.pk for mouse in self.mice]
+        response = self.client.get(view_url, {"selected_mouse": selection, "return_url": list_state, "mouse_editor_tab": "services"})
+        self.assertEqual(response.status_code, 200)
+        markup = Markup(response.content.decode())
+        self.assertIn(self.protocol.name, markup.find("div", **{"class": "page-subtitle"})[0].text)
+        self.assertNotContains(response, "Undated recording")
+        self.assertEqual(markup.find("a", **{"class": "back-link"})[0].attrs["href"], list_state)
+        self.assertTrue(any(link.attrs.get("aria-current") == "true" and link.text.strip() == "Procedures" for link in markup.find("a")))
+        edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        expected_edit_url = reverse("lab:edit_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        self.assertEqual(urlsplit(edit_link).path, expected_edit_url)
+        query = parse_qs(urlsplit(edit_link).query)
+        self.assertEqual(query["selected_mouse"], selection)
+        self.assertEqual(query["mouse_editor_tab"], ["services"])
+        summary_return = query["return_url"][0]
+        self.assertEqual(parse_qs(urlsplit(summary_return).query)["return_url"], [list_state])
+        self.assertEqual(parse_qs(urlsplit(summary_return).query)["selected_mouse"], selection)
+        editor = self.client.get(edit_link)
+        self.assertEqual(editor.status_code, 200)
+        self.assertContains(editor, "Add record")
+        saved = self.client.post(expected_edit_url, {
+            "selected_mouse": selection, "return_url": summary_return,
+            "apply_bulk_edit": "1", "update_status": "on", "status": "Culled", "mouse_editor_tab": "services",
+        })
+        self.assertRedirects(saved, summary_return)
+
+    def test_procedure_view_selection_post_only_redirects_and_never_saves_edits(self):
+        view_url = reverse("lab:view_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        response = self.client.post(view_url, {
+            "selected_mouse": [self.mice[0].pk, self.mice[0].pk], "update_status": "on", "status": "Culled",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(parse_qs(urlsplit(response.url).query)["selected_mouse"], [self.mice[0].pk])
+        summary = self.client.get(response.url)
+        self.assertEqual(summary.status_code, 200)
+        self.assertTrue(summary.context["single_mouse_mode"])
+        self.mice[0].refresh_from_db()
+        self.assertEqual(self.mice[0].status, "Alive")
+        self.assertEqual(self.client.delete(view_url).status_code, 405)
+
+    def test_procedure_summary_rejects_missing_and_out_of_protocol_animals(self):
+        view_url = reverse("lab:view_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        fallback = reverse("lab:procedure_page_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        other_protocol = Protocol.objects.create(licence_reference="OTHER", protocol_number=82, name="Other protocol")
+        self.other_mouse.protocol = other_protocol
+        self.other_mouse.save()
+        for selection in ([], ["Missing animal"], [self.mice[0].pk, self.other_mouse.pk]):
+            with self.subTest(selection=selection):
+                response = self.client.get(view_url, {"selected_mouse": selection, "return_url": "https://example.com/unsafe"})
+                self.assertRedirects(response, fallback)
+        self.client.logout()
+        self.assertEqual(self.client.get(view_url, {"selected_mouse": self.mice[0].pk}).status_code, 302)
+
+    def test_renaming_from_procedure_summary_updates_its_selection_for_returning(self):
+        view_url = reverse("lab:view_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        response = self.client.get(view_url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
+        edit_link = Markup(response.content.decode()).find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        query = parse_qs(urlsplit(edit_link).query)
+        result = self.client.post(urlsplit(edit_link).path, {
+            "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
+            "return_url": query["return_url"][0], "confirm_mouse_ids": "on",
+            individual_mouse_field_prefix(self.mice[0]) + "_mouse_id": "Renamed procedure animal",
+        })
+        self.assertEqual(result.status_code, 302)
+        summary_return = parse_qs(urlsplit(result.url).query)["return_url"][0]
+        self.assertEqual(parse_qs(urlsplit(summary_return).query)["selected_mouse"], ["Renamed procedure animal", self.mice[1].pk])
+        self.assertContains(self.client.get(summary_return), "Renamed procedure animal")
+
+    def test_changing_protocol_in_editor_keeps_the_summary_accessible(self):
+        view_url = reverse("lab:view_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
+        new_protocol = Protocol.objects.create(licence_reference="NEW", protocol_number=83, name="New protocol")
+        response = self.client.get(view_url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
+        edit_link = Markup(response.content.decode()).find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
+        result = self.client.post(urlsplit(edit_link).path, {
+            "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
+            "return_url": parse_qs(urlsplit(edit_link).query)["return_url"][0],
+            "update_protocol": "on", "protocol": new_protocol.pk,
+        })
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(urlsplit(result.url).path, reverse("lab:view_selected_mice_licence_protocol", args=["NEW", 83]))
+        summary = self.client.get(result.url)
+        self.assertEqual(summary.status_code, 200)
+        self.assertContains(summary, "New protocol")

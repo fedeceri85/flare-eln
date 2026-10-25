@@ -7,14 +7,16 @@ from urllib.parse import (
     urlunsplit,
 )
 
-from django.db.models import F, Q
+from django.db.models import F, Prefetch, Q, prefetch_related_objects
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from ..forms import RecordingForm
+from ..animal_summary import build_animal_summary
 from ..models import (
+    CrossingLine,
     Experiment,
     Mouse,
     Project,
@@ -71,6 +73,38 @@ def url_with_query_params(url, **params):
             parts.fragment,
         )
     )
+
+
+def animal_summary_context(request, mice, *, summary_url, edit_url):
+    """Keep animal viewing and edit navigation consistent across entry points."""
+    prefetch_related_objects(
+        mice, "added_by", "crossing_definition__species", "genotype_calls__mouse_line",
+        Prefetch(
+            "crossing_definition__crossing_lines",
+            queryset=CrossingLine.objects.select_related("line").order_by("position", "crossing_line_id"),
+        ),
+    )
+    active_tab = request.GET.get("mouse_editor_tab", "shared")
+    available_tabs = {"shared", "procedures", "services"} | ({"individual"} if len(mice) > 1 else set())
+    if active_tab not in available_tabs:
+        active_tab = "shared"
+    summary_url = url_with_query_params(summary_url, mouse_editor_tab=active_tab)
+    summary = build_animal_summary(mice)
+    individual_return_url = url_with_query_params(
+        summary_url, mouse_editor_tab="shared" if len(mice) == 1 else "individual",
+    )
+    for row in summary.get("individual_rows", []):
+        row["record_url"] = url_with_query_params(row["record_url"], return_url=individual_return_url)
+    return {
+        **summary,
+        "selected_mice": mice,
+        "read_only": True,
+        "active_tab": active_tab,
+        "edit_animals_url": url_with_query_params(
+            edit_url, selected_mouse=[mouse.pk for mouse in mice],
+            mouse_editor_tab=active_tab, return_url=summary_url,
+        ) if mice else "",
+    }
 
 
 def selected_mouse_ids(request):

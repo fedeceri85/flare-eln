@@ -11,7 +11,7 @@
                 <thead><tr><th scope="col">Name</th><th scope="col">Created by</th><th scope="col">Created</th><th scope="col">Actions</th></tr></thead>
                 <tbody>{% for template in group.list %}
                     <tr><td>{{ template.name }}</td><td>{{ template.created_by|default:'Deleted user' }}</td><td>{{ template.created_at|date:'j M Y' }}</td>
-                        <td class="action-cell"><div class="actions"><a class="button" href="{% url 'lab:rename_import_template' template.pk %}" aria-label="Rename {{ template.name }}">Rename</a><a class="button" href="{% url 'lab:delete_import_template' template.pk %}" aria-label="Delete {{ template.name }}">Delete</a></div></td>
+                        <td class="action-cell"><div class="table-row-actions"><a class="table-row-action" href="{% url 'lab:rename_import_template' template.pk %}" aria-label="Rename {{ template.name }}">Rename</a><a class="table-row-action table-row-action--danger" href="{% url 'lab:delete_import_template' template.pk %}" aria-label="Delete {{ template.name }}">Delete</a></div></td>
                     </tr>
                 {% endfor %}</tbody>
             </table></div></div>

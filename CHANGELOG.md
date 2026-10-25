@@ -1,3 +1,6 @@
+25/10/2026
+- Added page for simultaneous view of multiple animals
+
 24/10/2026
 - Import experiments from spreadsheet - first version. 
 - Added aliases to animal lines, to favour matching in spreadsheet imports

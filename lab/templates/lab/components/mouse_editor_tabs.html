@@ -1,7 +1,13 @@
-<div class="mouse-editor-tabs" role="tablist" aria-label="Animal editor sections" data-mouse-tab-list hidden>
+<div class="mouse-editor-tabs" role="tablist" aria-label="{% if read_only %}Animal summary sections{% else %}Animal editor sections{% endif %}" data-mouse-tab-list hidden>
+    {% if not read_only %}
     <button type="button" role="tab" id="mouse-tab-ids" aria-controls="mouse-panel-ids" data-mouse-tab="ids">Animal IDs <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+    {% endif %}
     <button type="button" role="tab" id="mouse-tab-shared" aria-controls="mouse-panel-shared" data-mouse-tab="shared">Animal details <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+    {% if read_only %}
+    {% if not single_mouse_mode %}<button type="button" role="tab" id="mouse-tab-individual" aria-controls="mouse-panel-individual" data-mouse-tab="individual">Individual animals <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>{% endif %}
+    {% else %}
     {% if form.dynamic_mouse_count or not form.single_mouse_mode %}<button type="button" role="tab" id="mouse-tab-individual" aria-controls="mouse-panel-individual" data-mouse-tab="individual" {% if form.single_mouse_mode %}hidden{% endif %}>Individual animals <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>{% endif %}
+    {% endif %}
     <button type="button" role="tab" id="mouse-tab-procedures" aria-controls="mouse-panel-procedures{% if editing_existing %} mouse-panel-existing-procedures{% endif %}" data-mouse-tab="procedures">Procedures <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
-    <button type="button" role="tab" id="mouse-tab-services" aria-controls="mouse-panel-services" data-mouse-tab="services">Services <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
+    <button type="button" role="tab" id="mouse-tab-services" aria-controls="mouse-panel-services" data-mouse-tab="services">Services &amp; recordings <span class="mouse-tab-error" data-mouse-tab-error hidden>— contains errors</span></button>
 </div>

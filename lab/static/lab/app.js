@@ -43,8 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (animalAction) {
                 let destination = createUrl;
                 if (count) {
-                    // Opening the editor is read-only; leave all writes to its
-                    // existing CSRF-protected forms. Never put CSRF tokens in URLs.
+                    // Selection links only open a page. Never put CSRF tokens in URLs.
                     const editUrl = new URL(form.action, window.location.href);
                     checkboxes.filter(checkbox => checkbox.checked).forEach(function (checkbox) {
                         editUrl.searchParams.append("selected_mouse", checkbox.value);
@@ -54,7 +53,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     destination = editUrl.href;
                 }
                 animalAction.setAttribute("href", destination);
-                animalAction.textContent = count ? "Edit selected" : "Add animals";
+                animalAction.textContent = count
+                    ? animalAction.getAttribute("data-animal-selected-label") || "Edit selected"
+                    : "Add animals";
             }
         }
 

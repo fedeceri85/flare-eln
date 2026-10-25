@@ -453,6 +453,7 @@ BASE_RECORDING_COLUMN_SPECS = [
         "key": "recording_date",
         "label": "Date",
         "format": "date",
+        "cell_class": "recording-date-cell",
         "url": lambda recording: selected_recording_url(recording),
         "link_class": "mouse-link",
     },
@@ -941,7 +942,7 @@ def build_projects_table(
                         "value": "Edit",
                         "class": "action-cell",
                         "url": edit_url,
-                        "link_class": "button",
+                        "link_class": "table-row-action",
                     },
                 ],
             }
@@ -996,7 +997,7 @@ def build_experiments_table(
                         "value": "Edit",
                         "class": "action-cell",
                         "url": edit_url,
-                        "link_class": "button",
+                        "link_class": "table-row-action",
                     },
                 ],
             }
@@ -1039,7 +1040,13 @@ def build_service_experiment_cards(experiments):
     return cards
 
 
-def build_recording_type_table(recording_type, recordings):
+def build_recording_type_table(recording_type, recordings, *, include_animals=False, include_notes=False):
+    base_specs = list(BASE_RECORDING_COLUMN_SPECS)
+    path_specs = list(RECORDING_PATH_COLUMN_SPEC)
+    if include_animals:
+        base_specs.insert(1, RECORDINGS_PAGE_BASE_COLUMN_SPECS[1])
+    if include_notes:
+        path_specs.append(RECORDINGS_PAGE_TRAILING_COLUMN_SPECS[1])
     display_fields = [
         field
         for field in recording_type.fields.all()
@@ -1050,7 +1057,7 @@ def build_recording_type_table(recording_type, recordings):
             "label": spec["label"],
             "class": spec.get("cell_class", ""),
         }
-        for spec in BASE_RECORDING_COLUMN_SPECS
+        for spec in base_specs
     ]
     field_columns = [
         {
@@ -1064,7 +1071,7 @@ def build_recording_type_table(recording_type, recordings):
             "label": spec["label"],
             "class": spec.get("cell_class", ""),
         }
-        for spec in RECORDING_PATH_COLUMN_SPEC
+        for spec in path_specs
     ]
     rows = []
 
@@ -1074,7 +1081,7 @@ def build_recording_type_table(recording_type, recordings):
                 "cells": [
                     *[
                         build_cell(recording, spec)
-                        for spec in BASE_RECORDING_COLUMN_SPECS
+                        for spec in base_specs
                     ],
                     *[
                         {
@@ -1088,7 +1095,7 @@ def build_recording_type_table(recording_type, recordings):
                     ],
                     *[
                         build_cell(recording, spec)
-                        for spec in RECORDING_PATH_COLUMN_SPEC
+                        for spec in path_specs
                     ],
                 ],
             }
@@ -1143,12 +1150,13 @@ def build_recordings_table(
             ],
             current_sort, current_direction, query_params,
         ),
-        {"label": "Edit", "class": "action-cell"},
+        {"label": "Actions", "class": "action-cell"},
     ]
     rows = []
 
     for recording in recordings:
         can_modify = recording.can_be_modified_by(user)
+        animal_count = len(recording.mice.all())
         is_selected = recording.pk == selected_recording_id
         edit_url = reverse(
             "lab:edit_recording",
@@ -1195,10 +1203,16 @@ def build_recordings_table(
                         for spec in RECORDINGS_PAGE_TRAILING_COLUMN_SPECS
                     ],
                     {
-                        "value": "Edit" if can_modify else EMPTY_VALUE,
                         "class": "action-cell",
-                        "url": edit_url if can_modify else None,
-                        "link_class": "button",
+                        "actions": [
+                            {
+                                "value": f"View animals ({animal_count})" if animal_count else "No animals",
+                                "url": reverse("lab:recording_animals", args=[
+                                    recording.experiment.project_id, recording.experiment_id, recording.pk,
+                                ]) if animal_count else None,
+                            },
+                            *([{"value": "Edit", "url": edit_url}] if can_modify else []),
+                        ],
                     },
                 ],
             }

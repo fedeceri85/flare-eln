@@ -21,6 +21,12 @@ from .genetics import (
 
 
 class BulkMouseUpdateForm(forms.Form):
+    MOUSE_UPDATE_GROUPS = (
+        ("Origin", ("date_of_birth", "breeding_pair")),
+        ("Animal status", ("status", "severity", "cull_date")),
+        ("Protocol", ("protocol", "protocol_start_date")),
+    )
+
     MOUSE_UPDATE_FIELDS = [
         ("update_status", "status"),
         ("update_severity", "severity"),
@@ -582,11 +588,7 @@ class BulkMouseUpdateForm(forms.Form):
         fields = {item["field"].name: item for item in self.mouse_update_bound_fields}
         return [
             {"title": title, "fields": [fields[name] for name in names]}
-            for title, names in (
-                ("Origin", ("date_of_birth", "breeding_pair")),
-                ("Animal status", ("status", "severity", "cull_date")),
-                ("Protocol", ("protocol", "protocol_start_date")),
-            )
+            for title, names in self.MOUSE_UPDATE_GROUPS
         ]
 
     @property

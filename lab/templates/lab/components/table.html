@@ -60,6 +60,12 @@
                                             aria-label="{{ cell.checkbox.aria_label }}"
                                             {% if cell.checkbox.checked %}checked{% endif %}
                                         >
+                                    {% elif cell.actions %}
+                                        <div class="table-row-actions">
+                                            {% for action in cell.actions %}
+                                                {% if action.url %}<a class="table-row-action" href="{% record_link action.url request %}">{{ action.value }}</a>{% else %}<span>{{ action.value }}</span>{% endif %}
+                                            {% endfor %}
+                                        </div>
                                     {% elif cell.url %}
                                         <a
                                             class="{{ cell.link_class }}"

@@ -11,7 +11,7 @@
         <thead><tr><th scope="col">Name</th><th scope="col">Slug</th><th scope="col">Active</th><th scope="col">Actions</th></tr></thead>
         <tbody>{% for type in recording_types %}<tr>
             <td>{{ type.name }}</td><td>{{ type.slug }}</td><td>{{ type.active|yesno:'Yes,No' }}</td>
-            <td class="action-cell"><a class="button" href="{% url 'lab:edit_recording_type' type.pk %}" aria-label="Edit {{ type.name }}">Edit type and fields</a></td>
+            <td class="action-cell"><a class="table-row-action" href="{% url 'lab:edit_recording_type' type.pk %}" aria-label="Edit {{ type.name }}">Edit type and fields</a></td>
         </tr>{% empty %}<tr><td colspan="4">No recording types yet.</td></tr>{% endfor %}</tbody>
     </table></div></div>
 {% endblock %}

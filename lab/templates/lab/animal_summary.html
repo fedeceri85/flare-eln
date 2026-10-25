@@ -1,0 +1,91 @@
+{% extends "lab/base.html" %}
+{% load static %}
+
+{% block title %}Animal summary{% endblock %}
+{% block page_title %}Animal summary{% endblock %}
+{% block main_class %}container container-wide{% endblock %}
+{% block page_subtitle %}
+    <p>{% if recording %}{{ project.name }} — {{ experiment.name }} · {{ recording.recording_date|date:"d/m/Y"|default:"Undated recording" }} · {% elif selected_protocol %}{{ selected_protocol.licence_reference }} — {{ selected_protocol.name }} · {% endif %}{{ selected_mice|length }} animal{{ selected_mice|length|pluralize }}</p>
+{% endblock %}
+
+{% block content %}
+    {% if selected_mice %}
+    <div class="animal-summary" data-mouse-editor data-mouse-initial-tab="{{ active_tab }}">
+        <div class="page-action-bar bulk-mouse-action-bar" role="region" aria-label="Animal summary actions" data-page-actions>
+            {% include "lab/components/selected_animals_scope.html" %}
+            <div class="actions"><a class="button button-primary" href="{{ edit_animals_url }}" data-mouse-summary-edit>Edit animals</a></div>
+        </div>
+        {% include "lab/components/mouse_editor_tabs.html" %}
+
+        <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared">
+            <h2 class="visually-hidden">Animal details</h2>
+            {% if single_mouse_mode %}
+                <div class="single-mouse-rows litter-rows-scroll">
+                    {% include "lab/components/individual_mouse_table.html" with rows=individual_rows %}
+                </div>
+            {% else %}
+                <p class="bulk-help">Shared values are shown below. Expand differing values to see each animal’s details.</p>
+            {% endif %}
+            <div class="shared-detail-groups">
+                {% for group in summary_groups %}
+                    <fieldset class="shared-detail-group">
+                        <legend>{{ group.title }}</legend>
+                        {% for item in group.fields %}
+                            {% include "lab/components/animal_summary_field.html" %}
+                        {% endfor %}
+                    </fieldset>
+                {% endfor %}
+            </div>
+            <div class="shared-genetics">
+                {% include "lab/components/animal_summary_field.html" with item=summary_crossing %}
+                {% if not single_mouse_mode %}
+                    <div class="shared-genotype-column">{% include "lab/components/animal_summary_field.html" with item=summary_genotype %}</div>
+                {% endif %}
+            </div>
+            <div class="shared-notes">{% include "lab/components/animal_summary_field.html" with item=summary_notes %}</div>
+        </section>
+
+        {% if not single_mouse_mode %}
+        <section class="bulk-section" id="mouse-panel-individual" data-mouse-tab-panel="individual">
+            <h2 class="visually-hidden">Individual animals</h2>
+            <p class="bulk-help">Each animal’s local identifier, sex and genotype. Select an Animal ID to open its complete record.</p>
+            <div class="litter-rows-scroll">
+                {% regroup individual_rows by crossing as crossing_groups %}
+                {% for group in crossing_groups %}
+                    {% include "lab/components/individual_mouse_table.html" with rows=group.list crossing=group.grouper %}
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="bulk-section procedure-editor" id="mouse-panel-procedures" data-mouse-tab-panel="procedures">
+            <h2 class="bulk-title">Existing procedures</h2>
+            {% if procedures %}
+                <div class="table-card"><div class="table-scroll"><table class="data-table">
+                    <thead><tr><th scope="col">Animal ID</th><th scope="col">Procedure type</th><th scope="col">Date</th><th scope="col">Lab member</th><th scope="col">Lab-book page</th><th scope="col">Notes</th></tr></thead>
+                    <tbody>
+                        {% for procedure in procedures %}
+                            {% ifchanged procedure.mouse_id %}<tr><th colspan="6" scope="rowgroup">Animal {{ procedure.mouse_id }}</th></tr>{% endifchanged %}
+                            <tr>
+                                <td>{{ procedure.mouse_id }}</td><td>{{ procedure.procedure_type }}</td>
+                                <td>{{ procedure.date|date:"d/m/Y"|default:"—" }}</td><td>{{ procedure.lab_member|default:"—" }}</td><td>{{ procedure.lab_book_page|default:"—" }}</td><td class="animal-summary-value">{{ procedure.notes|default:"—" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table></div></div>
+            {% else %}
+                <p>No existing procedures belong to the selected animals.</p>
+            {% endif %}
+        </section>
+        <section id="mouse-panel-services" data-mouse-tab-panel="services">
+            {% include "lab/components/animal_recordings.html" %}
+        </section>
+    </div>
+    {% else %}
+        <p class="empty-message">No animals are linked to this recording.</p>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
+{% endblock %}

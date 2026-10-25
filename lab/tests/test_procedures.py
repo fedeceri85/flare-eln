@@ -454,7 +454,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
             },
         )
         edit_selected_url = reverse(
-            "lab:edit_selected_mice_licence_protocol",
+            "lab:view_selected_mice_licence_protocol",
             kwargs={
                 "licence_reference": self.licence_a,
                 "protocol_number": self.protocol_a1.protocol_number,
@@ -465,6 +465,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertContains(response, f'href="{add_litter_url}?return_url=')
         self.assertContains(response, f'action="{edit_selected_url}"')
         self.assertContains(response, 'data-animal-action="selected-mice-form"', count=1)
+        self.assertContains(response, 'data-animal-selected-label="View animals"')
         self.assertNotContains(response, 'form="selected-mice-form"')
 
     def test_add_mouse_scoped_protocol_cannot_be_changed(self):

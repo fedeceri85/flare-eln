@@ -59,6 +59,7 @@
                 <a
                     class="button button-primary"
                     data-animal-action="selected-mice-form"
+                    data-animal-selected-label="View animals"
                     aria-live="polite"
                     href="{% url 'lab:add_litter_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}?return_url={{ request.get_full_path|urlencode }}"
                 >
@@ -90,7 +91,7 @@
         <form
             id="selected-mice-form"
             method="post"
-            action="{% url 'lab:edit_selected_mice_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}"
+            action="{% url 'lab:view_selected_mice_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}"
         >
             {% csrf_token %}
             <input

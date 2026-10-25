@@ -1,0 +1,15 @@
+<div class="bulk-field animal-summary-field">
+    <div class="bulk-toggle"><span>{{ item.label }}</span></div>
+    {% if item.varies %}
+        <details class="animal-summary-differences">
+            <summary>Varies between animals</summary>
+            <dl>
+                {% for animal in item.animals %}
+                    <div><dt>{{ animal.mouse_id }}</dt><dd class="animal-summary-value">{{ animal.value }}</dd></div>
+                {% endfor %}
+            </dl>
+        </details>
+    {% else %}
+        <p class="animal-summary-value">{{ item.value }}</p>
+    {% endif %}
+</div>

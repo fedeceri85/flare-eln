@@ -19,14 +19,7 @@
 {% block page_action_bar_class %} bulk-mouse-action-bar{% endblock %}
 
 {% block page_action_scope %}
-    <div class="bulk-selected-mice" data-sticky-selected-mice>
-        <p class="selected-list-label">Selected animals ({{ selected_mice|length }})</p>
-        <ul class="selected-list-items" tabindex="0" role="region" aria-label="Selected Animal IDs">
-            {% for mouse in selected_mice %}
-                <li class="selected-list-item">{{ mouse.mouse_id }}</li>
-            {% endfor %}
-        </ul>
-    </div>
+    {% include "lab/components/selected_animals_scope.html" %}
 {% endblock %}
 
 {% block page_actions %}
@@ -147,6 +140,7 @@
     </section>
 
     <section id="mouse-panel-services" data-mouse-tab-panel="services">
+        {% include "lab/components/animal_recordings.html" %}
         {% include "lab/components/service_recording_actions.html" with service_recording_actions_bulk_layout=1 hide_service_title=True %}
         {% if not service_recording_actions %}
             <div class="bulk-section"><h2 class="visually-hidden">Services</h2><p>No services are available for the selected animals.</p></div>

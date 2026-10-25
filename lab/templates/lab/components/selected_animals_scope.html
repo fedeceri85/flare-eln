@@ -1,0 +1,8 @@
+<div class="bulk-selected-mice" data-sticky-selected-mice>
+    <p class="selected-list-label">Selected animals ({{ selected_mice|length }})</p>
+    <ul class="selected-list-items" tabindex="0" role="region" aria-label="Selected Animal IDs">
+        {% for mouse in selected_mice %}
+            <li class="selected-list-item">{{ mouse.mouse_id }}</li>
+        {% endfor %}
+    </ul>
+</div>

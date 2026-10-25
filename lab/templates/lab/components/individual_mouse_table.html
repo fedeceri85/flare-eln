@@ -1,3 +1,4 @@
+{% load navigation %}
 <table class="data-table litter-mouse-table individual-mouse-table">
     {% if crossing %}<caption class="individual-crossing-label"><span>Crossing</span> {{ crossing }}</caption>{% endif %}
     <colgroup>
@@ -10,23 +11,37 @@
     <tbody>
         {% for row in rows %}
             <tr>
-                <th scope="row">{{ row.mouse_id }}</th>
+                <th scope="row">{% if read_only %}<a class="mouse-link" href="{% record_link row.record_url request %}">{{ row.mouse_id }}</a>{% else %}{{ row.mouse_id }}{% endif %}</th>
                 <td>
+                    {% if read_only %}{{ row.local_identifier }}{% else %}
                     <label class="visually-hidden" for="{{ row.local_identifier.id_for_label }}">{{ row.mouse_id }}: local identifier</label>
                     {{ row.local_identifier }}{{ row.local_identifier.errors }}
+                    {% endif %}
                 </td>
                 <td>
+                    {% if read_only %}{{ row.sex }}{% else %}
                     <label class="visually-hidden" for="{{ row.sex.id_for_label }}">{{ row.mouse_id }}: sex</label>
                     {{ row.sex }}{{ row.sex.errors }}
+                    {% endif %}
                 </td>
                 <td>
                     <div class="individual-genotype-grid">
+                        {% if read_only %}
+                            {% for result in row.genotype_results %}
+                                <div class="form-field individual-genotype-field">
+                                    <div class="individual-gene-heading"><span>{{ result.label }}</span>{% if result.uncertain %}<span class="genotype-uncertainty">Uncertain</span>{% endif %}</div>
+                                    <div class="genotype-result-controls">{{ result.value }}</div>
+                                </div>
+                            {% endfor %}
+                            {% if row.legacy_genotype %}<span>{{ row.legacy_genotype }}</span>{% elif not row.genotype_results %}<span>—</span>{% endif %}
+                        {% else %}
                         {% for field in row.genotype_fields %}
                             {% include "lab/components/individual_genotype_field.html" %}
                         {% empty %}
                             {% if row.legacy_genotype %}<small>Existing free-text genotype: {{ row.legacy_genotype }}</small>{% endif %}
                             <small>{{ empty_genotype_message }}</small>
                         {% endfor %}
+                        {% endif %}
                     </div>
                 </td>
             </tr>

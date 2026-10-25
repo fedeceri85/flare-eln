@@ -1159,6 +1159,16 @@ input[type="checkbox"] { accent-color: var(--blue); }
 
 .individual-mouse-table thead th:first-child { left: 0; z-index: 4; }
 
+.animal-summary-field .bulk-toggle { font-weight: 650; }
+.animal-summary-value { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.animal-summary-differences > summary { color: var(--muted); cursor: pointer; }
+.animal-summary-differences dl { margin: 10px 0 0; }
+.animal-summary-differences dl > div + div { margin-top: 10px; }
+.animal-summary-differences dt { font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.animal-summary-differences dd { margin: 3px 0 0; }
+.animal-summary .single-mouse-rows { margin-bottom: 20px; }
+.animal-summary .individual-gene-heading > span:first-child { font-weight: 650; }
+
 .mouse-ids-table { table-layout: fixed; white-space: normal; }
 .mouse-ids-table th:first-child { width: 40%; overflow-wrap: anywhere; }
 .mouse-ids-table td > input { width: 100%; min-width: 0; }
@@ -1227,6 +1237,7 @@ input[type="checkbox"] { accent-color: var(--blue); }
 }
 .genetics-catalogue .catalogue-filter { width: 100%; box-sizing: border-box; }
 .genetics-catalogue .catalogue-filter .filter-grid { grid-template-columns: minmax(160px, 1fr) minmax(200px, 3fr); }
+.table-row-actions,
 .genetics-catalogue .catalogue-row-actions { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
 .genetics-catalogue .catalogue-panel { margin-top: 24px; scroll-margin-top: 100px; }
 .genetics-catalogue .catalogue-panel > summary { cursor: pointer; font-weight: 600; }
@@ -1246,16 +1257,22 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .genetics-catalogue .catalogue-table th:last-child { width: 144px; }
 .genetics-catalogue .catalogue-table .catalogue-kind { width: 140px; }
 .genetics-catalogue .catalogue-table .catalogue-state { width: 70px; }
+.table-row-action,
 .genetics-catalogue .catalogue-row-action {
     display: inline-flex; align-items: center; padding: 4px 6px; margin: 0;
     min-height: 0; border: 0; border-radius: 4px; background: transparent;
     color: var(--blue); font-family: inherit; font-size: 12px; font-weight: 600;
     line-height: 1.25; text-decoration: none; white-space: nowrap; cursor: pointer;
 }
+.table-row-action:hover,
 .genetics-catalogue .catalogue-row-action:hover { background: var(--blue-soft); text-decoration: underline; }
+.table-row-action--danger,
 .genetics-catalogue .catalogue-row-action--danger { color: #b42318; }
+.table-row-action--danger:hover,
 .genetics-catalogue .catalogue-row-action--danger:hover { background: #fff1f0; }
+.table-row-action:focus-visible,
 .genetics-catalogue .catalogue-row-action:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.table-row-action:disabled { color: var(--muted); cursor: default; }
 
 /* Record lists share the compact Procedures toolbar, filters and table rhythm. */
 .record-list-page .page-action-bar { align-items: center; }
@@ -1268,25 +1285,24 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .record-list-page .data-table :is(th, td) { padding: 6px 8px; line-height: 1.35; }
 .record-list-page .data-table th { overflow-wrap: normal; word-break: normal; vertical-align: bottom; }
 .data-table.procedure-matrix.recordings-table { table-layout: auto; min-width: 1050px; }
+.data-table.recordings-table { white-space: normal; }
+.data-table.recordings-table td { overflow-wrap: anywhere; }
 .data-table.recordings-table :is(th, td) { padding: 6px 8px; line-height: 1.35; }
 .data-table.recordings-table th { overflow-wrap: normal; word-break: normal; vertical-align: bottom; }
 .data-table.recordings-table .recording-date-cell { width: 90px; min-width: 90px; white-space: nowrap; }
 .data-table.recordings-table .recording-animals-cell { width: 200px; min-width: 160px; max-width: 260px; }
-.recording-animal-links { display: flex; flex-wrap: wrap; gap: 3px 10px; }
-.recording-animal-links .mouse-link { max-width: 100%; overflow-wrap: anywhere; }
+.recording-animal-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 260px; max-width: 100%; min-width: 0; }
+.recording-animal-links .mouse-link { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .data-table.recordings-table .recording-field-cell { min-width: 95px; max-width: 260px; }
 .data-table.recordings-table .path-cell { width: 220px; min-width: 180px; max-width: 320px; overflow-wrap: anywhere; }
 .data-table.recordings-table .notes-cell { width: 180px; min-width: 140px; max-width: 300px; }
-.recordings-table .action-cell .button { min-height: 28px; padding: 3px 8px; }
 .data-table.procedure-matrix.experiments-table { table-layout: auto; min-width: 800px; }
 .data-table.experiments-table .compact-text-cell { min-width: 140px; max-width: 280px; }
 .data-table.experiments-table .notes-cell { width: auto; min-width: 220px; max-width: 480px; }
 .data-table.experiments-table .date-cell { width: 95px; min-width: 95px; white-space: nowrap; }
 .data-table.experiments-table .action-cell { width: 70px; }
-.experiments-table .action-cell .button { min-height: 28px; padding: 3px 8px; }
 .settings-page .data-table.procedure-matrix.settings-table { table-layout: auto; min-width: 600px; }
 .settings-page .settings-table .action-cell { width: 1%; white-space: nowrap; }
-.settings-page .settings-table .action-cell .button { min-height: 28px; padding: 3px 8px; }
 .settings-page .settings-table .actions { flex-wrap: nowrap; gap: 6px; }
 .settings-section-title { margin: 0; color: var(--ink); font-size: 14px; font-weight: 650; }
 .settings-help { margin: 0 0 12px; color: var(--muted); font-size: 13px; }

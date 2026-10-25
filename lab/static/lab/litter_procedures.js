@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function action(label, callback) {
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "button button-small";
+        button.className = label === "Remove" ? "table-row-action table-row-action--danger" : "table-row-action";
         button.textContent = label;
         button.addEventListener("click", callback);
         return button;
@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 row.appendChild(cell);
             });
             const actions = document.createElement("td");
+            actions.className = "action-cell";
             actions.appendChild(action("Edit", () => {
                 names.forEach(name => { fields[name].value = draft[name] || ""; });
                 editing = index;

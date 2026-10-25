@@ -81,6 +81,11 @@ urlpatterns = [
         name="edit_selected_mice_licence_protocol",
     ),
     path(
+        "procedures/licence/<path:licence_reference>/protocol/<int:protocol_number>/view-selected/",
+        protected(views.view_selected_mice),
+        name="view_selected_mice_licence_protocol",
+    ),
+    path(
         (
             "procedures/licence/<path:licence_reference>/"
             "protocol/<int:protocol_number>/delete-selected/"
@@ -237,6 +242,11 @@ urlpatterns = [
         ),
         protected(views.edit_recording),
         name="edit_recording",
+    ),
+    path(
+        "projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/<int:recording_pk>/animals/",
+        protected(views.recording_animals),
+        name="recording_animals",
     ),
     path(
         (

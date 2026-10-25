@@ -33,6 +33,8 @@ PAGE_TITLES = {
     "delete_recording": "Delete recording", "delete_selected_recordings": "Delete selected recordings", "select_recording_mouse": "Select animals",
     "edit_mouse": "Edit animal", "rename_mouse": "Rename animal",
     "delete_mouse": "Delete animal", "edit_mouse_procedure": "Edit procedure",
+    "recording_animals": "Animal summary",
+    "view_selected_mice": "Animal summary",
 }
 PRIMARY_ACTIONS = {
     "add_mouse": "Save animal", "add_litter": "Add animals",
@@ -48,6 +50,8 @@ CONTEXTUAL_ROUTES = {
     "edit_selected_mice_all", "edit_selected_mice_licence_protocol", "edit_selected_mice",
     "edit_mouse_procedure", "experiments_page", "recordings_page",
     "edit_project", "edit_experiment", "edit_recording", "delete_recording", "delete_selected_recordings",
+    "recording_animals",
+    "view_selected_mice_licence_protocol",
 }
 
 
@@ -77,7 +81,7 @@ def contextual_url(url, request):
 
 
 def action_route(name):
-    for prefix in ("add_mouse", "add_litter", "edit_selected_mice", "delete_selected_mice", "procedure_page"):
+    for prefix in ("add_mouse", "add_litter", "edit_selected_mice", "view_selected_mice", "delete_selected_mice", "procedure_page"):
         if name.startswith(prefix):
             return prefix
     return name
@@ -126,7 +130,7 @@ def build_navigation(context):
         section = "services"
     elif project or name in {"projects_page", "add_project"}:
         section = "projects"
-    elif action == "procedure_page" or (mouse and from_procedures) or (protocol and action in {"add_mouse", "add_litter", "edit_selected_mice", "delete_selected_mice"}):
+    elif action == "procedure_page" or (mouse and from_procedures) or (protocol and action in {"add_mouse", "add_litter", "edit_selected_mice", "view_selected_mice", "delete_selected_mice"}):
         section = "procedures"
     else:
         section = "mice"

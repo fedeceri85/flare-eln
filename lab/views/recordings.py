@@ -16,7 +16,7 @@ from django.db.models.functions import Cast, Lower, NullIf
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_safe
 
 from ..forms import RecordingForm, normalize_choice_values
 from ..models import Mouse, RecordingField
@@ -37,6 +37,8 @@ from ..ui import (
 )
 from .common import (
     add_recording_url,
+    animal_summary_context,
+    edit_selected_mice_all_url,
     experiment_for_project_or_404,
     experiment_recordings_url,
     experiments_page_url,
@@ -319,6 +321,26 @@ def apply_recording_field_filter_specs(queryset, filter_specs, values):
         queryset = queryset.filter(**{lookup_root: typed_value})
 
     return queryset
+
+
+@require_safe
+def recording_animals(request, project_pk, experiment_pk, recording_pk):
+    project, experiment = experiment_for_project_or_404(project_pk, experiment_pk)
+    recording = recording_for_experiment_or_404(experiment, recording_pk)
+    mice = list(recording.mice.select_related(
+        "protocol", "added_by", "crossing_definition__species",
+    ).order_by("mouse_id"))
+    return_url = safe_return_url(request, experiment_recordings_url(project, experiment))
+    return render(request, "lab/animal_summary.html", {
+        **animal_summary_context(
+            request, mice, summary_url=url_with_query_params(request.path, return_url=return_url),
+            edit_url=edit_selected_mice_all_url(),
+        ),
+        "project": project,
+        "experiment": experiment,
+        "recording": recording,
+        "return_url": return_url,
+    })
 
 
 def recordings_page(request, project_pk, experiment_pk):

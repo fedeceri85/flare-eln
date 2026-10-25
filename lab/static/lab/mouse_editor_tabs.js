@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const tablist = editor.querySelector('[data-mouse-tab-list]');
     const tabs = [...tablist.querySelectorAll('[data-mouse-tab]')];
     const panels = [...editor.querySelectorAll('[data-mouse-tab-panel]')];
-    const activeInput = editor.querySelector('[data-mouse-active-tab]');
+    const activeInput = editor.querySelector('[data-mouse-active-tab]') || { value: editor.dataset.mouseInitialTab || 'shared' };
+    const summaryEditLink = editor.querySelector('[data-mouse-summary-edit]');
     const errorSelector = '.error-summary, .error-list li, .errorlist li, [aria-invalid="true"]';
 
     function visibleTabs() { return tabs.filter(tab => !tab.hidden); }
@@ -18,6 +19,16 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selected && focus) tab.focus();
         });
         panels.forEach(panel => { panel.hidden = panel.dataset.mouseTabPanel !== key; });
+        if (summaryEditLink) {
+            const editUrl = new URL(summaryEditLink.href, window.location.href);
+            const summaryUrl = new URL(editUrl.searchParams.get('return_url'), window.location.href);
+            summaryUrl.searchParams.set('mouse_editor_tab', key);
+            const localSummaryUrl = summaryUrl.pathname + summaryUrl.search + summaryUrl.hash;
+            editUrl.searchParams.set('mouse_editor_tab', key);
+            editUrl.searchParams.set('return_url', localSummaryUrl);
+            summaryEditLink.href = editUrl.pathname + editUrl.search + editUrl.hash;
+            window.history.replaceState(window.history.state, '', localSummaryUrl);
+        }
     }
     function reveal(element) {
         const panel = element?.closest('[data-mouse-tab-panel]');
