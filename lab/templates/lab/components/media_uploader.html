@@ -1,0 +1,19 @@
+<section class="media-uploader" data-media-uploader{% if upload_form_id %} data-media-upload-form="{{ upload_form_id }}" data-media-remove-form="import-media-remove"{% endif %}>
+    <h2>Media</h2>
+    {% if shared %}<p class="import-help">These images will be attached to every recording created by this import, including separate date and crossing groups.</p>{% else %}<p class="bulk-help">Add images to save with this recording.</p>{% endif %}
+    <div class="media-dropzone" data-media-dropzone>
+        <span>Drag and drop images here</span>
+        <span class="media-dropzone-or">or</span>
+        <button class="button" type="button" data-media-browse hidden>Browse images</button>
+        <div class="media-native-input">{{ media_form.images }}</div>
+        <small>JPEG, PNG or WebP · up to 10 images at a time · 20 MB each</small>
+    </div>
+    <div class="media-caption-field">{{ media_form.caption.label_tag }}{{ media_form.caption }}</div>
+    <p class="media-status" data-media-status role="status" aria-live="polite"></p>
+    {% for field in media_form %}{% for error in field.errors %}<p class="error-list">{{ error }}</p>{% endfor %}{% endfor %}
+    <div class="media-items" data-media-items>{% if shared %}{% include "lab/components/import_media_items.html" %}{% endif %}</div>
+    {% if upload_form_id %}
+        <button class="button" type="submit" form="{{ upload_form_id }}" data-media-upload-fallback>Upload images</button>
+        <button class="button" type="button" data-media-retry hidden>Retry upload</button>
+    {% endif %}
+</section>

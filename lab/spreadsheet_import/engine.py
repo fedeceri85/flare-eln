@@ -15,8 +15,9 @@ from ..forms.recordings import RecordingForm, parse_recording_paths
 from ..forms.procedures import ProcedureCreateForm
 from ..models import (
     Crossing, Experiment, GenotypeCategory, Mouse, MouseGenotype, MouseLine,
-    ProcedureType, Protocol, Recording, RecordingField, RecordingType, Species, SpreadsheetImportDraft,
+    ProcedureType, Protocol, Recording, RecordingField, RecordingImage, RecordingType, Species, SpreadsheetImportDraft,
 )
+from ..recording_images import image_available
 from ..utils import generate_mouse_id
 from .mapping import ANIMAL_FIELDS, crossing_candidates, genotype_term_key, mapped_value, parse_date, resolve_genotype_term, typed_value, validate_definition
 from .source import resolve_binding, table_from_sheet
@@ -440,7 +441,12 @@ def build_review(draft, approvals=None):
             errors.extend(f"Rows {record['rows']}: {m}" for m in exc.messages)
     procedures, procedure_errors = build_procedure_review(definition, animals, approved)
     errors.extend(procedure_errors)
-    payload = {"animals": animals, "records": records, "procedures": procedures, "changes": all_changes, "errors": errors}
+    shared_images = list(draft.shared_images.select_related("storage_location"))
+    image_preview = [{"id": str(image.pk), "name": image.original_name, "caption": image.caption,
+                      "width": image.width, "height": image.height, "size_bytes": image.size_bytes}
+                     for image in shared_images if image_available(image)]
+    payload = {"animals": animals, "records": records, "procedures": procedures, "changes": all_changes, "errors": errors,
+               "shared_images": image_preview, "unavailable_images": len(shared_images) - len(image_preview)}
     environment = environmental_state(experiment, [a["mouse_id"] for a in animals if a["existing"]])
     payload["fingerprint"] = digest({"preview": payload, "environment": environment, "configuration": definition})
     return payload
@@ -471,7 +477,7 @@ def commit_import(draft_id, owner, experiment, approvals):
     if baseline["errors"]:
         raise ValidationError(baseline["errors"])
     if baseline["fingerprint"] != draft.state.get("review_fingerprint"):
-        raise ValidationError("Animal data or recording configuration changed after review. Refresh the review before importing.")
+        raise ValidationError("Animal data, recording configuration or shared images changed after review. Refresh the review before importing.")
     known = {c["token"] for c in baseline["changes"]}
     if not set(approvals) <= known:
         raise ValidationError("The approved changes no longer match this review. Refresh the review.")
@@ -534,8 +540,20 @@ def commit_import(draft_id, owner, experiment, approvals):
         procedure.mouse = mouse
         procedure.save()
         procedure_ids.append(procedure.pk)
+    selected_images = {image["id"] for image in preview["shared_images"]}
+    for image in draft.shared_images.all():
+        if str(image.pk) in selected_images:
+            RecordingImage.objects.bulk_create([
+                RecordingImage(recording_id=recording_id, storage_location_id=image.storage_location_id,
+                    filename=image.filename, original_name=image.original_name, caption=image.caption,
+                    width=image.width, height=image.height, size_bytes=image.size_bytes)
+                for recording_id in recording_ids
+            ])
+    # The committed recording links now own the files; expiry cleanup must not remove them.
+    draft.shared_images.all().delete()
     result = {"recordings": len(recording_ids), "created_animals": created, "updated_animals": updated, "recording_ids": recording_ids,
-              "procedures": len(procedure_ids), "procedure_ids": procedure_ids}
+              "procedures": len(procedure_ids), "procedure_ids": procedure_ids,
+              "shared_images": len(selected_images), "image_attachments": len(selected_images) * len(recording_ids)}
     draft.completed_at = timezone.now()
     draft.state = {**draft.state, "result": result}
     draft.save(update_fields=["completed_at", "state"])

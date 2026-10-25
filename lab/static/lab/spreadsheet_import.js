@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll('[data-import-image-preview]').forEach(image => {
+        const hideUnavailable = () => { image.hidden = true; };
+        image.addEventListener('error', hideUnavailable);
+        if (image.complete && !image.naturalWidth) hideUnavailable();
+    });
     const form = document.querySelector("[data-import-form]");
     if (!form) return;
     const templateSelect = form.querySelector("[data-import-template-select]");

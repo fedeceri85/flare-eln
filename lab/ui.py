@@ -7,6 +7,7 @@ from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
 
 from .models import Mouse
+from .recording_images import available_images
 
 
 EMPTY_VALUE = format_html("&mdash;")
@@ -1092,6 +1093,7 @@ def build_recordings_table(
     for recording in recordings:
         can_modify = recording.can_be_modified_by(user)
         animal_count = len(recording.mice.all())
+        image_count = len(available_images(recording))
         is_selected = recording.pk == selected_recording_id
         edit_url = reverse(
             "lab:edit_recording",
@@ -1147,6 +1149,10 @@ def build_recordings_table(
                                 ]) if animal_count else None,
                             },
                             *([{"value": "Edit", "url": edit_url}] if can_modify else []),
+                            *([{
+                                "value": f"Images ({image_count})", "gallery": True,
+                                "url": reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk]),
+                            }] if image_count else []),
                         ],
                     },
                 ],

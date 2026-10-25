@@ -1,0 +1,48 @@
+<dialog class="recording-gallery" data-image-dialog aria-labelledby="recording-gallery-title">
+    <div class="gallery-heading">
+        <h2 id="recording-gallery-title">Recording images</h2>
+        <button type="button" class="button" data-gallery-close autofocus aria-label="Close recording images">Close</button>
+    </div>
+    <p class="gallery-status" data-gallery-status role="status" aria-live="polite"></p>
+    <div data-gallery-viewer hidden>
+        <div class="gallery-stage" data-gallery-stage>
+            <img data-gallery-image alt="" hidden>
+        </div>
+        <p class="gallery-caption" data-gallery-caption></p>
+        <div class="gallery-controls">
+            <button type="button" class="button" data-gallery-previous aria-label="Previous image">← Previous</button>
+            <span data-gallery-position aria-live="polite"></span>
+            <button type="button" class="button" data-gallery-next aria-label="Next image">Next →</button>
+            <button type="button" class="button" data-gallery-zoom aria-pressed="false">Enlarge</button>
+            <a class="button" data-gallery-download download>Download</a>
+        </div>
+    </div>
+    <div data-gallery-management hidden>
+        <details class="gallery-edit-caption" data-gallery-caption-details hidden>
+            <summary>Edit caption or remove image</summary>
+            <form method="post" data-gallery-caption-form>
+                {% csrf_token %}
+                <input type="hidden" name="image_id">
+                <label for="gallery-caption-input">Caption (optional)</label>
+                <textarea id="gallery-caption-input" name="caption" maxlength="500" rows="2"></textarea>
+                <div class="actions">
+                    <button class="button" type="submit" name="action" value="caption">Save caption</button>
+                    <button class="button button-danger" type="submit" name="action" value="remove">Remove image</button>
+                </div>
+            </form>
+        </details>
+        <details class="gallery-upload" data-gallery-upload-details>
+            <summary>Add images</summary>
+            <form method="post" enctype="multipart/form-data" data-gallery-upload-form>
+                {% csrf_token %}
+                <label for="gallery-upload-input">Images</label>
+                <input id="gallery-upload-input" type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple required>
+                <small>JPEG, PNG or WebP. Up to 10 at a time, 20 MB each. Stored as compressed viewing copies.</small>
+                <label for="gallery-upload-caption">Caption (optional)</label>
+                <input id="gallery-upload-caption" type="text" name="caption" maxlength="500">
+                <small>Applies to the selected images. You can edit each caption afterward.</small>
+                <button class="button button-primary" type="submit" name="action" value="upload">Upload images</button>
+            </form>
+        </details>
+    </div>
+</dialog>

@@ -1009,3 +1009,51 @@ class Recording(models.Model):
 
         if errors:
             raise ValidationError({"values": errors})
+
+
+class ImageStorageLocation(models.Model):
+    directory = models.CharField(max_length=1024, unique=True)
+
+    def __str__(self):
+        return self.directory
+
+
+class ImageStorageSettings(models.Model):
+    # A single database-backed setting is shared by every application worker.
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    active_location = models.ForeignKey(ImageStorageLocation, on_delete=models.PROTECT)
+
+
+class RecordingImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="images")
+    storage_location = models.ForeignKey(ImageStorageLocation, on_delete=models.PROTECT)
+    filename = models.CharField(max_length=255)
+    original_name = models.CharField(max_length=255)
+    caption = models.CharField(max_length=500, blank=True)
+    width = models.PositiveIntegerField()
+    height = models.PositiveIntegerField()
+    size_bytes = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["storage_location", "filename"], name="recording_image_file_idx")]
+
+
+class SpreadsheetImportImage(models.Model):
+    """Compressed shared images awaiting a reviewed spreadsheet import."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    draft = models.ForeignKey(SpreadsheetImportDraft, on_delete=models.CASCADE, related_name="shared_images")
+    storage_location = models.ForeignKey(ImageStorageLocation, on_delete=models.PROTECT)
+    filename = models.CharField(max_length=255)
+    original_name = models.CharField(max_length=255)
+    caption = models.CharField(max_length=500, blank=True)
+    width = models.PositiveIntegerField()
+    height = models.PositiveIntegerField()
+    size_bytes = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["storage_location", "filename"], name="import_image_file_idx")]

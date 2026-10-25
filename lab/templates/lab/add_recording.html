@@ -1,4 +1,5 @@
 {% extends "lab/base.html" %}
+{% load static %}
 
 {% block title %}Add recording{% endblock %}
 {% block page_title %}Add recording{% endblock %}
@@ -15,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-    <form id="primary-form" method="post" class="form-card">
+    <form id="primary-form" method="post" enctype="multipart/form-data" class="form-card">
         {% csrf_token %}
         <input
             type="hidden"
@@ -24,7 +25,9 @@
         >
 
         {% include "lab/components/recording_form_fields.html" with form=form %}
+        {% include 'lab/components/media_uploader.html' with media_form=media_form %}
 
         {% include "lab/components/form_actions.html" %}
     </form>
 {% endblock %}
+{% block scripts %}<script src="{% static 'lab/media_uploader.js' %}"></script>{% endblock %}

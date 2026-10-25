@@ -79,6 +79,10 @@ load_local_env_file()
 
 FLARE_VERSION = env_first("FLARE_VERSION", default="dev")
 
+# Uploaded viewing copies are private and served by authenticated application views.
+RECORDING_MEDIA_ROOT = Path(env_first("FLARE_MEDIA_ROOT", default=str(BASE_DIR / "media")))
+RECORDING_MEDIA_BOUNDARY = env_first("FLARE_MEDIA_BOUNDARY", default="")
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(

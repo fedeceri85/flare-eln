@@ -1,4 +1,5 @@
 {% extends "lab/base.html" %}
+{% load static %}
 
 {% block title %}Recordings{% endblock %}
 {% block page_title %}Recordings{% endblock %}
@@ -74,4 +75,6 @@
 
     {% include "lab/components/pagination.html" with pagination=pagination %}
 </div>
+{% include "lab/components/recording_image_dialog.html" %}
 {% endblock %}
+{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-2"></script>{% endblock %}

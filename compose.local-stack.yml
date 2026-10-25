@@ -32,8 +32,11 @@ services:
       DB_NAME: "${LABDB_STACK_DB_NAME:-lab_container_stack}"
       DB_USER: "${LABDB_STACK_DB_USER:-labdb_lesson}"
       DB_PASSWORD: "${LABDB_STACK_DB_PASSWORD:?Set LABDB_STACK_DB_PASSWORD in .env before running Compose}"
+      FLARE_MEDIA_ROOT: /media
+      FLARE_MEDIA_BOUNDARY: /media
     volumes:
       - .:/app
+      - "${LABDB_LOCAL_MEDIA_ROOT:-./media}:/media"
 
 volumes:
   postgres_lesson_data:

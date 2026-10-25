@@ -1,4 +1,5 @@
 {% extends "lab/base.html" %}
+{% load static %}
 
 {% block title %}Edit recording {{ recording.pk }}{% endblock %}
 {% block page_title %}Edit recording{% endblock %}
@@ -27,4 +28,11 @@
 
         {% include "lab/components/form_actions.html" %}
     </form>
+    <section class="form-card recording-images-section">
+        <h2>Images</h2>
+        <p>Attach compressed viewing copies and browse this recording’s images.</p>
+        <a class="button" href="{% url 'lab:recording_images' project.pk experiment.pk recording.pk %}" data-recording-gallery>Manage images</a>
+    </section>
+    {% include "lab/components/recording_image_dialog.html" %}
 {% endblock %}
+{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-2"></script>{% endblock %}

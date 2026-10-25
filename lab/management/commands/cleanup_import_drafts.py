@@ -8,5 +8,7 @@ class Command(BaseCommand):
     help = "Delete spreadsheet import drafts older than their 24-hour expiry."
 
     def handle(self, *args, **options):
-        count, _ = SpreadsheetImportDraft.objects.filter(expires_at__lte=timezone.now()).delete()
+        drafts = SpreadsheetImportDraft.objects.filter(expires_at__lte=timezone.now())
+        count = drafts.count()
+        drafts.delete()
         self.stdout.write(f"Deleted {count} expired import drafts.")

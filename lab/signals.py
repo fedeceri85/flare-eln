@@ -4,8 +4,18 @@ from django.contrib.auth.signals import (
     user_login_failed,
 )
 from django.dispatch import receiver
+from django.db import transaction
+from django.db.models.signals import post_delete
 
 from .models import LoginEvent
+from .models import RecordingImage, SpreadsheetImportImage
+
+
+@receiver(post_delete, sender=RecordingImage, dispatch_uid="lab_recording_image_deleted")
+@receiver(post_delete, sender=SpreadsheetImportImage, dispatch_uid="lab_import_image_deleted")
+def remove_recording_image_file(sender, instance, **kwargs):
+    from .recording_images import delete_image_file
+    transaction.on_commit(lambda: delete_image_file(instance))
 
 
 def request_ip_address(request):

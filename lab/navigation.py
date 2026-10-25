@@ -26,6 +26,7 @@ PAGE_TITLES = {
     "add_recording": "Add recording", "edit_recording": "Edit recording",
     "import_recordings": "Import from spreadsheet", "import_recordings_draft": "Import from spreadsheet",
     "settings_page": "Settings", "import_templates": "Import templates",
+    "image_storage_settings": "Image storage", "recording_images": "Recording images",
     "rename_import_template": "Rename import template", "delete_import_template": "Delete import template",
     "genotype_categories": "Genotype categories", "add_genotype_category": "Add genotype category", "edit_genotype_category": "Edit genotype category",
     "recording_types": "Recording types", "add_recording_type": "Add recording type", "edit_recording_type": "Edit recording type",
@@ -51,6 +52,7 @@ CONTEXTUAL_ROUTES = {
     "edit_mouse_procedure", "experiments_page", "recordings_page",
     "edit_project", "edit_experiment", "edit_recording", "delete_recording", "delete_selected_recordings",
     "recording_animals",
+    "recording_images",
     "view_selected_mice_licence_protocol",
 }
 
@@ -118,6 +120,7 @@ def build_navigation(context):
         section = "home"
     elif name in {
         "settings_page", "import_templates", "rename_import_template", "delete_import_template",
+        "image_storage_settings",
         "genotype_categories", "add_genotype_category", "edit_genotype_category",
         "recording_types", "add_recording_type", "edit_recording_type", "delete_recording_type", "add_recording_field", "edit_recording_field",
     }:
@@ -162,6 +165,8 @@ def build_navigation(context):
                 crumb(kind.name, reverse("lab:edit_recording_type", args=[kind.pk]))
             if name != "recording_types":
                 crumb(title)
+        elif name == "image_storage_settings":
+            crumb(title)
         elif name != "settings_page":
             crumb("Import templates", reverse("lab:import_templates"))
         if name in {"rename_import_template", "delete_import_template"}:

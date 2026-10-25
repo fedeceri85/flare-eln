@@ -37,5 +37,8 @@ services:
       DB_NAME: "${LABDB_PROD_DB_NAME:?Set LABDB_PROD_DB_NAME in .env}"
       DB_USER: "${LABDB_PROD_DB_USER:?Set LABDB_PROD_DB_USER in .env}"
       DB_PASSWORD: "${LABDB_PROD_DB_PASSWORD:?Set LABDB_PROD_DB_PASSWORD in .env}"
+      FLARE_MEDIA_ROOT: /media
+      FLARE_MEDIA_BOUNDARY: /media
     volumes:
       - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/external-imports:/external-imports:ro"
+      - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/media:/media"

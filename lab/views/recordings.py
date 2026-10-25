@@ -4,9 +4,9 @@ from urllib.parse import urlencode
 from uuid import uuid4
 
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import (
     BigIntegerField, DateField, F, FloatField, OuterRef,
     Q, Subquery, TextField, Value,
@@ -19,6 +19,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST, require_safe
 
 from ..forms import RecordingForm, normalize_choice_values
+from ..forms.recording_images import RecordingImageUploadForm
+from ..recording_images import discard_image_files, save_images
 from ..models import Mouse, RecordingField
 from ..ui import (
     CROSSING_FILTER_AUTOCOMPLETE,
@@ -120,7 +122,7 @@ def recording_for_experiment_or_404(experiment, recording_pk):
             "owner",
             "experiment",
             "recording_type",
-        ).prefetch_related("mice"),
+        ).prefetch_related("mice", "images__storage_location"),
         pk=recording_pk,
     )
 
@@ -354,7 +356,7 @@ def recordings_page(request, project_pk, experiment_pk):
     recordings = (
         experiment.recordings
         .select_related("owner", "experiment", "recording_type")
-        .prefetch_related("mice")
+        .prefetch_related("mice", "images__storage_location")
         .all()
     )
     recordings = apply_filter_specs(
@@ -605,6 +607,11 @@ def add_recording(request, project_pk, experiment_pk):
             raise Http404("Recording does not belong to this experiment type.")
         require_recording_modify_permission(request.user, source_recording)
 
+    media_form = RecordingImageUploadForm(
+        request.POST if request.method == "POST" else None,
+        request.FILES if request.method == "POST" else None,
+        prefix="media", optional=True,
+    )
     if request.method == "POST":
         form = RecordingForm(
             request.POST,
@@ -618,14 +625,20 @@ def add_recording(request, project_pk, experiment_pk):
         if selection_redirect is not None:
             return selection_redirect
 
-        if form.is_valid():
-            recording = form.save()
-            discard_recording_form_draft(request)
-            messages.success(
-                request,
-                f"Recording {recording.pk} was created successfully.",
-            )
-            return redirect(return_url)
+        if form.is_valid() and media_form.is_valid():
+            images = []
+            try:
+                with transaction.atomic():
+                    recording = form.save()
+                    if media_form.cleaned_data["images"]:
+                        images = save_images(recording, media_form.cleaned_data["images"], media_form.cleaned_data["caption"])
+            except (ValidationError, OSError, IntegrityError) as exc:
+                discard_image_files(images)
+                form.add_error(None, exc if isinstance(exc, ValidationError) else "The recording or its images could not be saved. Check image storage and try again.")
+            else:
+                discard_recording_form_draft(request)
+                messages.success(request, f"Recording {recording.pk} was created successfully.")
+                return redirect(return_url)
     else:
         form = RecordingForm(
             experiment=experiment,
@@ -650,6 +663,7 @@ def add_recording(request, project_pk, experiment_pk):
             "project": project,
             "experiment": experiment,
             "source_recording": source_recording,
+            "media_form": media_form,
             "return_url": return_url,
             "selected_mice": form.selected_mice_for_display(),
             **mouse_workflow_urls,

@@ -8,7 +8,7 @@
 {% if expired %}
     <div class="form-card"><p role="alert">This import has expired. Drafts expire after 24 hours.</p><a class="button button-primary" href="{{ base_url }}">Upload again</a></div>
 {% elif result %}
-    <div class="form-card"><h2>Import completed</h2><p>Imported {{ result.recordings }} recordings; created {{ result.created_animals }} animals and updated {{ result.updated_animals }} animals.{% if result.procedures %} Added {{ result.procedures }} procedures.{% endif %}</p><a class="button" href="{{ recordings_url }}">Back to recordings</a></div>
+    <div class="form-card"><h2>Import completed</h2><p>Imported {{ result.recordings }} recordings; created {{ result.created_animals }} animals and updated {{ result.updated_animals }} animals.{% if result.procedures %} Added {{ result.procedures }} procedures.{% endif %}{% if result.shared_images %} Attached {{ result.shared_images }} shared image{{ result.shared_images|pluralize }} to each recording.{% endif %}</p><a class="button" href="{{ recordings_url }}">Back to recordings</a></div>
 {% elif upload_form %}
     <form method="post" enctype="multipart/form-data" class="form-card">
         {% csrf_token %}
@@ -75,7 +75,7 @@
                     <summary>Distinguish reused local identifiers</summary>
                     {% include 'lab/components/form_field.html' with field=form.identity_columns only %}
                 </details>
-                <p class="import-help">Combined recordings share a date. Conflicting populated recording fields must be corrected in Excel or left unmapped.</p>
+                <p class="import-help">Combined recordings share a date and crossing. Conflicting populated recording fields must be corrected in Excel or left unmapped.</p>
             </section>
             <section class="form-card">
                 <h2>Shared animal details</h2>
@@ -86,6 +86,7 @@
                 </div>
                 <p class="import-help">New animals need a protocol and crossing. Existing animals change only when you approve updates in Review.</p>
             </section>
+            <div class="form-card">{% include 'lab/components/media_uploader.html' with media_form=shared_image_upload_form shared=True upload_form_id="import-media-upload" %}</div>
         {% elif step == 'mapping' %}
             {% include 'lab/components/error_summary.html' %}
             <section class="form-card import-template-toolbar" aria-label="Column templates">
@@ -191,7 +192,11 @@
             <input type="hidden" name="review_fingerprint" value="{{ draft.state.review_fingerprint }}">
             <section class="form-card">
                 <div class="import-review-heading"><div><h2>Review import</h2><p>{{ preview.records|length }} recordings · {{ preview.animals|length }} resolved animals · {{ preview.changes|length }} proposed animal changes{% if preview.procedures %} · {{ preview.procedures|length }} procedures{% endif %}</p></div><a class="button" href="?step=review">Refresh review</a></div>
-                <p class="import-help">Nothing is saved until you select Import. Unchecked changes preserve the animal’s current value.</p>
+                <p class="import-help">Recordings and animal changes are saved when you select Import. Unchecked changes preserve the animal’s current value.</p>
+                {% if preview.shared_images %}<p><strong>{{ preview.shared_images|length }} shared image{{ preview.shared_images|length|pluralize }}</strong> will be attached to each of the {{ preview.records|length }} recordings.</p>
+                    <div class="recording-image-cards">{% for image in preview.shared_images %}<div class="recording-image-card"><img src="{% url 'lab:import_image_file' image.id %}" alt="{{ image.caption|default:image.name }}" loading="lazy" data-import-image-preview><p>{{ image.name }}</p>{% if image.caption %}<p class="gallery-caption">{{ image.caption }}</p>{% endif %}</div>{% endfor %}</div>
+                {% endif %}
+                {% if preview.unavailable_images %}<p class="import-help">{{ preview.unavailable_images }} unavailable shared image{{ preview.unavailable_images|pluralize }} will be skipped. <a href="?step=setup">Review media in Import settings</a></p>{% endif %}
                 {% for error in preview.errors %}<p class="message message-error" role="alert">{{ error }}</p>{% endfor %}
             </section>
             <section class="form-card import-table-panel">
@@ -242,6 +247,14 @@
             <a class="button" href="{{ recordings_url }}">Back to recordings</a>
         </div>
     </form>
+    {% if step == 'setup' %}
+        <form id="import-media-upload" method="post" enctype="multipart/form-data" action="{% url 'lab:import_shared_images' project.pk experiment.pk draft.pk %}">
+            {% csrf_token %}<input type="hidden" name="revision" value="{{ revision }}"><input type="hidden" name="image_action" value="upload">
+        </form>
+        <form id="import-media-remove" method="post" action="{% url 'lab:import_shared_images' project.pk experiment.pk draft.pk %}">
+            {% csrf_token %}<input type="hidden" name="revision" value="{{ revision }}"><input type="hidden" name="image_action" value="remove">
+        </form>
+    {% endif %}
     {% if step == 'mapping' %}
         <dialog id="import-template-dialog" class="import-template-dialog" aria-labelledby="import-template-dialog-title" data-import-template-dialog data-reopen="{{ template_dialog_open|yesno:'true,false' }}">
             <form method="post" data-import-template-save-form>
@@ -264,4 +277,4 @@
 {% endif %}
 </div>
 {% endblock %}
-{% block scripts %}<script src="{% static 'lab/spreadsheet_import.js' %}" defer></script>{% if step == 'procedures' %}<script src="{% static 'lab/litter_procedures.js' %}" defer></script>{% endif %}{% endblock %}
+{% block scripts %}<script src="{% static 'lab/spreadsheet_import.js' %}?v=shared-images-2" defer></script><script src="{% static 'lab/media_uploader.js' %}" defer></script>{% if step == 'procedures' %}<script src="{% static 'lab/litter_procedures.js' %}" defer></script>{% endif %}{% endblock %}

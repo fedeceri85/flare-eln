@@ -63,7 +63,7 @@
                                     {% elif cell.actions %}
                                         <div class="table-row-actions">
                                             {% for action in cell.actions %}
-                                                {% if action.url %}<a class="table-row-action" href="{% record_link action.url request %}">{{ action.value }}</a>{% else %}<span>{{ action.value }}</span>{% endif %}
+                                                {% if action.url %}<a class="table-row-action" href="{% record_link action.url request %}"{% if action.gallery %} data-recording-gallery data-gallery-count{% endif %}>{{ action.value }}</a>{% else %}<span>{{ action.value }}</span>{% endif %}
                                             {% endfor %}
                                         </div>
                                     {% elif cell.url %}

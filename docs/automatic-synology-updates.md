@@ -153,7 +153,15 @@ The remaining examples use this existing layout:
 /volume1/docker/flare-eln/project/.env
 /volume1/docker/flare-eln/postgres-data/
 /volume1/docker/flare-eln/backups/
+/volume1/docker/flare-eln/media/
 ```
+
+Recording image uploads use the persistent `media` folder, mounted at `/media`
+in the web container. For an existing installation, create this host folder and
+add the media mount from the supplied Compose file before enabling image uploads;
+an image-only application update does not add new mounts to an installed Compose
+configuration. Application backup scripts remain database-only and do not copy
+image files. Use your existing NAS backup arrangements for media if required.
 
 If your directory or YAML filename differs, substitute the real values in all
 commands and in the scheduled task. If multiple Compose files are listed or you

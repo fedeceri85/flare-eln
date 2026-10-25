@@ -20,6 +20,7 @@ Synology first deploy:
    mkdir -p /volume1/docker/flare-eln/postgres-data
    mkdir -p /volume1/docker/flare-eln/backups
    mkdir -p /volume1/docker/flare-eln/external-imports
+   mkdir -p /volume1/docker/flare-eln/media
 3. cp .env.synology.example .env
 4. Edit .env with real NAS IP, secret key, DB user, and DB password
 5. docker compose -f compose.synology.yml build web

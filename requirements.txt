@@ -4,3 +4,4 @@ psycopg2-binary==2.9.12
 pandas
 openpyxl
 whitenoise
+Pillow>=12.0,<13

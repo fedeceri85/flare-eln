@@ -5,12 +5,16 @@ from pathlib import Path
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST, require_safe
 
-from ..models import Protocol, SpreadsheetImportDraft, SpreadsheetImportTemplate
+from ..models import Protocol, SpreadsheetImportDraft, SpreadsheetImportImage, SpreadsheetImportTemplate
+from ..forms.recording_images import RecordingImageUploadForm
+from ..recording_images import discard_image_files, image_available, read_image, save_import_images
 from ..forms.import_templates import ImportTemplateNameForm
 from ..forms.procedures import BulkProcedureCreateForm
 from ..spreadsheet_import.engine import build_review, commit_import, digest, draft_table, identity_signature, selected_rows
@@ -21,6 +25,69 @@ from ..spreadsheet_import.templates import capture_mapping, match_mapping, mappe
 from .common import experiment_for_project_or_404
 
 STEPS = [("source", "Source & rows"), ("setup", "Import settings"), ("mapping", "Recording fields"), ("animals", "Animals"), ("genetics", "Crossings & genotypes"), ("procedures", "Add procedures"), ("review", "Review & import")]
+
+
+def import_media_items(draft):
+    return [{"id": str(image.pk), "name": image.original_name, "caption": image.caption,
+             "available": image_available(image)} for image in draft.shared_images.select_related("storage_location")]
+
+
+@require_POST
+def import_shared_images(request, project_pk, experiment_pk, draft_id):
+    project, experiment = experiment_for_project_or_404(project_pk, experiment_pk)
+    destination = reverse("lab:import_recordings_draft", args=[project.pk, experiment.pk, draft_id]) + "?step=setup"
+    ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    created = []
+    try:
+        with transaction.atomic():
+            draft = get_object_or_404(SpreadsheetImportDraft.objects.select_for_update(), pk=draft_id, owner=request.user, experiment=experiment)
+            if draft.expires_at <= timezone.now() or draft.completed_at:
+                raise ValidationError("This import is completed or expired. Start a new import to add images.")
+            if request.POST.get("revision") != digest([draft.configuration, draft.state]):
+                raise ValidationError("This import changed in another tab. Reload this page before continuing.")
+            action = request.POST.get("image_action")
+            if action == "upload":
+                form = RecordingImageUploadForm(request.POST, request.FILES)
+                if not form.is_valid():
+                    raise ValidationError([str(error) for group in form.errors.values() for error in group])
+                created = save_import_images(draft, form.cleaned_data["images"], form.cleaned_data["caption"])
+            elif action == "remove":
+                try:
+                    image = get_object_or_404(draft.shared_images.all(), pk=request.POST.get("image_id"))
+                except (ValueError, ValidationError):
+                    raise Http404 from None
+                image.delete()
+            else:
+                raise ValidationError("Choose an image action.")
+            draft.state["shared_images_revision"] = draft.state.get("shared_images_revision", 0) + 1
+            draft.state.pop("review_fingerprint", None)
+            draft.save(update_fields=["state"])
+    except (ValidationError, OSError, IntegrityError) as exc:
+        # This also covers a failure committing the enclosing wizard transaction.
+        discard_image_files(created)
+        message = " ".join(exc.messages) if isinstance(exc, ValidationError) else "Image storage is unavailable or the upload could not be saved. No images were added."
+        if ajax:
+            return JsonResponse({"errors": [message]}, status=400)
+        messages.error(request, message)
+    else:
+        if ajax:
+            images = import_media_items(draft)
+            return JsonResponse({"html": render_to_string("lab/components/import_media_items.html", {"shared_images": images}, request=request),
+                "revision": digest([draft.configuration, draft.state]), "count": len(images)})
+    return redirect(destination)
+
+
+@require_safe
+def import_image_file(request, image_id):
+    image = get_object_or_404(SpreadsheetImportImage.objects.select_related("storage_location", "draft"),
+        pk=image_id, draft__owner=request.user, draft__expires_at__gt=timezone.now(), draft__completed_at__isnull=True)
+    data = read_image(image)
+    if data is None:
+        raise Http404
+    response = HttpResponse(data, content_type="image/webp")
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def import_recordings(request, project_pk, experiment_pk, draft_id=None):
@@ -132,6 +199,8 @@ def import_recordings(request, project_pk, experiment_pk, draft_id=None):
                         summary = f"Imported {result['recordings']} recordings; created {result['created_animals']} animals and updated {result['updated_animals']} animals."
                         if result.get("procedures"):
                             summary += f" Added {result['procedures']} procedures."
+                        if result.get("shared_images"):
+                            summary += f" Attached {result['shared_images']} shared images to each recording."
                         messages.success(request, summary)
                         return redirect(recordings_url)
                     except (ValidationError, IntegrityError) as exc:
@@ -172,7 +241,10 @@ def import_recordings(request, project_pk, experiment_pk, draft_id=None):
                     draft.save(update_fields=["configuration", "state"])
                     return redirect(request.path + "?step=" + (request_next if request_next in dict(STEPS) else step))
                 except ValidationError as exc:
-                    form.add_error(None, exc)
+                    if form is not None:
+                        form.add_error(None, exc)
+                    else:
+                        errors.extend(exc.messages)
         if step == "review":
             try:
                 preview = build_review(draft)
@@ -190,7 +262,13 @@ def import_recordings(request, project_pk, experiment_pk, draft_id=None):
         if preview:
             for procedure in preview["procedures"]:
                 procedures_by_animal[procedure["animal_key"]].append(procedure)
+        media_form = RecordingImageUploadForm()
+        media_form.fields["caption"].label = "Caption for next upload (optional)"
+        for field in media_form.fields.values():
+            field.widget.attrs["form"] = "import-media-upload"
         context.update(
+            shared_image_upload_form=media_form if step == "setup" else None,
+            shared_images=import_media_items(draft) if step == "setup" else [],
             import_templates=SpreadsheetImportTemplate.objects.filter(recording_type=experiment.recording_type),
             template_name_form=template_name_form,
             template_dialog_open=template_action == "save" and (bool(errors) or bool(template_name_form.errors)),

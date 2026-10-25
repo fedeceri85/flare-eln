@@ -1,0 +1,39 @@
+{% extends "lab/base.html" %}
+{% load static %}
+{% block title %}Recording images{% endblock %}
+{% block page_title %}Recording images{% endblock %}
+{% block page_subtitle %}<p>{{ experiment.name }} · {{ recording.recording_date|date:"d/m/Y" }}</p>{% endblock %}
+{% block content %}
+    {% if errors %}<div class="message message-error" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+    <a class="button" href="{{ request.get_full_path }}" data-recording-gallery>Open image gallery</a>
+    <div class="recording-image-cards">
+        {% for image in gallery.images %}
+            <section class="form-card recording-image-card" data-image-card>
+                <a href="{{ image.url }}"><img src="{{ image.url }}" alt="{{ image.caption|default:image.name }}" loading="lazy" data-image-fallback></a>
+                <p class="gallery-caption">{{ image.caption }}</p>
+                <a class="button" href="{{ image.download_url }}">Download</a>
+                {% if gallery.can_modify %}
+                    <form method="post">
+                        {% csrf_token %}<input type="hidden" name="image_id" value="{{ image.id }}">
+                        <label for="caption-{{ image.id }}">Caption</label>
+                        <textarea id="caption-{{ image.id }}" name="caption" maxlength="500" rows="2">{{ image.caption }}</textarea>
+                        <div class="actions"><button type="submit" name="action" value="caption" class="button">Save caption</button><button type="submit" name="action" value="remove" class="button button-danger">Remove image</button></div>
+                    </form>
+                {% endif %}
+            </section>
+        {% empty %}<p>No images available.</p>{% endfor %}
+    </div>
+    {% if gallery.can_modify %}
+        <section class="form-card">
+            <h2>Add images</h2>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}<input type="hidden" name="action" value="upload">
+                {% include "lab/components/form_fields.html" with form=upload_form %}
+                <button type="submit" class="button button-primary">Upload images</button>
+            </form>
+        </section>
+    {% endif %}
+    <p><a href="{{ return_url }}">Back to recordings</a></p>
+    {% include "lab/components/recording_image_dialog.html" %}
+{% endblock %}
+{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-2"></script>{% endblock %}

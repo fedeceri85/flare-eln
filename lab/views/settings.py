@@ -30,6 +30,7 @@ def settings_page(request):
     }]
     if request.user.is_staff:
         cards.extend([
+          #  {"title": "Image storage", "description": "Choose the folder for new recording images.", "url": reverse("lab:image_storage_settings")},
             {"title": "Genotype categories", "description": "Manage genotype labels, ordering and availability.", "url": reverse("lab:genotype_categories")},
             {"title": "Recording types", "description": "Manage experiment types and their recording fields.", "url": reverse("lab:recording_types")},
         ])
