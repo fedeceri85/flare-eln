@@ -442,7 +442,7 @@ def build_review(draft, approvals=None):
     procedures, procedure_errors = build_procedure_review(definition, animals, approved)
     errors.extend(procedure_errors)
     shared_images = list(draft.shared_images.select_related("storage_location"))
-    image_preview = [{"id": str(image.pk), "name": image.original_name, "caption": image.caption,
+    image_preview = [{"id": str(image.pk), "name": image.original_name,
                       "width": image.width, "height": image.height, "size_bytes": image.size_bytes}
                      for image in shared_images if image_available(image)]
     payload = {"animals": animals, "records": records, "procedures": procedures, "changes": all_changes, "errors": errors,
@@ -545,7 +545,7 @@ def commit_import(draft_id, owner, experiment, approvals):
         if str(image.pk) in selected_images:
             RecordingImage.objects.bulk_create([
                 RecordingImage(recording_id=recording_id, storage_location_id=image.storage_location_id,
-                    filename=image.filename, original_name=image.original_name, caption=image.caption,
+                    filename=image.filename, original_name=image.original_name,
                     width=image.width, height=image.height, size_bytes=image.size_bytes)
                 for recording_id in recording_ids
             ])

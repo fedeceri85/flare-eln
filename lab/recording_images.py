@@ -123,17 +123,17 @@ def compress_image(upload):
         raise ValidationError(f"{upload.name}: this image could not be read.") from exc
 
 
-def save_images(recording, uploads, caption=""):
-    return _save_image_batch(RecordingImage, {"recording": recording}, uploads, caption)
+def save_images(recording, uploads):
+    return _save_image_batch(RecordingImage, {"recording": recording}, uploads)
 
 
-def save_import_images(draft, uploads, caption=""):
+def save_import_images(draft, uploads):
     if draft.shared_images.count() + len(uploads) > MAX_BATCH_IMAGES:
         raise ValidationError("Attach up to 10 shared images per import.")
-    return _save_image_batch(SpreadsheetImportImage, {"draft": draft}, uploads, caption)
+    return _save_image_batch(SpreadsheetImportImage, {"draft": draft}, uploads)
 
 
-def _save_image_batch(model, parent, uploads, caption):
+def _save_image_batch(model, parent, uploads):
     if not uploads:
         raise ValidationError("Choose at least one image.")
     if len(uploads) > MAX_BATCH_IMAGES:
@@ -152,7 +152,7 @@ def _save_image_batch(model, parent, uploads, caption):
                     target.write(data)
                 saved.append(model.objects.create(
                     **parent, storage_location=location, filename=filename,
-                    original_name=Path(upload.name).name[:255], caption=caption,
+                    original_name=Path(upload.name).name[:255],
                     width=width, height=height, size_bytes=len(data),
                 ))
     except Exception:

@@ -28,7 +28,7 @@ STEPS = [("source", "Source & rows"), ("setup", "Import settings"), ("mapping", 
 
 
 def import_media_items(draft):
-    return [{"id": str(image.pk), "name": image.original_name, "caption": image.caption,
+    return [{"id": str(image.pk), "name": image.original_name,
              "available": image_available(image)} for image in draft.shared_images.select_related("storage_location")]
 
 
@@ -50,7 +50,7 @@ def import_shared_images(request, project_pk, experiment_pk, draft_id):
                 form = RecordingImageUploadForm(request.POST, request.FILES)
                 if not form.is_valid():
                     raise ValidationError([str(error) for group in form.errors.values() for error in group])
-                created = save_import_images(draft, form.cleaned_data["images"], form.cleaned_data["caption"])
+                created = save_import_images(draft, form.cleaned_data["images"])
             elif action == "remove":
                 try:
                     image = get_object_or_404(draft.shared_images.all(), pk=request.POST.get("image_id"))
@@ -263,7 +263,6 @@ def import_recordings(request, project_pk, experiment_pk, draft_id=None):
             for procedure in preview["procedures"]:
                 procedures_by_animal[procedure["animal_key"]].append(procedure)
         media_form = RecordingImageUploadForm()
-        media_form.fields["caption"].label = "Caption for next upload (optional)"
         for field in media_form.fields.values():
             field.widget.attrs["form"] = "import-media-upload"
         context.update(

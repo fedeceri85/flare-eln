@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const removeForm = uploadForm ? document.getElementById(root.dataset.mediaRemoveForm) : null;
         let busy = false, files = [], previews = [];
         root.setAttribute('data-media-ready', 'true');
+        input.parentElement.hidden = true;
         browse.hidden = false;
         const fallback = root.querySelector('[data-media-upload-fallback]');
         if (fallback) fallback.hidden = true;
@@ -36,6 +37,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const item = document.createElement('div'); item.className = 'media-item';
                 const image = document.createElement('img');
                 image.alt = file.name;
+                image.width = 100; image.height = 72;
+                image.style.objectFit = 'contain';
+                image.style.maxWidth = '100%';
+                image.style.flexShrink = '0';
                 image.src = URL.createObjectURL(file); previews.push(image.src);
                 image.addEventListener('error', () => { image.hidden = true; });
                 const label = document.createElement('strong'); label.textContent = file.name;

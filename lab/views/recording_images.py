@@ -35,7 +35,7 @@ def image_storage_settings(request):
 def gallery_payload(recording, user):
     return {
         "images": [{
-            "id": str(image.pk), "caption": image.caption, "name": image.original_name,
+            "id": str(image.pk), "name": image.original_name,
             "width": image.width, "height": image.height,
             "url": reverse("lab:recording_image_file", args=[image.pk]),
             "download_url": reverse("lab:recording_image_file", args=[image.pk]) + "?download=1",
@@ -58,27 +58,19 @@ def recording_images(request, project_pk, experiment_pk, recording_pk):
             upload_form = RecordingImageUploadForm(request.POST, request.FILES)
             if upload_form.is_valid():
                 try:
-                    save_images(recording, upload_form.cleaned_data["images"], upload_form.cleaned_data["caption"])
+                    save_images(recording, upload_form.cleaned_data["images"])
                 except ValidationError as exc:
                     errors = exc.messages
                 except OSError:
                     errors = ["Image storage is unavailable. No images were added."]
             else:
                 errors = [str(error) for group in upload_form.errors.values() for error in group]
-        elif action in {"caption", "remove"}:
+        elif action == "remove":
             try:
                 image = get_object_or_404(RecordingImage, pk=request.POST.get("image_id"), recording=recording)
             except (ValidationError, ValueError):
                 raise Http404 from None
-            if action == "remove":
-                image.delete()
-            else:
-                caption = request.POST.get("caption", "").strip()
-                if len(caption) > 500:
-                    errors = ["Captions must be 500 characters or fewer."]
-                else:
-                    image.caption = caption
-                    image.save(update_fields=["caption"])
+            image.delete()
         else:
             errors = ["Choose an image action."]
         recording._prefetched_objects_cache.pop("images", None)

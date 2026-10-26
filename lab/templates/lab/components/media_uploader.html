@@ -8,7 +8,6 @@
         <div class="media-native-input">{{ media_form.images }}</div>
         <small>JPEG, PNG or WebP · up to 10 images at a time · 20 MB each</small>
     </div>
-    <div class="media-caption-field">{{ media_form.caption.label_tag }}{{ media_form.caption }}</div>
     <p class="media-status" data-media-status role="status" aria-live="polite"></p>
     {% for field in media_form %}{% for error in field.errors %}<p class="error-list">{{ error }}</p>{% endfor %}{% endfor %}
     <div class="media-items" data-media-items>{% if shared %}{% include "lab/components/import_media_items.html" %}{% endif %}</div>

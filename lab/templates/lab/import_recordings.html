@@ -194,7 +194,7 @@
                 <div class="import-review-heading"><div><h2>Review import</h2><p>{{ preview.records|length }} recordings · {{ preview.animals|length }} resolved animals · {{ preview.changes|length }} proposed animal changes{% if preview.procedures %} · {{ preview.procedures|length }} procedures{% endif %}</p></div><a class="button" href="?step=review">Refresh review</a></div>
                 <p class="import-help">Recordings and animal changes are saved when you select Import. Unchecked changes preserve the animal’s current value.</p>
                 {% if preview.shared_images %}<p><strong>{{ preview.shared_images|length }} shared image{{ preview.shared_images|length|pluralize }}</strong> will be attached to each of the {{ preview.records|length }} recordings.</p>
-                    <div class="recording-image-cards">{% for image in preview.shared_images %}<div class="recording-image-card"><img src="{% url 'lab:import_image_file' image.id %}" alt="{{ image.caption|default:image.name }}" loading="lazy" data-import-image-preview><p>{{ image.name }}</p>{% if image.caption %}<p class="gallery-caption">{{ image.caption }}</p>{% endif %}</div>{% endfor %}</div>
+                    <div class="recording-image-cards">{% for image in preview.shared_images %}<div class="recording-image-card"><img width="100" height="72" style="object-fit:contain;max-width:100%" src="{% url 'lab:import_image_file' image.id %}" alt="{{ image.name }}" loading="lazy" data-import-image-preview><p>{{ image.name }}</p></div>{% endfor %}</div>
                 {% endif %}
                 {% if preview.unavailable_images %}<p class="import-help">{{ preview.unavailable_images }} unavailable shared image{{ preview.unavailable_images|pluralize }} will be skipped. <a href="?step=setup">Review media in Import settings</a></p>{% endif %}
                 {% for error in preview.errors %}<p class="message message-error" role="alert">{{ error }}</p>{% endfor %}
@@ -277,4 +277,4 @@
 {% endif %}
 </div>
 {% endblock %}
-{% block scripts %}<script src="{% static 'lab/spreadsheet_import.js' %}?v=shared-images-2" defer></script><script src="{% static 'lab/media_uploader.js' %}" defer></script>{% if step == 'procedures' %}<script src="{% static 'lab/litter_procedures.js' %}" defer></script>{% endif %}{% endblock %}
+{% block scripts %}<script src="{% static 'lab/spreadsheet_import.js' %}?v=shared-images-2" defer></script><script src="{% static 'lab/media_uploader.js' %}?v=media-thumbnails-3" defer></script>{% if step == 'procedures' %}<script src="{% static 'lab/litter_procedures.js' %}" defer></script>{% endif %}{% endblock %}

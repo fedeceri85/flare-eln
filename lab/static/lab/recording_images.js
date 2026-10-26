@@ -9,9 +9,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const find = key => dialog.querySelector('[data-gallery-' + key + ']');
     const status = find('status'), viewer = find('viewer'), stage = find('stage');
     let picture = find('image');
-    const caption = find('caption'), position = find('position');
-    const management = find('management'), captionDetails = find('caption-details');
-    const uploadDetails = find('upload-details'), uploadForm = find('upload-form'), captionForm = find('caption-form');
+    const imageName = find('image-name'), position = find('position');
+    const management = find('management');
+    const uploadDetails = find('upload-details'), uploadForm = find('upload-form'), removeForm = find('remove-form');
     const previous = find('previous'), next = find('next'), zoom = find('zoom'), download = find('download');
     let images = [], index = 0, url = '', opener, generation = 0, imageGeneration = 0, busy = false;
 
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function () {
         index = images.length ? (index + images.length) % images.length : 0;
         const image = images[index];
         viewer.hidden = !image;
-        captionDetails.hidden = !image;
+        removeForm.hidden = !image;
         stage.classList.remove('gallery-enlarged');
         zoom.setAttribute('aria-pressed', 'false');
         zoom.textContent = 'Enlarge';
@@ -46,13 +46,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         status.textContent = 'Loading image…';
-        caption.textContent = image.caption;
-        picture.alt = image.caption || image.name;
+        imageName.textContent = image.name;
+        picture.alt = image.name;
         position.textContent = (index + 1) + ' / ' + images.length;
         previous.disabled = next.disabled = images.length < 2;
         download.href = image.download_url;
-        captionForm.elements.image_id.value = image.id;
-        captionForm.elements.caption.value = image.caption;
+        removeForm.elements.image_id.value = image.id;
         picture.onload = function () {
             if (current !== imageGeneration) return;
             rendered.hidden = false;
@@ -83,10 +82,10 @@ document.addEventListener('DOMContentLoaded', function () {
         images = []; index = 0;
         viewer.hidden = management.hidden = true;
         status.textContent = 'Loading images…';
-        uploadForm.reset(); captionDetails.open = false;
+        uploadForm.reset();
         // Controls named "action" shadow HTMLFormElement.action in real browsers.
         uploadForm.setAttribute('action', url);
-        captionForm.setAttribute('action', url);
+        removeForm.setAttribute('action', url);
         dialog.showModal();
         try {
             const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
@@ -119,12 +118,12 @@ document.addEventListener('DOMContentLoaded', function () {
         zoom.setAttribute('aria-pressed', String(enlarged));
         zoom.textContent = enlarged ? 'Fit image' : 'Enlarge';
     });
-    [uploadForm, captionForm].forEach(form => form.addEventListener('submit', async event => {
+    [uploadForm, removeForm].forEach(form => form.addEventListener('submit', async event => {
         event.preventDefault();
         if (busy) return;
         const current = generation;
         const data = new FormData(form);
-        data.set('action', event.submitter?.value || (form === uploadForm ? 'upload' : 'caption'));
+        data.set('action', event.submitter?.value || (form === uploadForm ? 'upload' : 'remove'));
         busy = true;
         dialog.querySelectorAll('button[type="submit"]').forEach(button => { button.disabled = true; });
         status.textContent = form === uploadForm ? 'Uploading images…' : 'Saving changes…';

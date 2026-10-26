@@ -9,15 +9,13 @@
     <div class="recording-image-cards">
         {% for image in gallery.images %}
             <section class="form-card recording-image-card" data-image-card>
-                <a href="{{ image.url }}"><img src="{{ image.url }}" alt="{{ image.caption|default:image.name }}" loading="lazy" data-image-fallback></a>
-                <p class="gallery-caption">{{ image.caption }}</p>
+                <a href="{{ image.url }}"><img width="100" height="72" style="object-fit:contain;max-width:100%" src="{{ image.url }}" alt="{{ image.name }}" loading="lazy" data-image-fallback></a>
+                <p class="gallery-image-name">{{ image.name }}</p>
                 <a class="button" href="{{ image.download_url }}">Download</a>
                 {% if gallery.can_modify %}
                     <form method="post">
                         {% csrf_token %}<input type="hidden" name="image_id" value="{{ image.id }}">
-                        <label for="caption-{{ image.id }}">Caption</label>
-                        <textarea id="caption-{{ image.id }}" name="caption" maxlength="500" rows="2">{{ image.caption }}</textarea>
-                        <div class="actions"><button type="submit" name="action" value="caption" class="button">Save caption</button><button type="submit" name="action" value="remove" class="button button-danger">Remove image</button></div>
+                        <button type="submit" name="action" value="remove" class="button button-danger">Remove image</button>
                     </form>
                 {% endif %}
             </section>
@@ -36,4 +34,4 @@
     <p><a href="{{ return_url }}">Back to recordings</a></p>
     {% include "lab/components/recording_image_dialog.html" %}
 {% endblock %}
-{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-2"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-3"></script>{% endblock %}

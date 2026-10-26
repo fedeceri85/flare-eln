@@ -64,10 +64,10 @@ class ImportSharedImageTests(TestCase):
     def images_url(self, draft):
         return reverse("lab:import_shared_images", args=[self.project.pk, self.experiment.pk, draft.pk])
 
-    def stage(self, draft, *uploads, caption="Shared gel"):
+    def stage(self, draft, *uploads):
         response = self.client.get(self.url(draft), {"step": "setup"})
         result = self.client.post(self.images_url(draft), {"revision": response.context["revision"],
-            "image_action": "upload", "images": list(uploads) or [image_upload()], "caption": caption})
+            "image_action": "upload", "images": list(uploads) or [image_upload()]})
         self.assertEqual(result.status_code, 302)
         draft.refresh_from_db()
         return result
@@ -117,7 +117,6 @@ class ImportSharedImageTests(TestCase):
         self.assertEqual(draft.shared_images.count(), 0)
         for recording in self.experiment.recordings.all():
             self.assertEqual(recording.images.count(), 2)
-            self.assertEqual({image.caption for image in recording.images.all()}, {"Shared gel"})
         self.assertEqual(commit_import(draft.pk, self.user, self.experiment, []), result)
         self.assertEqual(RecordingImage.objects.count(), 6)
         with self.captureOnCommitCallbacks(execute=True):
@@ -136,10 +135,7 @@ class ImportSharedImageTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             images[0].delete()
         self.assertTrue(path.exists())
-        images[1].caption = "Only this recording"
-        images[1].save(update_fields=["caption"])
-        images[2].refresh_from_db()
-        self.assertEqual(images[2].caption, "Shared gel")
+        self.assertNotEqual(images[1].pk, images[2].pk)
         with self.captureOnCommitCallbacks(execute=True):
             images[1].recording.delete()
         self.assertTrue(path.exists())

@@ -45,18 +45,18 @@ class RecordingImageTests(TestCase):
         self.client.force_login(self.owner)
 
     def add_image(self, **kwargs):
-        save_images(self.recording, [upload(**kwargs)], "Example caption")
+        save_images(self.recording, [upload(**kwargs)])
         return self.recording.images.latest("created_at")
 
     def gallery(self):
         return self.client.get(self.url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
 
-    def test_default_upload_compression_download_and_caption(self):
-        response = self.client.post(self.url, {"action": "upload", "images": [upload(size=(3000, 1500))], "caption": "Gel A"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+    def test_default_upload_compression_download(self):
+        response = self.client.post(self.url, {"action": "upload", "images": [upload(size=(3000, 1500))]}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(len(payload["images"]), 1)
-        self.assertEqual(payload["images"][0]["caption"], "Gel A")
+        self.assertNotIn("caption", payload["images"][0])
         image = self.recording.images.get()
         self.assertEqual((image.width, image.height), (2048, 1024))
         self.assertEqual(Path(image.storage_location.directory), self.root / "default")
@@ -184,11 +184,11 @@ class RecordingImageTests(TestCase):
         self.client.force_login(self.viewer)
         self.assertEqual(self.client.get(file_url).status_code, 200)
         self.assertFalse(self.gallery().json()["can_modify"])
-        for action in ("upload", "caption", "remove"):
-            self.assertEqual(self.client.post(self.url, {"action": action, "image_id": image.pk, "caption": "No"}).status_code, 403)
+        for action in ("upload", "remove"):
+            self.assertEqual(self.client.post(self.url, {"action": action, "image_id": image.pk}).status_code, 403)
         self.client.force_login(self.admin)
-        response = self.client.post(self.url, {"action": "caption", "image_id": image.pk, "caption": "Staff caption"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
-        self.assertEqual(response.json()["images"][0]["caption"], "Staff caption")
+        response = self.client.post(self.url, {"action": "remove", "image_id": image.pk}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.json()["images"], [])
         csrf_client = Client(enforce_csrf_checks=True)
         csrf_client.force_login(self.owner)
         self.assertEqual(csrf_client.post(self.url, {"action": "remove", "image_id": image.pk}).status_code, 403)
@@ -267,7 +267,7 @@ class RecordingImageTests(TestCase):
             self.recording.delete()
         self.assertFalse(path.exists())
 
-    def test_caption_changes_are_scoped_to_the_recording(self):
+    def test_image_removal_is_scoped_to_the_recording(self):
         image = self.add_image()
         other = Recording.objects.create(owner=self.owner, experiment=self.experiment, recording_type=self.kind, recording_date="2026-10-24")
         other_url = reverse("lab:recording_images", args=[self.project.pk, self.experiment.pk, other.pk])
@@ -289,11 +289,11 @@ class RecordingImageTests(TestCase):
         self.assertContains(response, 'enctype="multipart/form-data"')
         self.assertContains(response, 'name="media-images"')
         result = self.client.post(url, {"recording_date": "2026-10-26", "mice": "",
-            "media-images": [upload(), upload(name="second.png")], "media-caption": "New recording gel"})
+            "media-images": [upload(), upload(name="second.png")]})
         self.assertEqual(result.status_code, 302)
         created = self.experiment.recordings.get(recording_date="2026-10-26")
         self.assertEqual(created.images.count(), 2)
-        self.assertEqual(set(created.images.values_list("caption", flat=True)), {"New recording gel"})
+        self.assertNotContains(response, "media-caption")
 
     def test_manual_add_invalid_images_or_storage_do_not_leave_a_partial_recording(self):
         url = reverse("lab:add_recording", args=[self.project.pk, self.experiment.pk])

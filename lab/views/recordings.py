@@ -631,7 +631,7 @@ def add_recording(request, project_pk, experiment_pk):
                 with transaction.atomic():
                     recording = form.save()
                     if media_form.cleaned_data["images"]:
-                        images = save_images(recording, media_form.cleaned_data["images"], media_form.cleaned_data["caption"])
+                        images = save_images(recording, media_form.cleaned_data["images"])
             except (ValidationError, OSError, IntegrityError) as exc:
                 discard_image_files(images)
                 form.add_error(None, exc if isinstance(exc, ValidationError) else "The recording or its images could not be saved. Check image storage and try again.")
