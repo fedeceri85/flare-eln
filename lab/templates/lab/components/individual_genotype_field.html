@@ -1,6 +1,6 @@
 <div class="form-field individual-genotype-field">
     <div class="individual-gene-heading">
-        {{ field.label_tag }}
+        {% if column_heading %}<span class="visually-hidden">{{ field.label_tag }}</span>{% else %}{{ field.label_tag }}{% endif %}
         {% if field.uncertainty_field %}
             <label class="genotype-uncertainty" for="{{ field.uncertainty_field.id_for_label }}">
                 {{ field.uncertainty_field }} <span>Uncertain</span>

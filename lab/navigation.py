@@ -40,7 +40,7 @@ PAGE_TITLES = {
 PRIMARY_ACTIONS = {
     "add_mouse": "Save animal", "add_litter": "Add animals",
     "edit_mouse": "Save changes", "rename_mouse": "Rename animal",
-    "edit_mouse_procedure": "Save procedure", "edit_selected_mice": "Save bulk changes",
+    "edit_mouse_procedure": "Save procedure", "edit_selected_mice": "Save changes",
     "add_project": "Save project", "edit_project": "Save changes",
     "add_experiment": "Save experiment", "edit_experiment": "Save changes",
     "add_recording": "Save recording", "edit_recording": "Save changes",

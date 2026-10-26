@@ -86,6 +86,7 @@ def build_animal_summary(mice):
             call = calls.get(line.pk)
             code = call.zygosity if call else "unknown"
             results.append({
+                "line_id": line.pk,
                 "label": line.name,
                 "value": labels.get(code, code),
                 "uncertain": bool(call and call.is_uncertain),
@@ -94,6 +95,7 @@ def build_animal_summary(mice):
         for call in calls.values():
             if call.mouse_line_id not in line_ids:
                 results.append({
+                    "line_id": call.mouse_line_id,
                     "label": call.mouse_line.name,
                     "value": labels.get(call.zygosity, call.zygosity),
                     "uncertain": call.is_uncertain,

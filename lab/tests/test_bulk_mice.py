@@ -121,7 +121,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         for name in ("genotype", "crossing", "crossing_type"):
             self.assertFalse(html.find("input", name=name))
 
-        saves = [button for button in html.find("button") if button.text.strip() == "Save bulk changes"]
+        saves = [button for button in html.find("button") if button.text.strip() == "Save changes"]
         self.assertEqual(len(saves), 1)
         self.assertEqual(saves[0].attrs.get("form"), "primary-form")
         self.assertTrue(saves[0].within("div", **{"data-page-actions": None}))

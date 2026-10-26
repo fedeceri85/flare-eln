@@ -30,8 +30,10 @@
 {% endblock %}
 
 {% block content %}
-    <div data-mouse-editor>
-    {% include "lab/components/mouse_editor_tabs.html" with editing_existing=True %}
+    <div class="animal-tabbed" data-mouse-editor>
+    <div class="animal-tabs-navigation">
+        {% include "lab/components/mouse_editor_tabs.html" with editing_existing=True %}
+    </div>
     <form id="primary-form" method="post" data-bulk-individual-form>
         {% csrf_token %}
         <input

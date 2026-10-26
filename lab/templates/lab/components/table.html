@@ -66,6 +66,11 @@
                                                 {% if action.url %}<a class="table-row-action" href="{% record_link action.url request %}"{% if action.gallery %} data-recording-gallery data-gallery-count{% endif %}>{{ action.value }}</a>{% else %}<span>{{ action.value }}</span>{% endif %}
                                             {% endfor %}
                                         </div>
+                                    {% elif cell.secondary_action %}
+                                        <div class="recording-animals-controls">
+                                            {{ cell.value }}
+                                            <a href="{% record_link cell.secondary_action.url request %}">{{ cell.secondary_action.value }}</a>
+                                        </div>
                                     {% elif cell.url %}
                                         <a
                                             class="{{ cell.link_class }}"

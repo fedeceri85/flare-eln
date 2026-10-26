@@ -3,6 +3,7 @@ from copy import copy, deepcopy
 
 from django import forms
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 
 from ..forms.recordings import RecordingForm
 from ..models import Crossing, GenotypeCategory, MAX_SEVERITY_CHOICES, Mouse, MouseLine, Protocol, Species
@@ -82,6 +83,8 @@ class SetupForm(forms.Form):
         self.initial["identity_columns"] = [column_initial(table, b) for b in definition.get("identity_columns", [])]
         for name in ("protocol_id", "protocol_start_date", "species_id"):
             self.initial[name] = definition["defaults"].get(name, "")
+        if "protocol_start_date" not in definition["defaults"]:
+            self.initial["protocol_start_date"] = timezone.localdate()
 
     def definition(self):
         result = deepcopy(self.draft.configuration)
@@ -141,6 +144,16 @@ class MappingForm(forms.Form):
             self.fields[default_name] = shared_value_field(original_field, label)
             self.initial[column_name] = column_initial(table, definition["bindings"].get(key))
             initial = definition["defaults"].get(key, "")
+            # Suggest defaults only for untouched, unmapped fields. A saved blank
+            # is intentional and must remain blank when revisiting the wizard.
+            if key not in definition["defaults"] and not definition["bindings"].get(key):
+                if key == "recording_date":
+                    initial = timezone.localdate()
+                elif key == "field:lab_member":
+                    initial = "".join(
+                        name.strip()[0] for name in (draft.owner.first_name, draft.owner.last_name)
+                        if name.strip()
+                    ).upper()
             if initial != "" and isinstance(original_field, forms.DateField):
                 try:
                     initial = parse_date(initial, definition["date_order"])

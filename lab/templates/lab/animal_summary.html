@@ -10,12 +10,14 @@
 
 {% block content %}
     {% if selected_mice %}
-    <div class="animal-summary" data-mouse-editor data-mouse-initial-tab="{{ active_tab }}">
+    <div class="animal-summary animal-tabbed" data-mouse-editor data-mouse-initial-tab="{{ active_tab }}">
         <div class="page-action-bar bulk-mouse-action-bar" role="region" aria-label="Animal summary actions" data-page-actions>
             {% include "lab/components/selected_animals_scope.html" %}
-            <div class="actions"><a class="button button-primary" href="{{ edit_animals_url }}" data-mouse-summary-edit>Edit animals</a></div>
         </div>
-        {% include "lab/components/mouse_editor_tabs.html" %}
+        <div class="animal-tabs-navigation">
+            {% include "lab/components/mouse_editor_tabs.html" %}
+            <a class="button button-primary" href="{{ edit_animals_url }}" data-mouse-summary-edit>Edit animals</a>
+        </div>
 
         <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared">
             <h2 class="visually-hidden">Animal details</h2>
@@ -42,9 +44,6 @@
             </div>
             <div class="shared-genetics">
                 {% include "lab/components/animal_summary_field.html" with item=summary_crossing %}
-                {% if not single_mouse_mode %}
-                    <div class="shared-genotype-column">{% include "lab/components/animal_summary_field.html" with item=summary_genotype %}</div>
-                {% endif %}
             </div>
             <div class="shared-notes">{% include "lab/components/animal_summary_field.html" with item=summary_notes %}</div>
         </section>

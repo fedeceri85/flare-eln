@@ -1039,31 +1039,94 @@ input[type="checkbox"] { accent-color: var(--blue); }
     z-index: 24;
     background: var(--surface);
     margin-bottom: 10px;
-    padding: 2px 0;
-    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+    border-bottom: 2px solid var(--border);
     overflow-x: auto;
     white-space: nowrap;
 }
 .mouse-editor-tabs[hidden], [data-mouse-tab-panel][hidden] { display: none; }
 .mouse-editor-tabs [role="tab"] {
-    margin-right: 2px;
-    padding: 4px 10px;
-    min-height: 32px;
-    border: 1px solid transparent;
-    border-radius: 6px 6px 0 0;
-    background: transparent;
-    color: var(--muted);
+    margin-right: 6px;
+    padding: 10px 16px;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--canvas);
+    color: var(--ink);
     font: inherit;
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
 }
+.mouse-editor-tabs [role="tab"]:hover { background: var(--blue-soft); border-color: var(--blue); }
+.mouse-editor-tabs [role="tab"]:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .mouse-editor-tabs [role="tab"][aria-selected="true"] {
-    border-color: var(--border);
-    background: var(--blue-soft);
-    color: var(--blue);
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #fff;
     font-weight: 650;
 }
 .mouse-tab-error { color: #a32921; font-size: 11px; }
+.mouse-editor-tabs [aria-selected="true"] .mouse-tab-error { color: #fff; }
+
+.animal-tabs-navigation {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 16px;
+    position: sticky;
+    top: calc(var(--header-height) + var(--action-height));
+    z-index: 24;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+    padding-top: 8px;
+}
+.animal-tabs-navigation .mouse-editor-tabs {
+    position: static;
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0 0 -1px;
+    padding: 4px 2px 0;
+    border: 0;
+}
+.animal-tabs-navigation .mouse-editor-tabs:not([hidden]) { display: flex; gap: 4px; }
+.animal-tabs-navigation [role="tab"] {
+    flex: 0 0 auto;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    background: var(--canvas);
+    color: var(--muted);
+}
+.animal-tabs-navigation [role="tab"]:hover { background: var(--blue-soft); color: var(--blue); }
+.animal-tabs-navigation [role="tab"][aria-selected="true"] {
+    border-color: var(--border);
+    border-bottom-color: var(--surface);
+    background: var(--surface);
+    color: var(--blue);
+    box-shadow: inset 0 3px 0 var(--blue);
+}
+.animal-tabs-navigation [aria-selected="true"] .mouse-tab-error { color: #a32921; }
+.animal-tabs-navigation > [data-mouse-summary-edit] { flex: 0 0 auto; margin: 0 0 8px auto; }
+.animal-tabbed > [data-mouse-tab-panel],
+.animal-tabbed > form > [data-mouse-tab-panel] {
+    margin-top: 0;
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 10px 10px;
+    background: var(--surface);
+}
+.animal-tabbed #mouse-panel-services > .bulk-section { padding: 0; border: 0; box-shadow: none; }
+.animal-tabbed #mouse-panel-services > .bulk-section:last-child { margin-bottom: 0; }
+.animal-tabbed > form + #mouse-panel-procedures { margin-bottom: 0; border-radius: 0; }
+@media (max-width: 600px) {
+    .animal-tabs-navigation { gap: 8px; }
+    .animal-tabs-navigation [role="tab"] { padding: 10px 12px; }
+    .animal-tabbed > [data-mouse-tab-panel],
+    .animal-tabbed > form > [data-mouse-tab-panel] { padding: 18px; }
+}
 
 .shared-detail-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
 .shared-detail-group { min-width: 0; margin: 0; padding: 0; border: 0; }
@@ -1141,9 +1204,10 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .individual-mouse-id-column { width: 240px; }
 .individual-local-id-column { width: 150px; }
 .individual-sex-column { width: 120px; }
-.individual-genotype-column { width: auto; }
+.individual-genotype-column { width: 200px; }
 .individual-mouse-table th[scope="row"] { position: sticky; top: auto; left: 0; z-index: 2; background: var(--surface); vertical-align: top; padding-top: 18px; overflow-wrap: anywhere; }
 .individual-mouse-table td { padding: 12px; }
+.individual-mouse-table td > .individual-genotype-field { margin: 0; min-width: 0; }
 .individual-mouse-table td > input,
 .individual-mouse-table td > select { width: 100%; min-height: 34px; padding: 6px 8px; }
 .individual-mouse-table .individual-genotype-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: start; gap: 12px 16px; }
@@ -1299,6 +1363,9 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .data-table.recordings-table .recording-date-cell { width: 90px; min-width: 90px; white-space: nowrap; }
 .data-table.recordings-table .recording-animals-cell { width: 200px; min-width: 160px; max-width: 260px; }
 .recording-animals > summary { cursor: pointer; color: var(--blue); }
+.recording-animals-controls { display: flex; align-items: flex-start; gap: 12px; }
+.recording-animals-controls > details { min-width: 0; }
+.recording-animals-controls > a { white-space: nowrap; }
 .recording-animals > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
 .recording-animals[open] > summary { margin-bottom: 6px; }
 .recording-animal-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 260px; max-width: 100%; min-width: 0; }

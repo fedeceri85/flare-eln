@@ -54,6 +54,12 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         response, markup = self.summary()
         self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")],
                          ["shared", "individual", "procedures", "services"])
+        edit = markup.find("a", **{"data-mouse-summary-edit": None})[0]
+        tablist = markup.find("div", role="tablist")[0]
+        self.assertIs(edit.parent, tablist.parent)
+        self.assertIs([node for node in markup.elements if node.parent is edit.parent][-1], edit)
+        self.assertFalse(edit.within("div", role="tablist"))
+        self.assertIn("button-primary", edit.attrs["class"])
         content = [node for node in markup.elements if node.within("div", **{"data-mouse-editor": None})]
         self.assertFalse([node for node in content if node.tag in {"form", "input", "select", "textarea"}])
         self.assertContains(response, "Origin")
@@ -141,6 +147,39 @@ class AnimalSummaryTests(AuthenticatedTestCase):
             response, reverse("lab:animal_summary", args=[self.mice[0].pk]),
             url_with_query_params(self.url, return_url=self.list_url, mouse_editor_tab="individual"),
         )
+
+    def test_genotypes_use_shared_column_headings_in_summary_and_editor(self):
+        for url, params in (
+            (self.url, {}),
+            (self.edit_url, {"selected_mouse": [mouse.pk for mouse in self.mice]}),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url, params)
+                self.assertEqual(response.status_code, 200)
+                markup = Markup(response.content.decode())
+                headings = [node.text.strip() for node in markup.find("th", scope="col")
+                            if node.within("section", id="mouse-panel-individual")]
+                self.assertEqual(headings, ["Animal ID", "Local identifier", "Sex", *[line.name for line in self.lines]])
+                for node in markup.find("label"):
+                    if node.text.strip() in [line.name for line in self.lines] and node.within("section", id="mouse-panel-individual"):
+                        self.assertTrue(node.within("span", **{"class": "visually-hidden"}))
+        _, markup = self.summary()
+        shared = markup.find("section", id="mouse-panel-shared")[0]
+        self.assertNotIn("Genotype", shared.text)
+
+    def test_historical_calls_align_with_their_own_column(self):
+        _, historical_lines = create_test_crossing(("Historical gene",))
+        MouseGenotype.objects.create(mouse=self.mice[1], mouse_line=historical_lines[0], zygosity="het")
+        _, markup = self.summary()
+        headings = [node.text.strip() for node in markup.find("th", scope="col")
+                    if node.within("section", id="mouse-panel-individual")]
+        self.assertEqual(headings[-3:], [line.name for line in self.lines] + ["Historical gene"])
+        rows = [node for node in markup.find("tr") if node.within("tbody")
+                and node.within("section", id="mouse-panel-individual")]
+        for index, row in enumerate(rows):
+            cells = [node for node in markup.find("td") if node.parent is row]
+            self.assertEqual(len(cells), 5)
+            self.assertEqual(cells[-1].text.strip(), "—" if index == 0 else "Het")
 
     def test_legacy_genotypes_and_different_crossings_are_retained(self):
         self.mice[1].crossing_definition = None
@@ -230,7 +269,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         other_user = get_user_model().objects.create_user(username="summary-viewer")
         self.client.force_login(other_user)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "View animals (2)")
+        self.assertContains(response, "View all")
         self.assert_contextual_link(response, self.url, self.list_url)
         self.assertEqual(self.client.get(self.url).status_code, 200)
         self.assertEqual(self.client.get(reverse("lab:recording_animals", args=[self.project.pk, self.experiment.pk + 1000, self.recording.pk])).status_code, 404)
@@ -243,8 +282,25 @@ class AnimalSummaryTests(AuthenticatedTestCase):
 
     def test_recording_button_preserves_list_filters_and_pagination(self):
         response = self.client.get(self.list_state)
-        self.assertContains(response, "View animals (2)")
+        self.assertContains(response, "View all")
         self.assert_contextual_link(response, self.url, self.list_state)
+        markup = Markup(response.content.decode())
+        view_all = next(node for node in markup.find("a") if node.text.strip() == "View all")
+        self.assertTrue(view_all.within("td", **{"class": "recording-animals-cell"}))
+        self.assertFalse(view_all.within("details"))
+        self.assertIn("2 animals", view_all.parent.text)
+        self.assertNotContains(response, "View animals")
+
+    def test_single_recording_animal_uses_name_link_without_group_link(self):
+        self.recording.mice.set(self.mice[:1])
+        response = self.client.get(self.list_url)
+        markup = Markup(response.content.decode())
+        cell = markup.find("td", **{"class": "recording-animals-cell"})[0]
+        self.assertIn(self.mice[0].pk, cell.text)
+        self.assertFalse(markup.find("details", **{"class": "recording-animals"}))
+        self.assertNotContains(response, "View all")
+        self.assertNotContains(response, "View animals")
+        self.assertContains(response, reverse("lab:animal_summary", args=[self.mice[0].pk]))
 
     def test_summary_escapes_notes_and_query_count_does_not_grow_per_animal(self):
         self.mice[0].notes = "<script>alert('notes')</script>\nSecond line"

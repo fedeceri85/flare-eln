@@ -1094,6 +1094,17 @@ def build_recordings_table(
         can_modify = recording.can_be_modified_by(user)
         animal_count = len(recording.mice.all())
         image_count = len(available_images(recording))
+        base_cells = []
+        for spec in RECORDINGS_PAGE_BASE_COLUMN_SPECS:
+            cell = build_cell(recording, spec)
+            if spec.get("format") == "recording_mice" and animal_count > 1:
+                cell["secondary_action"] = {
+                    "value": "View all",
+                    "url": reverse("lab:recording_animals", args=[
+                        recording.experiment.project_id, recording.experiment_id, recording.pk,
+                    ]),
+                }
+            base_cells.append(cell)
         is_selected = recording.pk == selected_recording_id
         edit_url = reverse(
             "lab:edit_recording",
@@ -1121,10 +1132,7 @@ def build_recordings_table(
                         ),
                         "value": EMPTY_VALUE if not can_modify else "",
                     },
-                    *[
-                        build_cell(recording, spec)
-                        for spec in RECORDINGS_PAGE_BASE_COLUMN_SPECS
-                    ],
+                    *base_cells,
                     *[
                         {
                             "value": format_recording_field_value(
@@ -1142,12 +1150,6 @@ def build_recordings_table(
                     {
                         "class": "action-cell",
                         "actions": [
-                            {
-                                "value": f"View animals ({animal_count})" if animal_count else "No animals",
-                                "url": reverse("lab:recording_animals", args=[
-                                    recording.experiment.project_id, recording.experiment_id, recording.pk,
-                                ]) if animal_count else None,
-                            },
                             *([{"value": "Edit", "url": edit_url}] if can_modify else []),
                             *([{
                                 "value": f"Images ({image_count})", "gallery": True,

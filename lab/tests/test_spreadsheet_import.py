@@ -18,7 +18,7 @@ from ..models import (
 )
 from ..test_navigation import Markup
 from ..spreadsheet_import.engine import animal_groups, build_review, commit_import, draft_table, initial_resolution
-from ..spreadsheet_import.forms import AnimalsForm, GeneticsForm, MappingForm
+from ..spreadsheet_import.forms import AnimalsForm, GeneticsForm, MappingForm, SetupForm
 from ..spreadsheet_import.mapping import crossing_candidates, crossing_suggestion, new_definition, parse_date, validate_definition
 from ..spreadsheet_import.source import binding, read_upload, table_from_sheet
 
@@ -994,6 +994,62 @@ class SpreadsheetImportTests(TestCase):
             ("mode", "choice", True, ["high", "low"]),
         ):
             RecordingField.objects.create(recording_type=self.recording_type, key=key, label=key.title(), data_type=data_type, required=required, choices=choices)
+
+    @patch("lab.spreadsheet_import.forms.timezone.localdate", return_value=date(2026, 10, 26))
+    def test_import_date_and_member_prefills_are_saved_and_used(self, localdate):
+        self.user.first_name, self.user.last_name = " Alice ", " Brown "
+        self.user.save()
+        RecordingField.objects.create(recording_type=self.recording_type, key="lab_member", label="Lab member", data_type="text")
+        draft = self.draft("Mouse ID,Frames\nOFFICIAL-1,10\n")
+        setup = self.client.get(self.url(draft), {"step": "setup"})
+        self.assertContains(setup, 'name="protocol_start_date" value="2026-10-26"')
+        data = self.form_data(setup.context["form"])
+        data.update(step="setup", revision=setup.context["revision"])
+        response = self.client.post(self.url(draft), data, follow=True)
+        form = response.context["form"]
+        self.assertEqual(form["default_recording_date"].value(), date(2026, 10, 26))
+        self.assertEqual(form["default_field:lab_member"].value(), "AB")
+        self.assertEqual(form["mode_recording_date"].value(), "shared")
+        self.assertEqual(form["mode_field:lab_member"].value(), "shared")
+        data = self.form_data(form)
+        data.update(step="mapping", revision=response.context["revision"])
+        self.assertEqual(self.client.post(self.url(draft), data).status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.configuration["defaults"]["protocol_start_date"], "2026-10-26")
+        self.reviewed(draft)
+        commit_import(draft.pk, self.user, self.experiment, [])
+        recording = self.experiment.recordings.get()
+        self.assertEqual(recording.recording_date, date(2026, 10, 26))
+        self.assertEqual(recording.values["lab_member"], "AB")
+
+    def test_import_prefills_preserve_columns_saved_values_and_cleared_values(self):
+        self.user.first_name, self.user.last_name = "Alice", "Brown"
+        self.user.save()
+        RecordingField.objects.create(recording_type=self.recording_type, key="lab_member", label="Lab member", data_type="text")
+        draft = self.draft("Date,Mouse ID,Lab member\n28.04.26,OFFICIAL-1,CD\n")
+        table = draft_table(draft)
+        form = MappingForm(draft, table)
+        for key in ("recording_date", "field:lab_member"):
+            self.assertEqual(form[f"mode_{key}"].value(), "column")
+            self.assertEqual(form[f"default_{key}"].value(), "")
+        draft.configuration["bindings"].pop("recording_date")
+        draft.configuration["bindings"].pop("field:lab_member")
+        for start, recorded, member in (("2026-04-01", "2026-04-28", "EF"), ("", "", "")):
+            with self.subTest(member=member):
+                draft.configuration["defaults"].update(protocol_start_date=start, recording_date=recorded, **{"field:lab_member": member})
+                self.assertEqual(SetupForm(draft, table)["protocol_start_date"].value(), start)
+                form = MappingForm(draft, table)
+                self.assertEqual(form["default_recording_date"].value(), date(2026, 4, 28) if recorded else "")
+                self.assertEqual(form["default_field:lab_member"].value(), member)
+
+    def test_import_member_prefill_handles_missing_names(self):
+        RecordingField.objects.create(recording_type=self.recording_type, key="lab_member", label="Lab member", data_type="text")
+        draft = self.draft()
+        for first, last, expected in (("", "", ""), ("Alice", "", "A"), ("", "Brown", "B")):
+            with self.subTest(first=first, last=last):
+                draft.owner.first_name, draft.owner.last_name = first, last
+                form = MappingForm(draft, draft_table(draft))
+                self.assertEqual(form["default_field:lab_member"].value(), expected)
 
     def test_sequence_is_only_offered_as_a_configured_recording_field(self):
         draft = self.draft()
