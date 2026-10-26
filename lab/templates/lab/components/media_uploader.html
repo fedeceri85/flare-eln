@@ -6,7 +6,7 @@
         <span class="media-dropzone-or">or</span>
         <button class="button" type="button" data-media-browse hidden>Browse images</button>
         <div class="media-native-input">{{ media_form.images }}</div>
-        <small>JPEG, PNG or WebP · up to 10 images at a time · 20 MB each</small>
+        <small>JPEG, PNG, WebP or TIFF · up to 10 images at a time · 20 MB each · multipage TIFFs use the first page</small>
     </div>
     <p class="media-status" data-media-status role="status" aria-live="polite"></p>
     {% for field in media_form %}{% for error in field.errors %}<p class="error-list">{{ error }}</p>{% endfor %}{% endfor %}

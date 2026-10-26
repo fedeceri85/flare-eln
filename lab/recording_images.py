@@ -108,10 +108,12 @@ def compress_image(upload):
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(upload) as source:
-                if source.format not in {"JPEG", "PNG", "WEBP"} or getattr(source, "is_animated", False):
-                    raise ValidationError(f"{upload.name}: choose a still JPEG, PNG or WebP image.")
+                if source.format not in {"JPEG", "PNG", "WEBP", "TIFF"} or (source.format != "TIFF" and getattr(source, "is_animated", False)):
+                    raise ValidationError(f"{upload.name}: choose a JPEG, PNG, WebP or TIFF image.")
                 if source.width * source.height > MAX_IMAGE_PIXELS:
                     raise ValidationError(f"{upload.name}: choose an image with no more than 40 million pixels.")
+                # TIFF attachments use the first page as their viewing copy.
+                source.seek(0)
                 source.load()
                 image = ImageOps.exif_transpose(source)
                 image.thumbnail((2048, 2048), Image.Resampling.LANCZOS)

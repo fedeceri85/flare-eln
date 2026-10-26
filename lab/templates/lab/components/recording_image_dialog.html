@@ -28,8 +28,8 @@
             <form method="post" enctype="multipart/form-data" data-gallery-upload-form>
                 {% csrf_token %}
                 <label for="gallery-upload-input">Images</label>
-                <input id="gallery-upload-input" type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple required>
-                <small>JPEG, PNG or WebP. Up to 10 at a time, 20 MB each. Stored as compressed viewing copies.</small>
+                <input id="gallery-upload-input" type="file" name="images" accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff" multiple required>
+                <small>JPEG, PNG, WebP or TIFF. Up to 10 at a time, 20 MB each. Stored as compressed viewing copies. Multipage TIFFs use the first page.</small>
                 <button class="button button-primary" type="submit" name="action" value="upload">Upload images</button>
             </form>
         </details>

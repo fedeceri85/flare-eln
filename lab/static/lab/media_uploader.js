@@ -89,8 +89,8 @@ document.addEventListener('DOMContentLoaded', function () {
         function choose(selected) {
             if (busy) return;
             const incoming = Array.from(selected);
-            if (incoming.some(file => !/\.(jpe?g|png|webp)$/i.test(file.name))) {
-                status.textContent = 'Choose JPEG, PNG or WebP images.';
+            if (incoming.some(file => !/\.(jpe?g|png|webp|tiff?)$/i.test(file.name))) {
+                status.textContent = 'Choose JPEG, PNG, WebP or TIFF images.';
                 if (!uploadForm) setFiles(files);
                 return;
             }

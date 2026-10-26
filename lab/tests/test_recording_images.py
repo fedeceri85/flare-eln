@@ -76,6 +76,22 @@ class RecordingImageTests(TestCase):
             self.assertEqual(saved.size, (100, 50))
             self.assertEqual(saved.mode, "RGBA")
 
+    def test_tiff_uploads_compress_first_page_to_webp(self):
+        for extension in ("tif", "tiff"):
+            with self.subTest(extension=extension):
+                data = BytesIO()
+                Image.new("RGB", (120, 80), "red").save(data, format="TIFF", save_all=True,
+                    append_images=[Image.new("RGB", (40, 60), "blue")])
+                response = self.client.post(self.url, {"action": "upload", "images":
+                    SimpleUploadedFile("gel." + extension, data.getvalue(), content_type="image/tiff")},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+                self.assertEqual(response.status_code, 200)
+                image = self.recording.images.get(original_name="gel." + extension)
+                with Image.open(image_path(image)) as result:
+                    self.assertEqual(result.format, "WEBP")
+                    self.assertEqual(result.size, (120, 80))
+                    self.assertGreater(result.getpixel((0, 0))[0], 200)
+
     def test_jpeg_orientation_is_applied_before_saving(self):
         exif = Image.Exif()
         exif[274] = 6
