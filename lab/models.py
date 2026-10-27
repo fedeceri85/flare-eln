@@ -234,6 +234,13 @@ class Crossing(models.Model):
 
 
 class Mouse(models.Model):
+    date_added = models.DateField(
+        default=timezone.localdate,
+        null=True,
+        blank=True,
+        editable=False,
+        verbose_name="Date added",
+    )
     added_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

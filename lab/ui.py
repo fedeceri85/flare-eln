@@ -32,6 +32,13 @@ MOUSE_TABLE_COLUMN_SPECS = [
         "cell_class": "mouse-id-cell",
     },
     {
+        "key": "date_added",
+        "label": "Date added",
+        "sort": "date_added",
+        "format": "date",
+        "cell_class": "date-cell",
+    },
+    {
         "key": "added_by__get_username",
         "label": "Added by",
         "sort": "added_by__username",
@@ -1150,7 +1157,7 @@ def build_recordings_table(
                     {
                         "class": "action-cell",
                         "actions": [
-                            *([{"value": "Edit", "url": edit_url}] if can_modify else []),
+                            *([{"value": "View", "url": edit_url}] if can_modify else []),
                             *([{
                                 "value": f"Images ({image_count})", "gallery": True,
                                 "url": reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk]),

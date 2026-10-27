@@ -88,14 +88,14 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
             licence_reference=licence_reference,
         )
 
-    sort = request.GET.get("sort", "protocol_start_date")
+    sort = request.GET.get("sort", "date_added")
     direction = request.GET.get("direction", "desc")
 
     if direction not in {"asc", "desc"}:
         direction = "desc"
 
     if sort not in sortable_fields():
-        sort = "protocol_start_date"
+        sort = "date_added"
 
     order_by_field = sort if direction == "asc" else f"-{sort}"
     filter_values = read_filter_values(request.GET, MOUSE_FILTER_SPECS)
@@ -123,7 +123,7 @@ def procedure_page(request, licence_reference=None, protocol_number=None):
         .order_by("name")
     )
 
-    if sort == "protocol_start_date":
+    if sort in {"date_added", "protocol_start_date"}:
         date_order = F(sort).desc(nulls_last=True) if direction == "desc" else F(sort).asc(nulls_last=True)
         mice = mice.order_by(date_order, "mouse_id")
     else:
