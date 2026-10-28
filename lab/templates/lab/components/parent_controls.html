@@ -1,0 +1,18 @@
+<fieldset class="shared-detail-group parent-controls">
+    <legend>Mother and father (optional)</legend>
+    {% for item in controls %}
+    <div class="parent-control" data-parent-control data-parent-role="{{ item.role }}" data-parent-target="{{ item.target }}" data-parent-had-value="{{ item.had_parent|yesno:'true,false' }}" data-parent-has-overrides="{{ item.has_overrides|yesno:'true,false' }}">
+        {% if item.checkbox %}<label>{{ item.checkbox }} {{ item.checkbox.label }}</label>{% endif %}
+        <label for="{{ item.text.id_for_label }}">{{ item.text.label }}</label>
+        {{ item.text }}{{ item.reference }}
+        {{ item.text.errors }}{{ item.reference.errors }}
+        <div class="parent-status-actions">
+            <span data-parent-state role="status" aria-live="polite">{% if item.reference.value %}Linked: {{ item.reference.value }}{% elif item.text.value %}External text{% else %}Unknown{% endif %}</span>
+            <div class="parent-actions">
+                <button type="button" class="button" data-parent-remove hidden>Remove parent</button>
+            </div>
+        </div>
+        <div data-parent-suggestions hidden></div>
+    </div>
+    {% endfor %}
+</fieldset>

@@ -41,7 +41,7 @@
             name="return_url"
             value="{{ return_url }}"
         >
-        <input type="hidden" name="mouse_editor_tab" value="{% firstof request.POST.mouse_editor_tab request.GET.mouse_editor_tab 'ids' %}" data-mouse-active-tab>
+        <input type="hidden" name="mouse_editor_tab" value="{% firstof request.POST.mouse_editor_tab request.GET.mouse_editor_tab initial_edit_tab %}" data-mouse-active-tab>
         <input
             type="hidden"
             name="apply_bulk_edit"
@@ -89,27 +89,7 @@
                     </fieldset>
                 {% endfor %}
             </div>
-            {% with item=form.shared_genetics_update %}
-                <div class="shared-genetics{% if form.single_mouse_mode %} shared-genetics-single{% endif %}">
-                    {% include "lab/components/shared_bulk_update_field.html" with field_class="shared-crossing-column" %}
-                    <div class="shared-genotype-column" {% if form.single_mouse_mode %}hidden{% endif %}>
-                        {% if not form.single_mouse_mode %}
-                        <div class="bulk-toggle">
-                            {{ item.secondary_checkbox }}
-                            <label for="{{ item.secondary_checkbox.id_for_label }}">Genotype</label>
-                        </div>
-                        {% if item.genotype_fields %}
-                            <fieldset class="form-subset genotype-subset" data-genotype-subset="true">
-                                <legend>Genotype</legend>
-                                {% for genotype_field in item.genotype_fields %}
-                                    {% include "lab/components/genotype_field.html" with field=genotype_field %}
-                                {% endfor %}
-                            </fieldset>
-                        {% endif %}
-                        {% endif %}
-                    </div>
-                </div>
-            {% endwith %}
+            {% if form.single_mouse_mode %}{% include "lab/components/bulk_shared_genetics.html" %}{% endif %}
             <div class="bulk-field shared-notes">
                 <div class="bulk-toggle">
                     <label for="{{ form.notes_action.id_for_label }}">Notes</label>
@@ -128,6 +108,11 @@
             {% if not form.single_mouse_mode %}
                 {% include "lab/components/individual_animal_overrides.html" %}
             {% endif %}
+        </section>
+
+        <section class="bulk-section family-details" id="mouse-panel-family" data-mouse-tab-panel="family">
+            <h2 class="visually-hidden">Family details</h2>
+            {% include "lab/components/parent_editor.html" %}
         </section>
 
         {% if not form.single_mouse_mode %}
@@ -154,8 +139,12 @@
 {% endblock %}
 
 {% block scripts %}
+    {% include "lab/components/recording_image_dialog.html" %}
+    <script src="{% static 'lab/recording_images.js' %}?v=recording-images-4"></script>
+    {% include "lab/components/remove_parent_dialog.html" %}
+    <script src="{% static 'lab/parentage.js' %}?v=parent-autocomplete-2"></script>
     <script src="{% static 'lab/shared_mouse_details.js' %}"></script>
-    <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=genotype-entry-1"></script>
     <script src="{% static 'lab/existing_procedures.js' %}"></script>
     <script src="{% static 'lab/new_procedures.js' %}"></script>
     <script src="{% static 'lab/new_animal_recording.js' %}"></script>

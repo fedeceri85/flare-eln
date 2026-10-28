@@ -1,0 +1,9 @@
+{% extends 'lab/base.html' %}
+{% load static %}
+{% block title %}Family details{% endblock %}
+{% block page_title %}Family details{% endblock %}
+{% block content %}
+    <section class="bulk-section family-details">{% include fragment_template %}</section>
+    <p><a href="{{ family_return_url }}">Back to animal summary</a></p>
+{% endblock %}
+{% block scripts %}<script src="{% static 'lab/family_details.js' %}"></script>{% endblock %}

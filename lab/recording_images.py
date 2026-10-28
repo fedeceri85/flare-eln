@@ -76,13 +76,22 @@ def image_path(image):
     return path
 
 
-def image_available(image):
+def image_status(image):
+    """Only gallery/file/audit paths inspect storage; table counts use metadata."""
     try:
         with image_path(image).open("rb") as source:
             header = source.read(12)
-            return header[:4] == b"RIFF" and header[8:12] == b"WEBP"
-    except (OSError, ValueError):
-        return False
+        return "available" if header[:4] == b"RIFF" and header[8:12] == b"WEBP" else "invalid format"
+    except FileNotFoundError:
+        return "missing"
+    except ValueError:
+        return "invalid path"
+    except OSError:
+        return "unreadable"
+
+
+def image_available(image):
+    return image_status(image) == "available"
 
 
 def available_images(recording):

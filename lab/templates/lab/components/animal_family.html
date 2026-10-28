@@ -1,0 +1,35 @@
+<section class="family-section" aria-labelledby="family-parents-title">
+    <div class="family-section-heading"><h2 class="section-title" id="family-parents-title">Parents</h2></div>
+    {% for group in parent_groups %}
+    <div class="parent-group-card">
+        <p class="family-members"><strong>Selected animals:</strong>{% for member in group.members %}<a href="{{ member.url }}">{{ member.id }}</a>{% endfor %}</p>
+        <dl class="family-parent-pair">{% for parent in group.parents %}
+            <div class="family-parent-field"><dt>{{ parent.role }}</dt><dd>{% if parent.linked %}<a href="{{ parent.url }}">{{ parent.id }}</a>{% else %}{{ parent.id|default:'Unknown' }}{% if parent.id %} · external ID{% endif %}{% endif %}
+                {% if parent.recorded_id %}<small>Recorded ID: {{ parent.recorded_id }}</small>{% endif %}
+                {% if parent.recorded_ids %}<details><summary>Recorded IDs differ</summary><ul>{% for record in parent.recorded_ids %}<li>{{ record.id }}: {{ record.value|default:'Unknown' }}</li>{% endfor %}</ul></details>{% endif %}
+            </dd></div>
+        {% endfor %}</dl>
+        {% if group.parents_url %}<a href="{{ group.parents_url }}">View parents</a>{% endif %}
+    </div>
+    {% endfor %}
+</section>
+<section class="family-section" aria-labelledby="family-offspring-title">
+    <div class="family-section-heading"><h2 class="section-title" id="family-offspring-title">Offspring</h2></div>
+    {% for family in family_sections %}
+    <div class="family-offspring-card">
+        <details class="family-offspring-list"{% if family_sections|length == 1 %} open{% endif %}>
+        <summary>
+            {% if family_sections|length > 1 %}<strong>{{ family.mouse_id }}</strong> · {% endif %}
+            <span>Offspring recorded in this ELN · {{ family.offspring_count }}</span>
+            {% if family.offspring_count %}<a href="{{ family.offspring_url }}">View all offspring</a>{% endif %}
+        </summary>
+        {% for group in family.groups %}
+            <div class="family-offspring-group">
+                <span class="family-offspring-group-label">{% if group.other_id %}With {{ group.other_role }} {% if group.other_url %}<a href="{{ group.other_url }}">{{ group.other_id }}</a>{% else %}{{ group.other_id }}{% if group.external %} · external ID{% endif %}{% endif %}{% else %}Other parent unknown{% endif %} · {{ group.count }}</span>
+                <span>{% for child in group.preview %}<a href="{{ child.url }}">{{ child.id }}</a>{% if not forloop.last %}, {% endif %}{% endfor %} · <a href="{{ group.url }}">View all</a></span>
+            </div>
+        {% empty %}<p class="family-offspring-empty">No linked offspring recorded.</p>{% endfor %}
+        </details>
+    </div>
+    {% endfor %}
+</section>

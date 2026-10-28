@@ -91,22 +91,18 @@ class MicePageTests(AuthenticatedTestCase):
         self.assertContains(response, self.no_dob_mouse.mouse_id)
         self.assertEqual(response.context["record_count"]["count"], 4)
 
-    def test_mice_page_defaults_to_dob_descending_with_empty_dob_last(self):
-        response = self.client.get(self.mice_url)
-        content = response.content.decode()
-
-        self.assertLess(
-            content.index(self.recent_mouse.mouse_id),
-            content.index(self.non_regulated_mouse.mouse_id),
-        )
-        self.assertLess(
-            content.index(self.non_regulated_mouse.mouse_id),
-            content.index(self.old_mouse.mouse_id),
-        )
-        self.assertLess(
-            content.index(self.old_mouse.mouse_id),
-            content.index(self.no_dob_mouse.mouse_id),
-        )
+    def test_mice_page_defaults_to_date_added_descending_with_unknown_last(self):
+        for mouse, added in ((self.recent_mouse, date(2026, 1, 1)), (self.old_mouse, date(2026, 2, 1)),
+                             (self.non_regulated_mouse, date(2026, 2, 1)), (self.no_dob_mouse, None)):
+            Mouse.objects.filter(pk=mouse.pk).update(date_added=added)
+        expected = [self.non_regulated_mouse.pk, self.old_mouse.pk, self.recent_mouse.pk, self.no_dob_mouse.pk]
+        for params, order in (({}, expected), ({'sort': 'invalid'}, expected),
+                              ({'sort': 'date_added', 'direction': 'asc'}, [self.recent_mouse.pk, self.non_regulated_mouse.pk, self.old_mouse.pk, self.no_dob_mouse.pk])):
+            response = self.client.get(self.mice_url, params)
+            rows = response.context['table']['rows']
+            self.assertEqual([row['cells'][0]['checkbox']['value'] for row in rows], order)
+        response = self.client.get(self.mice_url, {'sort': 'date_of_birth', 'direction': 'desc'})
+        self.assertEqual(response.context['table']['rows'][0]['cells'][0]['checkbox']['value'], self.recent_mouse.pk)
 
     def test_mice_page_renders_admin_style_columns_and_actions(self):
         response = self.client.get(self.mice_url)
@@ -114,6 +110,7 @@ class MicePageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         for label in (
             "Animal ID",
+            "Date added",
             "Genotype",
             "Sex",
             "Status",

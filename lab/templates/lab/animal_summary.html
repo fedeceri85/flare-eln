@@ -42,15 +42,28 @@
                     </fieldset>
                 {% endfor %}
             </div>
+            {% if single_mouse_mode %}
             <div class="shared-genetics">
                 {% include "lab/components/animal_summary_field.html" with item=summary_crossing %}
             </div>
+            {% endif %}
             <div class="shared-notes">{% include "lab/components/animal_summary_field.html" with item=summary_notes %}</div>
+        </section>
+
+        <section class="bulk-section family-details" id="mouse-panel-family" data-mouse-tab-panel="family" data-family-load-url="{{ family_fragment_url }}" data-family-loaded="{{ family_loaded|yesno:'true,false' }}">
+            <h2 class="visually-hidden">Family details</h2>
+            <div data-family-content>{% if family_loaded %}{% include "lab/components/animal_family.html" %}{% endif %}</div>
+            <p role="status" aria-live="polite" data-family-status></p>
+            <button type="button" class="button" data-family-retry hidden>Retry loading family details</button>
+            {% if not family_loaded %}<noscript><a href="{{ family_url }}">View family details</a></noscript>{% endif %}
         </section>
 
         {% if not single_mouse_mode %}
         <section class="bulk-section" id="mouse-panel-individual" data-mouse-tab-panel="individual">
             <h2 class="visually-hidden">Genotype details</h2>
+            <div class="shared-genetics">
+                {% include "lab/components/animal_summary_field.html" with item=summary_crossing %}
+            </div>
             <p class="bulk-help">Each animal’s local identifier, sex and genotype. Select an Animal ID to open its complete record.</p>
             <div class="litter-rows-scroll">
                 {% regroup individual_rows by crossing as crossing_groups %}
@@ -84,10 +97,13 @@
         </section>
     </div>
     {% else %}
-        <p class="empty-message">No animals are linked to this recording.</p>
+        <p class="empty-message">{{ empty_message|default:'No animals are linked to this recording.' }}</p>
     {% endif %}
 {% endblock %}
 
 {% block scripts %}
-    <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
+    {% include "lab/components/recording_image_dialog.html" %}
+    <script src="{% static 'lab/recording_images.js' %}?v=recording-images-4"></script>
+    <script src="{% static 'lab/family_details.js' %}?v=maintenance-1"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=genotype-entry-1"></script>
 {% endblock %}

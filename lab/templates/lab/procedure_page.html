@@ -59,13 +59,14 @@
                 <a
                     class="button button-primary"
                     data-animal-action="selected-mice-form"
-                    data-animal-selected-label="View animals"
+                    data-animal-selected-label="View selected"
                     aria-live="polite"
                     href="{% url 'lab:add_litter_licence_protocol' selected_protocol.licence_reference selected_protocol.protocol_number %}?return_url={{ request.get_full_path|urlencode }}"
                 >
                     Add animals
                 </a>
             {% endif %}
+            <a href="{% url 'lab:mice_page' %}">View all animals</a>
         </div>
     </div>
 

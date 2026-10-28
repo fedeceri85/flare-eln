@@ -2,12 +2,12 @@ from datetime import date
 from urllib.parse import urlencode
 
 from django.http import QueryDict
+from django.db.models import Count
 from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
 
-from .models import Mouse
-from .recording_images import available_images
+from .models import Mouse, RecordingImage
 
 
 EMPTY_VALUE = format_html("&mdash;")
@@ -119,6 +119,13 @@ MICE_PAGE_TABLE_COLUMN_SPECS = [
         "url": lambda mouse: reverse("lab:animal_summary", args=[mouse.pk]),
         "link_class": "mouse-link",
         "cell_class": "mouse-id-cell",
+    },
+    {
+        "key": "date_added",
+        "label": "Date added",
+        "sort": "date_added",
+        "format": "date",
+        "cell_class": "date-cell",
     },
     {
         "key": "added_by__get_username",
@@ -366,7 +373,7 @@ MOUSE_FILTER_SPECS = [
         "name": "show_current_year",
         "label": "Show only current year",
         "type": "checkbox",
-        "default": "1",
+        "default": "0",
         "checkbox_value": "1",
         "unchecked_value": "0",
     },
@@ -983,13 +990,46 @@ def build_service_experiment_cards(experiments):
     return cards
 
 
-def build_recording_type_table(recording_type, recordings, *, include_animals=False, include_notes=False):
-    base_specs = list(BASE_RECORDING_COLUMN_SPECS)
+def visible_recording_columns(specs, recording_type):
+    return [spec for spec in specs if not (
+        (spec.get("key") == "data_paths" and getattr(recording_type, "hide_data_paths_in_table", False)) or
+        (spec.get("key") == "notes" and getattr(recording_type, "hide_notes_in_table", False))
+    )]
+
+
+def recording_attachment_counts(recordings):
+    ids = [recording.pk for recording in recordings]
+    return dict(RecordingImage.objects.filter(recording_id__in=ids).values("recording_id")
+        .annotate(total=Count("pk")).values_list("recording_id", "total")) if ids else {}
+
+
+def recording_animals_cell(recording, spec):
+    cell = build_cell(recording, spec)
+    if spec.get("format") == "recording_mice" and len(recording.mice.all()) > 1:
+        cell["secondary_action"] = {"value": "View all", "url": reverse("lab:recording_animals", args=[
+            recording.experiment.project_id, recording.experiment_id, recording.pk,
+        ])}
+    return cell
+
+
+def recording_image_action(recording, count):
+    return {"value": f"Images ({count})", "gallery": True,
+        "title": "Registered image attachments; availability is checked when opened",
+        "url": reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk])}
+
+
+def build_recording_type_table(recording_type, recordings, *, include_animals=False, include_notes=False, attachment_counts=None):
+    recordings = list(recordings)
+    attachment_counts = recording_attachment_counts(recordings) if attachment_counts is None else attachment_counts
+    base_specs = [dict(spec) for spec in BASE_RECORDING_COLUMN_SPECS]
+    base_specs[0].pop("url", None)
+    base_specs[0].pop("link_class", None)
     path_specs = list(RECORDING_PATH_COLUMN_SPEC)
     if include_animals:
         base_specs.insert(1, RECORDINGS_PAGE_BASE_COLUMN_SPECS[1])
     if include_notes:
         path_specs.append(RECORDINGS_PAGE_TRAILING_COLUMN_SPECS[1])
+    path_specs = visible_recording_columns(path_specs, recording_type)
     display_fields = [
         field
         for field in recording_type.fields.all()
@@ -1023,7 +1063,7 @@ def build_recording_type_table(recording_type, recordings, *, include_animals=Fa
             {
                 "cells": [
                     *[
-                        build_cell(recording, spec)
+                        recording_animals_cell(recording, spec)
                         for spec in base_specs
                     ],
                     *[
@@ -1040,6 +1080,10 @@ def build_recording_type_table(recording_type, recordings, *, include_animals=Fa
                         build_cell(recording, spec)
                         for spec in path_specs
                     ],
+                    {"class": "action-cell", "actions": [
+                        {"value": "See in Experiment", "url": selected_recording_url(recording)},
+                        *([recording_image_action(recording, attachment_counts[recording.pk])] if attachment_counts.get(recording.pk) else []),
+                    ]},
                 ],
             }
         )
@@ -1050,6 +1094,7 @@ def build_recording_type_table(recording_type, recordings, *, include_animals=Fa
             *base_columns,
             *field_columns,
             *path_columns,
+            {"label": "Actions", "class": "action-cell"},
         ],
         "rows": rows,
         "empty_message": (
@@ -1069,6 +1114,9 @@ def build_recordings_table(
 ):
     if query_params is None:
         query_params = QueryDict()
+    recordings = list(recordings)
+    attachment_counts = recording_attachment_counts(recordings)
+    trailing_specs = visible_recording_columns(RECORDINGS_PAGE_TRAILING_COLUMN_SPECS, recording_type)
     display_fields = []
 
     if recording_type is not None:
@@ -1089,7 +1137,7 @@ def build_recordings_table(
             [
                 *RECORDINGS_PAGE_BASE_COLUMN_SPECS,
                 *[{"label": recording_field_label(field), "sort": f"field:{field.key}", "cell_class": "recording-field-cell"} for field in display_fields],
-                *RECORDINGS_PAGE_TRAILING_COLUMN_SPECS,
+                *trailing_specs,
             ],
             current_sort, current_direction, query_params,
         ),
@@ -1099,19 +1147,8 @@ def build_recordings_table(
 
     for recording in recordings:
         can_modify = recording.can_be_modified_by(user)
-        animal_count = len(recording.mice.all())
-        image_count = len(available_images(recording))
-        base_cells = []
-        for spec in RECORDINGS_PAGE_BASE_COLUMN_SPECS:
-            cell = build_cell(recording, spec)
-            if spec.get("format") == "recording_mice" and animal_count > 1:
-                cell["secondary_action"] = {
-                    "value": "View all",
-                    "url": reverse("lab:recording_animals", args=[
-                        recording.experiment.project_id, recording.experiment_id, recording.pk,
-                    ]),
-                }
-            base_cells.append(cell)
+        image_count = attachment_counts.get(recording.pk, 0)
+        base_cells = [recording_animals_cell(recording, spec) for spec in RECORDINGS_PAGE_BASE_COLUMN_SPECS]
         is_selected = recording.pk == selected_recording_id
         edit_url = reverse(
             "lab:edit_recording",
@@ -1152,16 +1189,13 @@ def build_recordings_table(
                     ],
                     *[
                         build_cell(recording, spec)
-                        for spec in RECORDINGS_PAGE_TRAILING_COLUMN_SPECS
+                        for spec in trailing_specs
                     ],
                     {
                         "class": "action-cell",
                         "actions": [
                             *([{"value": "View", "url": edit_url}] if can_modify else []),
-                            *([{
-                                "value": f"Images ({image_count})", "gallery": True,
-                                "url": reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk]),
-                            }] if image_count else []),
+                            *([recording_image_action(recording, image_count)] if image_count else []),
                         ],
                     },
                 ],

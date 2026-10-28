@@ -18,6 +18,36 @@ from ..models import (
 )
 
 
+def configure_genotype_modes(form, *, individual_default):
+    """Keep per-line shared/individual choices through row previews and validation."""
+    form.fields["genotype_modes_present"] = forms.CharField(
+        required=False, initial="1", widget=forms.HiddenInput,
+    )
+    for name in form.genotype_fields:
+        mode_name = f"{name}_individual"
+        if (form.is_bound and form.data.get(form.add_prefix("genotype_modes_present"))
+                and form.add_prefix(name) not in form.data and form.add_prefix(mode_name) not in form.data
+                and individual_default):
+            # A newly introduced line has no controls in the previous row preview.
+            form.data = form.data.copy()
+            form.data[form.add_prefix(mode_name)] = "on"
+        form.fields[mode_name] = forms.BooleanField(
+            required=False, initial=individual_default, label="Select individually",
+            widget=forms.CheckboxInput(attrs={
+                "data-genotype-individual": "true",
+                "data-line-id": form.fields[name].widget.attrs["data-line-id"],
+            }),
+        )
+        form[name].individual_field = form[mode_name]
+
+
+def uses_shared_genotype(form, line):
+    # Drafts and older clients without mode controls retain their existing behaviour.
+    return bool(form.data.get(form.add_prefix("genotype_modes_present"))) and not bool(
+        form.data.get(form.add_prefix(f"{genotype_field_name(line)}_individual"))
+    )
+
+
 def active_crossings_queryset():
     return (
         Crossing.objects

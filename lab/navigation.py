@@ -25,7 +25,7 @@ PAGE_TITLES = {
     "add_experiment": "Add experiment", "edit_experiment": "Edit experiment",
     "add_recording": "Add recording", "edit_recording": "Edit recording",
     "import_recordings": "Import from spreadsheet", "import_recordings_draft": "Import from spreadsheet",
-    "settings_page": "Settings", "import_templates": "Import templates",
+    "maintenance": "Maintenance", "settings_page": "Settings", "import_templates": "Import templates",
     "image_storage_settings": "Image storage", "recording_images": "Recording images",
     "rename_import_template": "Rename import template", "delete_import_template": "Delete import template",
     "genotype_categories": "Genotype categories", "add_genotype_category": "Add genotype category", "edit_genotype_category": "Edit genotype category",
@@ -36,6 +36,8 @@ PAGE_TITLES = {
     "delete_mouse": "Delete animal", "edit_mouse_procedure": "Edit procedure",
     "recording_animals": "Animal summary",
     "view_selected_mice": "Animal summary",
+    "animal_relatives": "Animal summary",
+    "creation_parentage_review": "Link matching offspring",
 }
 PRIMARY_ACTIONS = {
     "add_mouse": "Save animal", "add_litter": "Add animals",
@@ -54,6 +56,7 @@ CONTEXTUAL_ROUTES = {
     "recording_animals",
     "recording_images",
     "view_selected_mice_licence_protocol",
+    "view_selected_mice_all", "animal_relatives",
 }
 
 
@@ -119,7 +122,7 @@ def build_navigation(context):
     if name == "home":
         section = "home"
     elif name in {
-        "settings_page", "import_templates", "rename_import_template", "delete_import_template",
+        "maintenance", "settings_page", "import_templates", "rename_import_template", "delete_import_template",
         "image_storage_settings",
         "genotype_categories", "add_genotype_category", "edit_genotype_category",
         "recording_types", "add_recording_type", "edit_recording_type", "delete_recording_type", "add_recording_field", "edit_recording_field",
@@ -165,7 +168,7 @@ def build_navigation(context):
                 crumb(kind.name, reverse("lab:edit_recording_type", args=[kind.pk]))
             if name != "recording_types":
                 crumb(title)
-        elif name == "image_storage_settings":
+        elif name in {"image_storage_settings", "maintenance"}:
             crumb(title)
         elif name != "settings_page":
             crumb("Import templates", reverse("lab:import_templates"))

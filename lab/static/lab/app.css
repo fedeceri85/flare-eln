@@ -1586,3 +1586,93 @@ input[type="checkbox"] { accent-color: var(--blue); }
     .import-source-controls > .button { grid-column: auto; }
     .import-review-heading { flex-wrap: wrap; }
 }
+
+/* Optional parentage lives within Animal details. */
+.parent-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 14px 0; }
+.parent-control { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.parent-control > label, .parent-control > input:not([hidden]), .parent-control > [data-parent-suggestions], .parent-control > .errorlist { grid-column: 1 / -1; }
+.parent-control > input:not([hidden]) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 36px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--surface); }
+.parent-control > input:disabled { color: var(--muted); background: #f4f6f8; }
+.parent-status-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.parent-actions { display: flex; flex-shrink: 0; gap: 6px; }
+.parent-control [data-parent-state] { align-self: center; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.parent-control [data-parent-suggestions] { display: flex; flex-direction: column; max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+.parent-control [data-parent-suggestions][hidden] { display: none; }
+.parent-control [role="option"] { padding: 8px; border: 0; text-align: left; background: var(--surface); color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.parent-control [role="option"][aria-selected="true"], .parent-control [role="option"]:hover { background: var(--accent-soft, #e6efff); }
+.animal-family { margin: 14px 0; min-width: 0; overflow-wrap: anywhere; }
+.animal-family > summary { cursor: pointer; font-weight: 600; }
+.animal-family dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; }
+.animal-family dd { margin: 0; }
+.animal-family small { display: block; color: var(--muted); }
+.family-offspring-group + .family-offspring-group { border-top: 1px solid var(--border); padding-top: 8px; }
+@media (max-width: 640px) {
+    .parent-controls { grid-template-columns: minmax(0, 1fr); }
+    .parent-control { gap: 6px 4px; }
+}
+
+.parent-match-dialog { box-sizing: border-box; width: min(680px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 26px; border: 1px solid var(--border); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 16px 60px #17395c33; }
+.parent-match-dialog::backdrop { background: #13293d88; }
+.parent-match-dialog h2 { margin-top: 0; }
+.parent-match-list fieldset { margin: 18px 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.parent-match-list legend { font-weight: 650; overflow-wrap: anywhere; }
+.parent-match-candidate { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; padding: 8px 0; overflow-wrap: anywhere; }
+.parent-match-candidate label { flex: 1 1 220px; }
+.parent-match-candidate p { flex-basis: 100%; margin: 4px 0; }
+.parent-match-actions { flex-wrap: wrap; margin-top: 20px; }
+@media (max-width: 600px) {
+    .parent-match-dialog { padding: 18px; }
+    .parent-match-actions > .button { box-sizing: border-box; width: 100%; text-align: center; white-space: normal; }
+}
+
+/* Family details follows the same flat sections and compact fields as Animal details. */
+.family-section { min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; }
+.family-section + .family-section { margin-top: 28px; padding-top: 24px; border-top: 2px solid var(--border); }
+.family-section-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; }
+.family-section > .family-section-heading { padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.family-section-heading .section-title { margin: 0; }
+.family-section-heading > a { flex: 0 0 auto; font-size: 13px; }
+.parent-group-card, .family-offspring-card { min-width: 0; margin: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
+.parent-group-card + .parent-group-card { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.family-offspring-card + .family-offspring-card { border-top: 1px solid var(--border); }
+.parent-group-card > h3, .family-offspring-card > h3 { margin: 0 0 6px; color: #43566a; font-size: 13px; font-weight: 650; }
+.family-members { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 14px; font-size: 13px; }
+.family-parent-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 640px; gap: 14px 28px; margin: 0 0 12px; }
+.family-parent-field { min-width: 0; }
+.family-parent-field dt { margin-bottom: 4px; color: #43566a; font-size: 13px; font-weight: 650; }
+.family-parent-field dd { margin: 0; }
+.family-parent-pair small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.family-details .parent-controls { max-width: 760px; margin: 0; gap: 14px 28px; }
+.family-details .parent-controls > legend { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.family-details .parent-control { gap: 4px; }
+.family-details .parent-control > label { color: #43566a; font-size: 13px; font-weight: 650; }
+.family-details .parent-control > input:not([hidden]) { min-height: 34px; padding: 6px 8px; border-color: #cbd6e2; }
+.family-details .parent-control > input:disabled { background: #f3f5f7; color: #748393; border-color: #e0e5eb; opacity: 1; }
+.family-details .parent-actions .button { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+.individual-parent-overrides, .matching-parent-ids { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.individual-parent-overrides summary, .matching-parent-ids > summary { cursor: pointer; color: var(--blue); font-size: 13px; font-weight: 600; }
+.individual-parent-overrides > details { margin: 12px 0 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.individual-parent-overrides .parent-controls { margin-top: 12px; }
+.family-offspring-list > summary { padding: 10px 0; cursor: pointer; color: #43566a; font-size: 13px; }
+.family-offspring-list > summary a { display: inline-block; margin-left: 12px; }
+.family-offspring-list:not([open]) > summary a { display: none; }
+.family-offspring-list > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.family-offspring-group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin-left: 18px; padding: 6px 0 10px; font-size: 13px; }
+.family-offspring-group-label { font-weight: 600; }
+.family-offspring-empty { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+.family-offspring-card > .matching-parent-ids { margin: 0 0 10px; padding-top: 0; border-top: 0; }
+.parent-control [data-parent-state][data-removal-pending] { color: #a32921; font-weight: 600; }
+@media (max-width: 640px) {
+    .family-parent-pair { grid-template-columns: minmax(0, 1fr); }
+    .family-offspring-group { grid-template-columns: minmax(0, 1fr); }
+}
+.parent-actions [data-parent-remove][hidden] { display: none; }
+[data-family-retry][hidden] { display: none; }
+
+/* Crossing and shared results sit directly above the individual genotype table. */
+.genotype-global-editor .shared-genetics { margin: 0 0 18px; padding: 0 0 18px; border-top: 0; border-bottom: 1px solid var(--border); }
+.genotype-global-editor .genotype-subset { margin-top: 0; }
+.genotype-individual-choice { display: flex; align-items: center; gap: 6px; margin: 5px 0 8px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.genotype-individual-choice input { flex: 0 0 auto; width: auto; }
+.genotype-global-editor select:disabled, .individual-mouse-table select:disabled { background: #f3f5f7; color: #748393; opacity: 1; }
+.animal-tabbed [data-multiple-mice-slot] > .bulk-section { margin: 0; padding: 0; border: 0; box-shadow: none; }

@@ -13,13 +13,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const management = find('management');
     const uploadDetails = find('upload-details'), uploadForm = find('upload-form'), removeForm = find('remove-form');
     const previous = find('previous'), next = find('next'), zoom = find('zoom'), download = find('download');
+    let registeredCount = 0;
     let images = [], index = 0, url = '', opener, generation = 0, imageGeneration = 0, busy = false;
 
     function updateLinks() {
         document.querySelectorAll('[data-gallery-count]').forEach(link => {
             if (new URL(link.href, location.href).pathname !== new URL(url, location.href).pathname) return;
-            link.hidden = images.length === 0;
-            link.textContent = 'Images (' + images.length + ')';
+            link.hidden = registeredCount === 0;
+            link.textContent = 'Images (' + registeredCount + ')';
         });
     }
     function show() {
@@ -42,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function () {
         stage.replaceChildren(rendered);
         updateLinks();
         if (!image) {
-            status.textContent = 'No images available.';
+            status.textContent = registeredCount ? registeredCount + ' registered image attachment(s) currently unavailable. Check image storage.' : 'No images available.';
             return;
         }
         status.textContent = 'Loading image…';
@@ -55,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
         picture.onload = function () {
             if (current !== imageGeneration) return;
             rendered.hidden = false;
-            status.textContent = '';
+            status.textContent = registeredCount > images.length ? (registeredCount - images.length) + ' registered image attachment(s) currently unavailable.' : '';
         };
         picture.onerror = function () {
             if (current !== imageGeneration) return;
@@ -67,6 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function apply(payload) {
         const selected = images[index]?.id;
         images = payload.images;
+        registeredCount = payload.registered_count ?? images.length;
         const selectedIndex = images.findIndex(image => image.id === selected);
         index = selectedIndex >= 0 ? selectedIndex : Math.min(index, Math.max(0, images.length - 1));
         management.hidden = !payload.can_modify;

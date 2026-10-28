@@ -1,0 +1,21 @@
+<div class="shared-mouse-details genotype-global-editor">
+    {% if not form.single_mouse_mode %}<p class="bulk-help">Uncheck Select individually for a line to set its genotype for all selected animals. Shared results immediately update the rows below.</p>{% endif %}
+    {% with item=form.shared_genetics_update %}
+        <div class="shared-genetics{% if form.single_mouse_mode %} shared-genetics-single{% endif %}">
+            {% include "lab/components/shared_bulk_update_field.html" with field_class="shared-crossing-column" %}
+            <div class="shared-genotype-column" {% if form.single_mouse_mode %}hidden{% endif %}>
+                {% if not form.single_mouse_mode %}
+                    <span hidden>{{ item.secondary_checkbox }}</span>
+                    {% if item.genotype_fields %}
+                        <fieldset class="form-subset genotype-subset" data-genotype-subset="true">
+                            <legend>Genotype</legend>
+                            {% for genotype_field in item.genotype_fields %}
+                                {% include "lab/components/genotype_field.html" with field=genotype_field %}
+                            {% endfor %}
+                        </fieldset>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    {% endwith %}
+</div>

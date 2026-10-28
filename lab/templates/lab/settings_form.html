@@ -8,6 +8,19 @@
         {% csrf_token %}
         {% if help_note %}<p>{{ help_note }}</p>{% endif %}
         {% include 'lab/components/form_fields.html' %}
+        {% if form.inherited_recording_fields %}
+        <section class="section" aria-labelledby="inherited-recording-fields-title">
+            <h2 class="settings-section-title" id="inherited-recording-fields-title">Built-in recording fields</h2>
+            <p class="settings-help">These fields are included in every recording type. Hiding a column keeps its stored values and leaves the field available when adding or editing recordings.</p>
+            <div class="table-card"><div class="table-scroll"><table class="data-table settings-table">
+                <thead><tr><th scope="col">Field</th><th scope="col">Key</th><th scope="col">Hide from recording tables</th></tr></thead>
+                <tbody>{% for item in form.inherited_recording_fields %}<tr>
+                    <td>{{ item.label }}</td><td>{{ item.key }}</td>
+                    <td><label for="{{ item.visibility.id_for_label }}">{{ item.visibility }} Hide {{ item.label|lower }} column</label>{{ item.visibility.errors }}</td>
+                </tr>{% endfor %}</tbody>
+            </table></div></div>
+        </section>
+        {% endif %}
         <div class="actions"><button class="button button-primary" type="submit">Save changes</button><a class="button" href="{{ parent_url }}">Cancel</a></div>
     </form>
     {% if show_recording_fields %}

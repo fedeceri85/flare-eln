@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from .forms import BulkMouseUpdateForm
 from .models import Procedure, Recording, genotype_category_labels
-from .ui import build_recording_type_table, format_value
+from .ui import build_recording_type_table, format_value, recording_attachment_counts
 
 
 def build_animal_recording_sections(mice):
@@ -18,6 +18,8 @@ def build_animal_recording_sections(mice):
         .prefetch_related("mice", "recording_type__fields")
         .order_by("recording_type__name", "-recording_date", "recording_id")
     )
+    recordings = list(recordings)
+    attachment_counts = recording_attachment_counts(recordings)
     groups = {}
     for recording in recordings:
         group = groups.setdefault(recording.recording_type_id, {
@@ -28,7 +30,7 @@ def build_animal_recording_sections(mice):
         {
             "title": group["recording_type"].display_plural_name,
             "table": build_recording_type_table(
-                group["recording_type"], group["recordings"], include_animals=True, include_notes=True,
+                group["recording_type"], group["recordings"], include_animals=True, include_notes=True, attachment_counts=attachment_counts,
             ),
         }
         for group in groups.values()

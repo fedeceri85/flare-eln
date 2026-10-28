@@ -33,13 +33,17 @@ def image_storage_settings(request):
 
 
 def gallery_payload(recording, user):
+    registered = list(recording.images.all())
+    available = available_images(recording)
     return {
+        "registered_count": len(registered),
+        "unavailable_count": len(registered) - len(available),
         "images": [{
             "id": str(image.pk), "name": image.original_name,
             "width": image.width, "height": image.height,
             "url": reverse("lab:recording_image_file", args=[image.pk]),
             "download_url": reverse("lab:recording_image_file", args=[image.pk]) + "?download=1",
-        } for image in available_images(recording)],
+        } for image in available],
         "can_modify": recording.can_be_modified_by(user),
     }
 

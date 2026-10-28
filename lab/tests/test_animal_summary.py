@@ -1,5 +1,6 @@
 from datetime import date
 from urllib.parse import parse_qs, urlsplit
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -8,7 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from ..forms import individual_mouse_field_prefix
-from ..models import Experiment, GenotypeCategory, Mouse, MouseGenotype, Procedure, ProcedureType, Project, Protocol, RecordingType
+from ..models import Experiment, GenotypeCategory, ImageStorageLocation, Mouse, MouseGenotype, Procedure, ProcedureType, Project, Protocol, RecordingImage, RecordingType
 from ..test_navigation import Markup
 from ..views.common import url_with_query_params
 from ._support import AuthenticatedTestCase, create_recording, create_test_crossing
@@ -53,7 +54,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
     def test_summary_uses_familiar_tabs_and_has_no_editable_fields(self):
         response, markup = self.summary()
         self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")],
-                         ["shared", "individual", "procedures", "services"])
+                         ["individual", "shared", "family", "procedures", "services"])
         edit = markup.find("a", **{"data-mouse-summary-edit": None})[0]
         tablist = markup.find("div", role="tablist")[0]
         self.assertIs(edit.parent, tablist.parent)
@@ -204,7 +205,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
         edit_query = parse_qs(urlsplit(edit_link).query)
         self.assertEqual(edit_query["selected_mouse"], [mouse.pk for mouse in self.mice])
-        self.assertEqual(edit_query["mouse_editor_tab"], ["procedures"])
+        self.assertEqual(edit_query["mouse_editor_tab"], ["individual"])
         summary_return = edit_query["return_url"][0]
         self.assertEqual(parse_qs(urlsplit(summary_return).query), {
             "return_url": [self.list_state], "mouse_editor_tab": ["procedures"],
@@ -213,7 +214,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         editor = self.client.get(edit_link)
         self.assertEqual(editor.status_code, 200)
         editor_markup = Markup(editor.content.decode())
-        self.assertEqual(editor_markup.find("input", name="mouse_editor_tab")[0].attrs["value"], "procedures")
+        self.assertEqual(editor_markup.find("input", name="mouse_editor_tab")[0].attrs["value"], "individual")
         result = self.client.post(self.edit_url, {
             "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
             "return_url": summary_return, "mouse_editor_tab": "procedures",
@@ -241,7 +242,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         for tab in ("individual", "ids", "invalid"):
             with self.subTest(tab=tab):
                 response, markup = self.summary(mouse_editor_tab=tab)
-                self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")], ["shared", "procedures", "services"])
+                self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")], ["shared", "family", "procedures", "services"])
                 self.assertEqual(response.context["active_tab"], "shared")
                 local_value = next(node for node in markup.find("td") if "Local-0" in node.text)
                 self.assertTrue(local_value.within("section", id="mouse-panel-shared"))
@@ -345,6 +346,40 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertNotIn("Unrelated genotyping record", panel.text)
         self.assertEqual(sum(len(section["table"]["rows"]) for section in response.context["animal_recording_sections"]), 3)
 
+    def test_services_recording_actions_date_and_animal_navigation(self):
+        self.genotyping_recording(self.mice[:1])
+        image = RecordingImage.objects.create(recording=self.recording,
+            storage_location=ImageStorageLocation.objects.create(directory='/unavailable-summary-images'),
+            filename='missing.webp', original_name='Missing image', width=10, height=10, size_bytes=20)
+        selection = {'selected_mouse': [mouse.pk for mouse in self.mice], 'mouse_editor_tab': 'services'}
+        for url, params in ((self.url, {'mouse_editor_tab': 'services'}), (self.edit_url, selection)):
+            with self.subTest(url=url), patch('lab.recording_images.image_path', side_effect=AssertionError('Table touched image storage')):
+                response = self.client.get(url, params)
+            self.assertEqual(response.status_code, 200)
+            markup, panel = self.services_panel(response)
+            tables = [node for node in markup.find('table') if node.within('section', id='mouse-panel-services')]
+            for table in tables:
+                headings = [node.text.strip() for node in markup.find('th', scope='col') if node.within('table') and node.parent.parent.parent is table]
+                self.assertEqual(headings[-1], 'Actions')
+            date_cells = [node for node in markup.find('td', **{'class': 'recording-date-cell'}) if node.within('section', id='mouse-panel-services')]
+            self.assertTrue(date_cells)
+            self.assertFalse([link for link in markup.find('a') if link.within('td', **{'class': 'recording-date-cell'})])
+            actions = [node for node in markup.find('a') if node.text.strip() == 'See in Experiment' and node.within('section', id='mouse-panel-services')]
+            self.assertEqual(len(actions), 2)
+            selected = next(node for node in actions if parse_qs(urlsplit(node.attrs['href']).query)['selected_recording'] == [str(self.recording.pk)])
+            self.assertTrue(selected.within('td', **{'class': 'action-cell'}))
+            self.assertEqual(urlsplit(selected.attrs['href']).fragment, f'recording-{self.recording.pk}')
+            self.assertEqual(parse_qs(urlsplit(selected.attrs['href']).query)['return_url'], [response.wsgi_request.get_full_path()])
+            images = next(node for node in markup.find('a') if node.text.strip() == 'Images (1)')
+            self.assertTrue(images.within('td', **{'class': 'action-cell'}))
+            self.assertIn('data-recording-gallery', images.attrs)
+            self.assertEqual(urlsplit(images.attrs['href']).path, reverse('lab:recording_images', args=[self.project.pk, self.experiment.pk, self.recording.pk]))
+            self.assertEqual(len(markup.find('dialog', **{'data-image-dialog': None})), 1)
+            view_all = [node for node in markup.find('a') if node.text.strip() == 'View all' and node.within('td', **{'class': 'recording-animals-cell'})]
+            self.assertEqual(len(view_all), 1)  # No redundant group link for the single-animal record.
+            self.assertEqual(urlsplit(view_all[0].attrs['href']).path, self.url)
+            self.assertEqual(parse_qs(urlsplit(view_all[0].attrs['href']).query)['return_url'], [response.wsgi_request.get_full_path()])
+
     def test_both_edit_routes_show_the_same_recordings_and_keep_service_creation(self):
         self.genotyping_recording(self.mice)
         for url in (
@@ -376,7 +411,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertEqual(response.context["active_tab"], "services")
         edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
         query = parse_qs(urlsplit(edit_link).query)
-        self.assertEqual(query["mouse_editor_tab"], ["services"])
+        self.assertEqual(query["mouse_editor_tab"], ["individual"])
         self.assertEqual(parse_qs(urlsplit(query["return_url"][0]).query)["mouse_editor_tab"], ["services"])
         editor = self.client.get(edit_link)
         _, editor_panel = self.services_panel(editor)
@@ -417,7 +452,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertEqual(urlsplit(edit_link).path, expected_edit_url)
         query = parse_qs(urlsplit(edit_link).query)
         self.assertEqual(query["selected_mouse"], selection)
-        self.assertEqual(query["mouse_editor_tab"], ["services"])
+        self.assertEqual(query["mouse_editor_tab"], ["individual"])
         summary_return = query["return_url"][0]
         self.assertEqual(parse_qs(urlsplit(summary_return).query)["return_url"], [list_state])
         self.assertEqual(parse_qs(urlsplit(summary_return).query)["selected_mouse"], selection)

@@ -1,10 +1,11 @@
 <section class="{% if embedded %}single-mouse-rows single-animal-genotype{% else %}bulk-section{% endif %}" {% if embedded %}id="mouse-individual-details" aria-labelledby="single-animal-genotype-title"{% else %}id="mouse-panel-individual" data-mouse-tab-panel="individual"{% endif %}>
+    {% if not embedded %}{% include "lab/components/bulk_shared_genetics.html" %}{% endif %}
     {% if embedded %}<h3 class="single-animal-genotype-title" id="single-animal-genotype-title">Genotype details</h3>{% else %}<h2 class="visually-hidden">Genotype details</h2>{% endif %}
     <p class="bulk-help">{% if embedded %}Set this animal’s{% else %}Set each animal’s{% endif %} local identifier, sex and genotype. Check Uncertain beside any doubtful result.</p>
     {% if not embedded %}
         <details class="individual-mouse-help">
             <summary>How shared genotype changes apply</summary>
-            <p class="bulk-help">With Genotype checked in Animal details, shared results immediately fill matching cells here. You can adjust any animal afterward; the displayed values are saved.</p>
+            <p class="bulk-help">Uncheck Select individually for a line to set one result for all animals. Shared changes immediately fill the matching cells below. Check Select individually to edit each animal separately.</p>
         </details>
     {% endif %}
     <span hidden data-bulk-rows-retry>

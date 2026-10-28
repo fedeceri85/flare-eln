@@ -240,6 +240,12 @@ class AnimalsForm(forms.Form):
                 "protocol": forms.ModelChoiceField(queryset=Protocol.objects.all(), required=False, label="Protocol override"),
                 "crossing_definition": forms.ModelChoiceField(queryset=Crossing.objects.filter(active=True).select_related("species"), required=False, label="Crossing override", widget=crossing_select()),
             }
+            for role in ("mother", "father"):
+                fields[f"{role}_external_id"] = forms.CharField(
+                    required=False, max_length=255, label=f"{role.title()} ID override",
+                    widget=forms.TextInput(attrs={"data-parent-text": "", "data-parent-lookup": reverse("lab:mouse_lookup"), "autocomplete": "off"}),
+                )
+                fields[f"{role}_text_only"] = forms.BooleanField(required=False, label=f"Keep {role} as external text")
             bound = []
             for name, field in fields.items():
                 field_name = f"{key}_{name}"
@@ -247,6 +253,11 @@ class AnimalsForm(forms.Form):
                 self.initial[field_name] = resolution.get(name, "") if name in {"mode", "mouse_id"} else resolution.get("details", {}).get(name, "")
                 if name == "mode" and resolution.get("mode") == "create" and resolution.get("generate_id"):
                     self.initial[field_name] = "generate"
+                if name.endswith("_text_only"):
+                    self.initial[field_name] = resolution.get("parent_text_only", {}).get(name.removesuffix("_text_only"), False)
+                if name in {"mother_external_id", "father_external_id"}:
+                    self[field_name].parent_autocomplete = True
+                    self[field_name].parent_role = name.removesuffix("_external_id")
                 bound.append(self[field_name])
             candidates = Mouse.objects.filter(tattoo__iexact=group["identifier"]).select_related("crossing_definition")[:20] if not group["animal_id"] and group["identifier"] else []
             mapped = {}
@@ -295,7 +306,7 @@ class AnimalsForm(forms.Form):
             action = self.cleaned_data[f"{key}_mode"]
             result = {"mode": "link" if action == "link" else "create", "mouse_id": self.cleaned_data.get(f"{key}_mouse_id", "") if action != "generate" else "", "generate_id": action == "generate"}
             details = {}
-            for name in ("date_of_birth", "tattoo", "breeding_pair", "sex", "status", "cull_date", "severity", "protocol", "crossing_definition"):
+            for name in ("date_of_birth", "tattoo", "breeding_pair", "sex", "status", "cull_date", "severity", "protocol", "crossing_definition", "mother_external_id", "father_external_id"):
                 value = self.cleaned_data.get(f"{key}_{name}", "")
                 if value is None:
                     value = ""
@@ -304,6 +315,7 @@ class AnimalsForm(forms.Form):
                 elif hasattr(value, "isoformat"):
                     value = value.isoformat()
                 details[name] = value
+            result["parent_text_only"] = {role: bool(self.cleaned_data.get(f"{key}_{role}_text_only")) for role in ("mother", "father")}
             result["details"] = details
             result["genotypes"] = old.get("genotypes", {})
             resolutions[key] = result

@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const section = document.querySelector('[data-shared-bulk-editor]');
+    const sectionRoot = document.querySelector('[data-shared-bulk-editor]');
+    const section = sectionRoot?.closest?.('form') || sectionRoot;
     if (!section) return;
     const genotypeColumn = section.querySelector('.shared-genotype-column');
     const crossingToggle = section.querySelector('[name="update_crossing"]');
@@ -9,7 +10,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateGenotypeState() {
         // Changing crossing also applies its displayed genotypes in the existing save logic.
-        const enabled = crossingToggle.checked || genotypeToggle.checked;
+        const enabled = Boolean(crossingToggle?.checked || genotypeToggle?.checked);
+        if (genotypeColumn.querySelector('[data-genotype-individual]')) return;
         genotypeColumn.querySelectorAll('[data-genotype-subset] input, [data-genotype-subset] select').forEach(field => {
             field.disabled = !enabled;
         });

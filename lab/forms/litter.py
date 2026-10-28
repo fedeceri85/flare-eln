@@ -14,7 +14,10 @@ from .genetics import (
     MouseStructuredGeneticsMixin,
     genotype_field_name,
     visible_field_sections_for_names,
+    configure_genotype_modes,
+    uses_shared_genotype,
 )
+from .parentage import configure_parent_controls, clean_parent_controls
 from .procedures import BulkProcedureCreateForm, validate_procedure_drafts
 
 
@@ -113,6 +116,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         self.instance = Mouse()
         super().__init__(*args, **kwargs)
 
+        configure_parent_controls(self)
         self.fields["protocol"].required = True
         self.fields["protocol"].empty_label = "Select a protocol"
         self.fields["protocol"].queryset = Protocol.objects.all().order_by(
@@ -154,6 +158,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             self.data[self.add_prefix("mouse_id_prefix")] = prefix
             self.fields["mouse_id_prefix"].widget.attrs["readonly"] = True
         self.single_mouse_mode = len(self.numbers) <= 1
+        configure_genotype_modes(self, individual_default=True)
         self.mouse_rows = []
         choices = genotype_category_choices()
         for number in self.numbers:
@@ -168,12 +173,15 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             for line in self.crossing_lines:
                 name = f"{stem}_{genotype_field_name(line)}"
                 shared_name = genotype_field_name(line)
+                legacy_apply = "apply_shared_genotype" in self.data and not self.data.get(self.add_prefix("genotype_modes_present"))
                 if (self.is_bound
-                        and (self.add_prefix(name) not in self.data or "apply_shared_genotype" in self.data)):
+                        and (self.add_prefix(name) not in self.data or legacy_apply
+                             or (not self.single_mouse_mode and uses_shared_genotype(self, line)))):
                     # Seed new rows, preserving every explicitly posted individual result.
                     self.data[self.add_prefix(name)] = self.data.get(self.add_prefix(shared_name), "unknown")
                     uncertainty_name = self.add_prefix(f"{name}_uncertain")
-                    if uncertainty_name not in self.data or "apply_shared_genotype" in self.data:
+                    if (uncertainty_name not in self.data or legacy_apply
+                            or (not self.single_mouse_mode and uses_shared_genotype(self, line))):
                         self.data[uncertainty_name] = self.data.get(
                             self.add_prefix(f"{shared_name}_uncertain"), "")
                 self.fields[name] = forms.ChoiceField(required=False, choices=choices, initial="unknown", label=line.name,
@@ -223,6 +231,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                 and cleaned_data.get("procedure_drafts")):
             self.add_error("procedure_drafts", "This protocol does not allow regulated procedures.")
 
+        clean_parent_controls(self)
         return cleaned_data
 
     @property

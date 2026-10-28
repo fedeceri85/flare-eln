@@ -165,6 +165,10 @@ def order_recordings(recordings, recording_type, sort, direction):
         "notes": Lower(NullIf(F("notes"), Value(""), output_field=TextField())),
     }
     if recording_type is not None:
+        if recording_type.hide_data_paths_in_table:
+            expressions.pop("data_paths")
+        if recording_type.hide_notes_in_table:
+            expressions.pop("notes")
         for field in recording_type.fields.all():
             if not field.active or not field.display_in_table:
                 continue
@@ -356,7 +360,7 @@ def recordings_page(request, project_pk, experiment_pk):
     recordings = (
         experiment.recordings
         .select_related("owner", "experiment", "recording_type")
-        .prefetch_related("mice", "images__storage_location")
+        .prefetch_related("mice")
         .all()
     )
     recordings = apply_filter_specs(

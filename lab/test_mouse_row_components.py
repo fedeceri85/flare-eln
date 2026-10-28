@@ -59,7 +59,7 @@ class MouseRowComponentTests(TestCase):
         mouse = Mouse.objects.create(mouse_id="No crossing", protocol=self.protocol, sex="M")
         response = self.client.get(reverse("lab:edit_selected_mice_all"), {"selected_mouse": [mouse.pk]})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Choose a crossing in Animal details to enter genotypes.")
+        self.assertContains(response, "Choose a crossing to enter genotypes.")
         html = Markup(response.content.decode())
         self.assertFalse(html.find("caption", **{"class": "individual-crossing-label"}))
         self.assertTrue(html.find("select", name=f"{individual_mouse_field_prefix(mouse)}_sex"))

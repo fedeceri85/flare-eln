@@ -6,6 +6,7 @@
 {% block content %}
     {% if errors %}<div class="message message-error" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
     <a class="button" href="{{ request.get_full_path }}" data-recording-gallery>Open image gallery</a>
+    {% if gallery.unavailable_count %}<p class="message">{{ gallery.unavailable_count }} registered image attachment{{ gallery.unavailable_count|pluralize }} currently unavailable. Check image storage or run the attachment audit.</p>{% endif %}
     <div class="recording-image-cards">
         {% for image in gallery.images %}
             <section class="form-card recording-image-card" data-image-card>
@@ -34,4 +35,4 @@
     <p><a href="{{ return_url }}">Back to recordings</a></p>
     {% include "lab/components/recording_image_dialog.html" %}
 {% endblock %}
-{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-3"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-4"></script>{% endblock %}

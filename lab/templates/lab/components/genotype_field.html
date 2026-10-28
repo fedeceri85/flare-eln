@@ -1,5 +1,8 @@
 <div class="form-field">
     {{ field.label_tag }}
+    {% if field.individual_field %}
+        <label class="genotype-individual-choice" for="{{ field.individual_field.id_for_label }}">{{ field.individual_field }} Select individually</label>
+    {% endif %}
     <div class="genotype-result-controls">
         {{ field }}
         {% if field.uncertainty_field %}

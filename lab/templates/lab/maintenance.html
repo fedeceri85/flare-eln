@@ -1,0 +1,43 @@
+{% extends 'lab/settings_base.html' %}
+{% block title %}Maintenance{% endblock %}
+{% block page_title %}Maintenance{% endblock %}
+{% block page_subtitle %}<p>Check and tidy shared animal records.</p>{% endblock %}
+{% block settings_content %}
+<section class="form-card">
+    <h2>Resolve missing family links</h2>
+    <p>Some animals have a mother or father ID saved as text because that parent was not in the ELN at the time. This check searches all animal records for parents that have since been added.</p>
+    <p><strong>Scan database</strong> only finds possible matches; it does not change any animals. Review the results, uncheck any links you do not want, then choose <strong>Resolve selected links</strong>.</p>
+    <p>Only a unique Animal ID match is offered. Capital letters and spaces around an ID are ignored.</p>
+    <p>Resolving a link connects an existing parent to its offspring. The original recorded ID is kept. Already linked parents are left alone, and IDs with no matching animal stay as text. </p>
+    <form method="post">{% csrf_token %}<button class="button button-primary" type="submit" name="action" value="scan">Scan database</button></form>
+</section>
+{% for error in errors %}<p class="message message-error" role="alert">{{ error }}</p>{% endfor %}
+{% if scan %}
+<section class="section">
+    <h2 class="section-title">Family-link scan</h2>
+    <p>Scanned {{ scanned_at|date:'d/m/Y H:i' }} · {{ scan.counts.eligible }} eligible link{{ scan.counts.eligible|pluralize }} · {{ scan.counts.issues }} needing attention · {{ scan.counts.unmatched }} external parent ID{{ scan.counts.unmatched|pluralize }} without a matching animal.</p>
+    {% if scan.stale %}<p class="message message-warning">Animal information has changed. Run Scan database again before resolving links.</p>{% endif %}
+    {% if page_obj.object_list %}
+    <p>Eligible matches on all pages start selected. Your selections are saved when you use Previous or Next. Resolve selected links includes selections on every page. Current saved selection: {{ selected_count }} link{{ selected_count|pluralize }}.</p>
+    <form method="post">
+        {% csrf_token %}<input type="hidden" name="scan_id" value="{{ scan.id }}"><input type="hidden" name="current_page" value="{{ page_obj.number }}">
+        <div class="table-card"><div class="table-scroll"><table class="data-table">
+            <thead><tr><th scope="col">Resolve</th><th scope="col">Offspring</th><th scope="col">Parent role</th><th scope="col">Recorded ID</th><th scope="col">Matching parent</th><th scope="col">Review</th></tr></thead>
+            <tbody>{% for entry in page_obj %}<tr>
+                <td><input type="checkbox" name="family_link" value="{{ entry.key }}" aria-label="Link {{ entry.role }} for {{ entry.mouse_id }}"{% if entry.checked %} checked{% endif %}{% if not entry.eligible or scan.stale %} disabled{% endif %}></td>
+                <td><a href="{{ entry.animal_url }}">{{ entry.mouse_id }}</a></td><td>{{ entry.role|capfirst }}</td><td>{{ entry.text }}</td>
+                <td>{% if entry.parent_url %}<a href="{{ entry.parent_url }}">{{ entry.parent_id }}</a>{% else %}{{ entry.parent_ids|join:', ' }}{% endif %}</td>
+                <td>{% if entry.reason %}<p>{{ entry.reason }}</p><a href="{{ entry.edit_url }}">Edit parents</a>{% else %}<span>Ready to link</span>{% endif %}{% for warning in entry.warnings %}<p class="message message-warning">{{ warning }}</p>{% endfor %}</td>
+            </tr>{% endfor %}</tbody>
+        </table></div></div>
+        <div class="actions">
+            {% if page_obj.has_previous %}<button class="button" type="submit" name="next_page" value="{{ page_obj.previous_page_number }}">Previous</button>{% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<button class="button" type="submit" name="next_page" value="{{ page_obj.next_page_number }}">Next</button>{% endif %}
+            {% if scan.counts.eligible and not scan.stale %}<button class="button button-primary" type="submit" name="action" value="resolve">Resolve selected links</button>{% endif %}
+        </div>
+    </form>
+    {% else %}<p>No matching family links were found. External IDs stay as text until a matching parent is added.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

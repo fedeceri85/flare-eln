@@ -17,6 +17,8 @@ from ..models import (
     Crossing, Experiment, GenotypeCategory, Mouse, MouseGenotype, MouseLine,
     ProcedureType, Protocol, Recording, RecordingField, RecordingImage, RecordingType, Species, SpreadsheetImportDraft,
 )
+from ..parentage import parentage_transaction, parentage_review, ParentageContext, model_parentage_context, save_parent_pairs
+from .parentage import build_parentage_review
 from ..recording_images import image_available
 from ..utils import generate_mouse_id
 from .mapping import ANIMAL_FIELDS, crossing_candidates, genotype_term_key, mapped_value, parse_date, resolve_genotype_term, typed_value, validate_definition
@@ -126,6 +128,8 @@ def group_details(draft, table, group):
                 convert = lambda value: {s.casefold(): s for s, _ in Mouse.STATUS_CHOICES}.get(str(value).casefold(), value)
             elif key == "severity":
                 convert = lambda value: typed_value(str(value).strip(), MouseEditForm.base_fields["severity"], definition["date_order"])
+            if key in {"mother_external_id", "father_external_id"}:
+                convert = lambda value: str(value).strip()
             details[key] = consistent_value(draft, table, group["rows"], f"animal:{key}", convert=convert)
     for key in ("date_of_birth", "cull_date"):
         if details[key]:
@@ -200,7 +204,7 @@ def animal_display_details(details, calls=None):
         if value == "" or key == "marking_type":
             continue
         field = Mouse._meta.get_field(key)
-        label = {"crossing_definition": "Crossing", "marking_type": "Local ID type", "severity": "Severity experienced"}.get(key, field.verbose_name.title())
+        label = {"crossing_definition": "Crossing", "marking_type": "Local ID type", "severity": "Severity experienced", "mother_external_id": "Mother ID", "father_external_id": "Father ID"}.get(key, field.verbose_name.title())
         if key in {"protocol", "crossing_definition"}:
             model = Protocol if key == "protocol" else Crossing
             obj = model.objects.filter(pk=value).first()
@@ -233,7 +237,8 @@ def environmental_state(experiment, mouse_ids):
     }
 
 
-def build_review(draft, approvals=None):
+@parentage_review
+def build_review(draft, approvals=None, *, parentage_context=None):
     """Return a deterministic, JSON-safe preview without changing database rows."""
     experiment = draft.experiment
     table = draft_table(draft)
@@ -273,7 +278,7 @@ def build_review(draft, approvals=None):
             changes = []
             if mouse:
                 for field, value in details.items():
-                    if value == "":
+                    if value == "" or field in {"mother_external_id", "father_external_id"}:
                         continue
                     old = getattr(mouse, field + "_id" if field in {"protocol", "crossing_definition"} else field)
                     old = old.isoformat() if isinstance(old, date) else old
@@ -324,14 +329,20 @@ def build_review(draft, approvals=None):
                     raise ValidationError(f"Animal ID {animal_id} is already in use.")
                 reserved_ids.add(animal_id)
             animal = {"key": group["key"], "identifier": group["identifier"], "rows": [r["number"] for r in group["rows"]],
-                      "existing": bool(mouse), "mouse_id": animal_id, "details": details, "calls": calls,
+                      "existing": bool(mouse), "mouse_id": animal_id, "source_animal_id": group["animal_id"], "details": details, "calls": calls,
                       "crossing_id": crossing.pk if crossing else None, "changes": changes,
-                      "generate_id": not mouse and bool(resolution.get("generate_id")), "display_details": animal_display_details(details, calls)}
+                      "generate_id": not mouse and bool(resolution.get("generate_id")),
+                      "display_details": animal_display_details({k: v for k, v in details.items() if k not in {"mother_external_id", "father_external_id"}}, calls)}
             animals.append(animal)
             all_changes.extend(changes)
         except (ValidationError, ValueError, TypeError) as exc:
             messages = exc.messages if isinstance(exc, ValidationError) else [str(exc)]
             errors.extend(f"Rows {', '.join(str(r['number']) for r in group['rows'])}: {m}" for m in messages)
+
+    parentage = build_parentage_review(draft, animals, approvals, context=parentage_context)
+    all_changes.extend(parentage["changes"])
+    all_changes.extend(parentage["reconciliations"])
+    errors.extend(parentage["errors"])
 
     # Review approvals affect the final crossing and its valid genotype calls.
     approved = set(approvals) if approvals is not None else {c["token"] for c in all_changes}
@@ -349,7 +360,7 @@ def build_review(draft, approvals=None):
             data = {field: getattr(current, field + "_id" if field in {"protocol", "crossing_definition"} else field)
                     for field in MouseEditForm.Meta.fields}
             for entry in animal["changes"]:
-                if entry["token"] in approved and not entry["field"].startswith("genotype:"):
+                if entry["token"] in approved and not entry["field"].startswith(("genotype:", "parent:")):
                     data[entry["field"]] = entry["new"]
             edit_form = MouseEditForm(data=data, instance=current)
             if not edit_form.is_valid():
@@ -446,13 +457,14 @@ def build_review(draft, approvals=None):
                       "width": image.width, "height": image.height, "size_bytes": image.size_bytes}
                      for image in shared_images if image_available(image)]
     payload = {"animals": animals, "records": records, "procedures": procedures, "changes": all_changes, "errors": errors,
-               "shared_images": image_preview, "unavailable_images": len(shared_images) - len(image_preview)}
+               "shared_images": image_preview, "unavailable_images": len(shared_images) - len(image_preview),
+               "parentage_updates": parentage["updates"], "reconciliations": parentage["reconciliations"], "warnings": parentage["warnings"]}
     environment = environmental_state(experiment, [a["mouse_id"] for a in animals if a["existing"]])
-    payload["fingerprint"] = digest({"preview": payload, "environment": environment, "configuration": definition})
+    payload["fingerprint"] = digest({"preview": payload, "environment": environment, "configuration": definition, "parentage_version": parentage["version"], "parentage_state": parentage["state"]})
     return payload
 
 
-@transaction.atomic
+@parentage_transaction
 def commit_import(draft_id, owner, experiment, approvals):
     draft = SpreadsheetImportDraft.objects.select_for_update().get(pk=draft_id, owner=owner, experiment=experiment)
     if draft.completed_at:
@@ -473,7 +485,8 @@ def commit_import(draft_id, owner, experiment, approvals):
     list(Mouse.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
     list(MouseGenotype.objects.select_for_update().filter(mouse_id__in=ids).order_by("pk"))
     list(ProcedureType.objects.select_for_update().order_by("pk"))
-    baseline = build_review(draft)
+    parentage_context = ParentageContext()
+    baseline = build_review(draft, parentage_context=parentage_context)
     if baseline["errors"]:
         raise ValidationError(baseline["errors"])
     if baseline["fingerprint"] != draft.state.get("review_fingerprint"):
@@ -481,7 +494,7 @@ def commit_import(draft_id, owner, experiment, approvals):
     known = {c["token"] for c in baseline["changes"]}
     if not set(approvals) <= known:
         raise ValidationError("The approved changes no longer match this review. Refresh the review.")
-    preview = build_review(draft, approvals=approvals)
+    preview = build_review(draft, approvals=approvals, parentage_context=parentage_context)
     if preview["errors"]:
         raise ValidationError(preview["errors"])
     saved, created, updated = {}, 0, 0
@@ -495,6 +508,8 @@ def commit_import(draft_id, owner, experiment, approvals):
                 if entry["token"] not in approvals:
                     continue
                 field, value = entry["field"], entry["new"]
+                if field.startswith("parent:"):
+                    continue
                 if field.startswith("genotype:"):
                     calls[int(field.split(":")[1])] = value
                 elif field == "crossing_definition":
@@ -502,7 +517,8 @@ def commit_import(draft_id, owner, experiment, approvals):
                 else:
                     setattr(mouse, field + "_id" if field == "protocol" else field, value)
                     fields.append(field)
-            mouse.full_clean(exclude=["crossing_definition"])
+            with model_parentage_context(parentage_context):
+                mouse.full_clean(exclude=["crossing_definition"])
             if fields:
                 mouse.save(update_fields=fields)
             if crossing and (calls or crossing.pk != mouse.crossing_definition_id):
@@ -521,6 +537,10 @@ def commit_import(draft_id, owner, experiment, approvals):
             sync_mouse_structured_genetics(mouse, crossing, {int(k): v for k, v in animal["calls"].items()})
             created += 1
         saved[animal["key"]] = mouse
+    save_parent_pairs(preview["parentage_updates"])
+    updated_ids = {a["mouse_id"] for a in preview["animals"] if a["existing"] and any(c["token"] in approvals for c in a["changes"])}
+    updated_ids.update(pk for entry in preview["reconciliations"] if entry["token"] in approvals for pk in entry["new"])
+    updated = len(updated_ids)
     recording_ids = []
     for record in preview["records"]:
         data = {**record["scalars"],
@@ -552,7 +572,7 @@ def commit_import(draft_id, owner, experiment, approvals):
     # The committed recording links now own the files; expiry cleanup must not remove them.
     draft.shared_images.all().delete()
     result = {"recordings": len(recording_ids), "created_animals": created, "updated_animals": updated, "recording_ids": recording_ids,
-              "procedures": len(procedure_ids), "procedure_ids": procedure_ids,
+              "procedures": len(procedure_ids), "procedure_ids": procedure_ids, "warnings": preview["warnings"],
               "shared_images": len(selected_images), "image_attachments": len(selected_images) * len(recording_ids)}
     draft.completed_at = timezone.now()
     draft.state = {**draft.state, "result": result}

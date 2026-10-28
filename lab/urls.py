@@ -1,5 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from .views import parentage as parentage_views
+from .views.maintenance import maintenance
 from django.urls import path, register_converter
 
 from . import converters, views
@@ -20,6 +22,7 @@ urlpatterns = [
     path("settings/image-storage/", protected(views.image_storage_settings), name="image_storage_settings"),
     path("recording-images/<uuid:image_id>/", protected(views.recording_image_file), name="recording_image_file"),
     path("projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/<int:recording_pk>/images/", protected(views.recording_images), name="recording_images"),
+    path("settings/maintenance/", protected(maintenance), name="maintenance"),
     path("settings/", protected(views.settings_page), name="settings_page"),
     path("settings/genotype-categories/", protected(views.genotype_categories), name="genotype_categories"),
     path("settings/genotype-categories/new/", protected(views.edit_genotype_category), name="add_genotype_category"),
@@ -286,6 +289,12 @@ urlpatterns = [
         protected(views.delete_selected_mice_all),
         name="delete_selected_mice_all",
     ),
+    path("animal-families/selected/", protected(parentage_views.family_fragment), name="family_fragment"),
+    path("mice/<mousepk:mouse_pk>/parent-candidates/", protected(parentage_views.retired_parentage_review), name="parentage_candidates"),
+    path("mice/view-selected/", protected(parentage_views.view_selected_mice_all), name="view_selected_mice_all"),
+    path("mice/review-parent-matches/", protected(parentage_views.retired_parentage_review), name="creation_parentage_review"),
+    path("mice/<mousepk:mouse_pk>/family/", protected(parentage_views.animal_relatives), name="animal_relatives"),
+    path("mice/<mousepk:mouse_pk>/link-offspring/", protected(parentage_views.retired_parentage_review), name="reconcile_parentage"),
     path(
         "mice/lookup/",
         protected(views.mouse_lookup),

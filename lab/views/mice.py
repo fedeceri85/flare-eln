@@ -7,6 +7,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 import json
 from uuid import uuid4
 
+from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.core import signing
 from django.core.paginator import Paginator
@@ -20,6 +21,8 @@ from django.urls import reverse
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 
+from ..parentage import apply_parentage, parentage_transaction, parentage_lock
+from ..family import parent_group_version
 from ..animal_summary import build_animal_recording_sections
 from ..forms import (
     BulkMouseDeleteConfirmForm,
@@ -80,8 +83,12 @@ from .common import (
 )
 
 
-@transaction.atomic
+@parentage_transaction
 def apply_bulk_mouse_updates(mice, form):
+    if form.cleaned_data.get("parentage_updates"):
+        current = list(Mouse.objects.select_for_update().filter(pk__in=[mouse.pk for mouse in mice]).order_by("pk"))
+        if parent_group_version(current) != form._parent_group_version:
+            raise ValidationError("Parent groups changed. Reload the editor before changing parents.")
     renames = form.cleaned_data.get("mouse_id_renames", {})
     if renames:
         locked = list(Mouse.objects.select_for_update().filter(pk__in=[mouse.pk for mouse in mice]).order_by("pk"))
@@ -143,6 +150,8 @@ def apply_bulk_mouse_updates(mice, form):
                 uncertainty_values={**uncertainty_values, **individual_uncertainty},
             )
 
+    form.parentage_warnings = list(dict.fromkeys([*getattr(form, "parentage_resolution_warnings", []), *apply_parentage(form.cleaned_data.get("parentage_updates", {}))]))
+
     # Release all old names first, allowing swaps and chains without collisions.
     temporary_ids = {}
     for old_id in renames:
@@ -162,7 +171,7 @@ def create_mouse_procedure(mouse, form):
     return procedure
 
 
-@transaction.atomic
+@parentage_transaction
 def rename_mouse_identity(mouse_pk, new_mouse_id):
     mouse = Mouse.objects.select_for_update().get(pk=mouse_pk)
     renamed_mouse = Mouse(mouse_id=new_mouse_id)
@@ -320,6 +329,7 @@ def possible_duplicate_confirmed(request, warning):
     return context == warning["confirmation_context"]
 
 
+@parentage_transaction
 def create_litter_mice(selected_protocol, form, *, added_by=None):
     cleaned_data = form.cleaned_data
     litter_protocol = cleaned_data.get("protocol") or selected_protocol
@@ -355,18 +365,19 @@ def create_litter_mice(selected_protocol, form, *, added_by=None):
                 **procedure_values,
             )
 
+    form.parentage_warnings = list(dict.fromkeys([*getattr(form, "parentage_resolution_warnings", []), *apply_parentage({mouse.pk: form.cleaned_data.get("shared_parentage", {}) for mouse in mice})]))
     return mice, litter_protocol
 
 
 def mice_page(request):
-    sort = request.GET.get("sort", "date_of_birth")
+    sort = request.GET.get("sort", "date_added")
     direction = request.GET.get("direction", "desc")
 
     if direction not in {"asc", "desc"}:
         direction = "desc"
 
     if sort not in mice_page_sortable_fields():
-        sort = "date_of_birth"
+        sort = "date_added"
 
     filter_specs = build_mice_page_filter_specs()
     filter_values = read_filter_values(request.GET, filter_specs)
@@ -420,7 +431,7 @@ def edit_mouse(request, mouse_pk):
     return redirect(url_with_query_params(
         edit_selected_mice_all_url(), selected_mouse=[mouse.pk],
         return_url=safe_return_url(request, procedure_protocol_url(mouse.protocol)),
-        mouse_editor_tab=request.GET.get("mouse_editor_tab", "ids"),
+        mouse_editor_tab=request.GET.get("mouse_editor_tab", "shared"),
     ))
 
 
@@ -456,6 +467,7 @@ def delete_mouse(request, mouse_pk):
 
             try:
                 with transaction.atomic():
+                    parentage_lock()
                     locked_mouse = Mouse.objects.select_for_update().get(
                         pk=mouse_id,
                     )
@@ -508,6 +520,9 @@ def bulk_individual_rows_preview(request, form):
             for mouse, stem, crossing, lines, calls in form.individual_row_details:
                 for line in lines:
                     shared_name = genotype_field_name(line)
+                    if (form.data.get(form.add_prefix("genotype_modes_present"))
+                            and form.data.get(form.add_prefix(f"{shared_name}_individual"))):
+                        continue
                     value = form.data.get(form.add_prefix(shared_name))
                     if value:
                         form.data[form.add_prefix(f"{stem}_{shared_name}")] = value
@@ -635,10 +650,15 @@ def _edit_selected_mice(request, selected_protocol=None):
         elif form.is_valid():
             try:
                 apply_bulk_mouse_updates(selected_mice, form)
+            except ValidationError as exc:
+                form.parentage_errors = exc.messages
+                form.add_error(None, exc)
             except IntegrityError:
                 form.add_error(None, "The animal changes conflict with an existing record. No changes were saved. Review the local identifiers and shared details.")
             else:
                 messages.success(request, f"{len(selected_mice)} animals were updated successfully.")
+                for warning in getattr(form, "parentage_warnings", []):
+                    messages.warning(request, warning)
                 renames = form.cleaned_data.get("mouse_id_renames", {})
                 parts = urlsplit(return_url)
                 if scoped and parts.path == reverse("lab:view_selected_mice_licence_protocol", args=[
@@ -675,6 +695,7 @@ def _edit_selected_mice(request, selected_protocol=None):
             **editor_context(request, selected_mice, selected_protocol, return_url=bulk_return_url),
             **creation_context(selected_mice, return_url=bulk_return_url),
             "form": form,
+            "initial_edit_tab": "individual" if len(selected_mice) > 1 else "shared",
             "selected_mice": selected_mice,
             "mouse": selected_mice[0] if len(selected_mice) == 1 else None,
             "selected_protocol": selected_protocol,
@@ -769,6 +790,7 @@ def _delete_selected_mice(request, selected_protocol=None):
         if form.is_valid():
             try:
                 with transaction.atomic():
+                    parentage_lock()
                     locked_mice = load_selected_mice(for_update=True)
                     deleted_count = len(locked_mice)
 
@@ -896,6 +918,9 @@ def add_litter(request, protocol_number=None, licence_reference=None):
                             form,
                             added_by=request.user,
                         )
+                except ValidationError as exc:
+                    form.parentage_errors = exc.messages
+                    form.add_error(None, exc)
                 except IntegrityError:
                     possible_duplicate_warning = None
                     form.add_error(
@@ -911,17 +936,17 @@ def add_litter(request, protocol_number=None, licence_reference=None):
                         protocol_assignment_message(len(mice), litter_protocol),
                     )
 
+                    for warning in getattr(form, "parentage_warnings", []):
+                        messages.warning(request, warning)
                     if return_with_mouse:
                         mouse_ids = selected_recording_mouse_ids_from_url(return_url)
                         mouse_ids.extend(mouse.pk for mouse in mice if mouse.pk not in mouse_ids)
-                        return redirect(url_with_query_params(return_url, mice=recording_mice_query_value(mouse_ids), mouse=None))
-                    if selected_protocol is None:
-                        return redirect(return_url)
-
-                    if litter_protocol == selected_protocol:
-                        return redirect(return_url)
-
-                    return redirect(procedure_protocol_url(litter_protocol))
+                        destination = url_with_query_params(return_url, mice=recording_mice_query_value(mouse_ids), mouse=None)
+                    elif selected_protocol is None or litter_protocol == selected_protocol:
+                        destination = return_url
+                    else:
+                        destination = procedure_protocol_url(litter_protocol)
+                    return redirect(destination)
     else:
         form = LitterCreateForm(selected_protocol=selected_protocol)
     can_add_litter_procedure = (
@@ -1017,21 +1042,18 @@ def mouse_lookup(request):
 
     mice = (
         Mouse.objects
+        .exclude(pk__in=request.GET.getlist("exclude"))
         .filter(mouse_id__icontains=mouse_query)
         .order_by("mouse_id")[:10]
     )
 
-    return JsonResponse(
-        {
-            "results": [
-                {
-                    "id": mouse.pk,
-                    "label": mouse.mouse_id,
-                }
-                for mouse in mice
-            ],
-        }
-    )
+    payload = {"results": [{"id": mouse.pk, "label": mouse.mouse_id} for mouse in mice]}
+    if request.GET.get("resolve_exact") == "1":
+        # Exact resolution must not depend on the truncated suggestion list.
+        exact = list(Mouse.objects.filter(pk__iexact=mouse_query).order_by("pk").values_list("pk", flat=True)[:2])
+        payload["exact_match"] = {"id": exact[0], "label": exact[0]} if len(exact) == 1 else None
+        payload["ambiguous"] = len(exact) > 1
+    return JsonResponse(payload)
 
 
 @require_http_methods(["GET", "HEAD"])

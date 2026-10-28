@@ -26,7 +26,7 @@ class MouseEditorTabTests(TestCase):
         return response, Markup(response.content.decode())
 
     def assert_tabs(self, html):
-        self.assertEqual(len(html.find("button", role="tab")), 5)
+        self.assertEqual(len(html.find("button", role="tab")), 6)
         self.assertEqual(len(html.find("div", role="tablist")), 1)
         for node in html.elements:
             # Without JS, all sections remain accessible and native form controls stay enabled.

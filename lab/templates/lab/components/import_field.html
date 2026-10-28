@@ -1,8 +1,15 @@
 <div class="form-field">
+    {% if field.parent_autocomplete %}<div class="parent-control" data-parent-control data-parent-import="true" data-parent-role="{{ field.parent_role }}">{% endif %}
     {% if hide_label %}
         <label class="visually-hidden" for="{{ field.id_for_label }}">{{ field.label }}</label>
     {% else %}
         {{ field.label_tag }}
     {% endif %}
     {% include 'lab/components/field_control.html' with field=field hide_help=True only %}
+    {% if field.parent_autocomplete %}
+        <input type="hidden" data-parent-reference value="">
+        <span data-parent-state role="status" aria-live="polite">Review will resolve this ID.</span>
+        <small>Links are confirmed in Review; “Keep as external text” takes precedence.</small>
+        <div data-parent-suggestions hidden></div>
+    </div>{% endif %}
 </div>

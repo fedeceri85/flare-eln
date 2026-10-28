@@ -84,12 +84,22 @@ def animal_summary_context(request, mice, *, summary_url, edit_url):
             queryset=CrossingLine.objects.select_related("line").order_by("position", "crossing_line_id"),
         ),
     )
-    active_tab = request.GET.get("mouse_editor_tab", "shared")
-    available_tabs = {"shared", "procedures", "services"} | ({"individual"} if len(mice) > 1 else set())
+    entry_tab = "individual" if len(mice) > 1 else "shared"
+    active_tab = request.GET.get("mouse_editor_tab", entry_tab)
+    available_tabs = {"shared", "family", "procedures", "services"} | ({"individual"} if len(mice) > 1 else set())
     if active_tab not in available_tabs:
-        active_tab = "shared"
+        active_tab = entry_tab
     summary_url = url_with_query_params(summary_url, mouse_editor_tab=active_tab)
     summary = build_animal_summary(mice)
+    from ..family import build_family_sections, build_parent_groups
+    family_url = url_with_query_params(summary_url, mouse_editor_tab="family")
+    summary["family_return_url"] = family_url
+    summary["family_url"] = family_url
+    summary["family_fragment_url"] = url_with_query_params(reverse("lab:family_fragment"), selected_mouse=[mouse.pk for mouse in mice], return_url=family_url)
+    summary["family_loaded"] = active_tab == "family"
+    if summary["family_loaded"]:
+        summary["family_sections"] = build_family_sections(mice, family_url)
+        summary["parent_groups"] = build_parent_groups(mice, family_url, families=summary["family_sections"])
     individual_return_url = url_with_query_params(
         summary_url, mouse_editor_tab="shared" if len(mice) == 1 else "individual",
     )
@@ -102,7 +112,7 @@ def animal_summary_context(request, mice, *, summary_url, edit_url):
         "active_tab": active_tab,
         "edit_animals_url": url_with_query_params(
             edit_url, selected_mouse=[mouse.pk for mouse in mice],
-            mouse_editor_tab=active_tab, return_url=summary_url,
+            mouse_editor_tab=entry_tab, return_url=summary_url,
         ) if mice else "",
     }
 
@@ -281,7 +291,7 @@ def apply_severity_exceeded_filter(queryset):
 
 
 def order_mice_page_queryset(queryset, sort, direction):
-    if sort in {"date_of_birth", "cull_date"}:
+    if sort in {"date_added", "date_of_birth", "cull_date"}:
         expression = (
             F(sort).desc(nulls_last=True)
             if direction == "desc"

@@ -13,11 +13,14 @@ from ..models import (
     MAX_SEVERITY_CHOICES,
     genotype_category_choices,
 )
+from .parentage import configure_parent_controls, clean_parent_controls
 from .genetics import (
     active_crossings_queryset,
     crossing_choice_label,
     genotype_field_name,
     individual_mouse_field_prefix,
+    configure_genotype_modes,
+    uses_shared_genotype,
 )
 
 
@@ -227,8 +230,10 @@ class BulkMouseUpdateForm(forms.Form):
 
             self.fields.update(genotype_form_fields)
 
+        configure_genotype_modes(self, individual_default=True)
         self.configure_individual_detail_overrides()
         self.configure_individual_rows()
+        configure_parent_controls(self, self.selected_mice, bulk=True)
 
     def configure_individual_detail_overrides(self):
         self.individual_detail_rows = []
@@ -371,7 +376,10 @@ class BulkMouseUpdateForm(forms.Form):
             for line in lines:
                 name = f"{stem}_{genotype_field_name(line)}"
                 call = calls.get(line.pk)
-                if self.add_prefix(name) in self.data and name in cleaned_data:
+                shared_name = genotype_field_name(line)
+                if not self.single_mouse_mode and uses_shared_genotype(self, line) and cleaned_data.get(shared_name):
+                    genotype_values[line.pk] = cleaned_data[shared_name]
+                elif self.add_prefix(name) in self.data and name in cleaned_data:
                     value = cleaned_data[name] or "unknown"
                     if (
                         cleaned_data.get("update_genotype") or cleaned_data.get("update_crossing")
@@ -526,11 +534,17 @@ class BulkMouseUpdateForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         cleaned_data["mouse_id_renames"] = self.clean_mouse_ids(cleaned_data)
-        has_mouse_update = bool(cleaned_data["mouse_id_renames"]) or any(
+        has_parent_update = clean_parent_controls(self)
+        has_mouse_update = has_parent_update or bool(cleaned_data["mouse_id_renames"]) or any(
             cleaned_data.get(update_field)
             for update_field, _ in self.MOUSE_UPDATE_FIELDS
         )
         has_notes_update = cleaned_data.get("notes_action") in {"append", "replace"}
+        if not self.single_mouse_mode and self.selected_crossing and any(
+            uses_shared_genotype(self, line) and cleaned_data.get(genotype_field_name(line))
+            for line in self.selected_crossing.ordered_lines()
+        ):
+            cleaned_data["update_genotype"] = True
         cleaned_data["individual_updates"] = self.clean_individual_updates(cleaned_data)
         has_mouse_update = has_mouse_update or bool(cleaned_data["individual_updates"])
         update_crossing = cleaned_data.get("update_crossing")
@@ -585,6 +599,12 @@ class BulkMouseUpdateForm(forms.Form):
                 for line in crossing.ordered_lines():
                     field_name = genotype_field_name(line)
                     zygosity = cleaned_data.get(field_name)
+
+                    if (not self.single_mouse_mode and self.data.get(self.add_prefix("genotype_modes_present"))
+                            and not uses_shared_genotype(self, line)):
+                        if update_crossing:
+                            genotype_values[line.pk] = "unknown"
+                        continue
 
                     if update_crossing:
                         genotype_values[line.pk] = zygosity or "unknown"

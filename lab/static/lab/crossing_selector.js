@@ -100,6 +100,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 controls.appendChild(uncertaintyLabel);
             }
             wrapper.appendChild(label);
+            if (bulkMode) {
+                const individualLabel = document.createElement('label');
+                individualLabel.className = 'genotype-individual-choice';
+                const individual = document.createElement('input');
+                individual.type = 'checkbox';
+                individual.name = line.field_name + '_individual';
+                individual.id = 'id_' + individual.name;
+                individual.dataset.genotypeIndividual = 'true';
+                individual.dataset.lineId = line.id;
+                individual.checked = true;
+                individualLabel.htmlFor = individual.id;
+                individualLabel.appendChild(individual);
+                individualLabel.appendChild(document.createTextNode('Select individually'));
+                wrapper.appendChild(individualLabel);
+            }
             wrapper.appendChild(controls);
             subset.appendChild(wrapper);
         });

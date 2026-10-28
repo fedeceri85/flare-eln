@@ -14,11 +14,13 @@
 {% endblock %}
 
 {% block content %}
-    <div data-mouse-editor data-dynamic-mouse-layout data-mouse-count="{{ form.numbers|length }}">
-    {% include "lab/components/mouse_editor_tabs.html" %}
+    <div class="animal-tabbed" data-mouse-editor data-dynamic-mouse-layout data-mouse-count="{{ form.numbers|length }}">
+    <div class="animal-tabs-navigation">
+        {% include "lab/components/mouse_editor_tabs.html" %}
+    </div>
     <form id="primary-form" method="post" data-litter-form>
         {% csrf_token %}
-        <input type="hidden" name="mouse_editor_tab" value="{{ request.POST.mouse_editor_tab|default:'ids' }}" data-mouse-active-tab>
+        <input type="hidden" name="mouse_editor_tab" value="{% firstof request.POST.mouse_editor_tab request.GET.mouse_editor_tab 'ids' %}" data-mouse-active-tab>
         <input
             type="hidden"
             name="return_url"
@@ -79,16 +81,7 @@
                     </fieldset>
                 {% endfor %}
             </div>
-            <div class="shared-genetics">
-                <div class="bulk-field shared-crossing-column">
-                    {% include "lab/components/shared_mouse_input.html" with field=form.crossing_search %}
-                </div>
-                <div class="shared-genotype-column" data-multiple-mice-only {% if form.single_mouse_mode %}hidden{% endif %}>
-                    <div data-litter-shared-genotypes>{% include "lab/components/litter_shared_genotypes.html" %}</div>
-                    <p role="status" aria-live="polite" data-litter-genotype-status></p>
-                    <noscript><button class="button" type="submit" name="apply_shared_genotype" value="1" formnovalidate>Apply shared genotype to animal rows</button></noscript>
-                </div>
-            </div>
+            <div data-single-genetics-slot>{% if form.single_mouse_mode %}{% include "lab/components/litter_shared_genetics.html" %}{% endif %}</div>
             <details class="shared-notes" {% if form.notes.value or form.notes.errors %}open{% endif %}>
                 <summary>Notes (optional)</summary>
                 {% include "lab/components/shared_mouse_input.html" with field=form.notes %}
@@ -97,7 +90,13 @@
 
         </div>
 
+        <section class="bulk-section family-details" id="mouse-panel-family" data-mouse-tab-panel="family">
+            <h2 class="visually-hidden">Family details</h2>
+            {% include "lab/components/parent_editor.html" %}
+        </section>
+
         <section id="mouse-panel-individual" data-mouse-tab-panel="individual" {% if form.single_mouse_mode %}hidden{% endif %}>
+            <div data-multiple-genetics-slot>{% if not form.single_mouse_mode %}{% include "lab/components/litter_shared_genetics.html" %}{% endif %}</div>
             <div data-multiple-mice-slot>{% if not form.single_mouse_mode %}{% include "lab/components/litter_individual_editor.html" %}{% endif %}</div>
         </section>
 
@@ -114,7 +113,9 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="{% static 'lab/mouse_editor_tabs.js' %}"></script>
+    {% include "lab/components/remove_parent_dialog.html" %}
+    <script src="{% static 'lab/parentage.js' %}?v=parent-autocomplete-2"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=genotype-entry-1"></script>
     {{ protocol_procedure_permissions|json_script:"protocol-procedure-permissions" }}
     <script src="{% static 'lab/litter_protocol_permissions.js' %}"></script>
     {% include "lab/components/crossing_selector_assets.html" %}

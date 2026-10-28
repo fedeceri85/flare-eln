@@ -1,3 +1,7 @@
+27/10/2026
+- Added optional external and linked mother/father IDs, family summaries, grouped offspring, and explicit matching of external parent IDs.
+- Added parent matching and approvals to spreadsheet imports within the existing workflow.
+
 25/10/2026
 - Added page for simultaneous view of multiple animals
 - Added the possibility to add an experiment from edit animal view.

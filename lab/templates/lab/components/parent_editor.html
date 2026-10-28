@@ -1,0 +1,22 @@
+<section class="family-section" aria-labelledby="family-parents-title">
+    <div class="family-section-heading"><h2 class="section-title" id="family-parents-title">Parents</h2></div>
+    {% if form.parentage_errors %}<ul class="error-list">{% for error in form.parentage_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+    {% for group in form.parent_groups %}
+    <div class="parent-group-card">
+        {% if group.mouse_ids %}
+        <p class="family-members"><strong>Selected animals:</strong>{% for mouse_id in group.mouse_ids %}<a href="{% url 'lab:animal_summary' mouse_id %}">{{ mouse_id }}</a>{% endfor %}</p>
+        {% else %}<p>These parents apply to all animals being added.</p>{% endif %}
+        {% include 'lab/components/parent_controls.html' with controls=group.controls %}
+        {% if group.overrides %}
+        <details class="individual-parent-overrides"><summary>Individual parent overrides</summary>
+            <p>Checked individual overrides take precedence over changes to this group.</p>
+            {% for row in group.overrides %}
+            <details {% if form.is_bound %}open{% endif %}><summary>{{ row.mouse_id }}</summary>
+                {% include 'lab/components/parent_controls.html' with controls=row.controls %}
+            </details>
+            {% endfor %}
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+</section>

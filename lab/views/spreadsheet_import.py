@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_safe
 
+from ..parentage import parentage_lock
 from ..models import Protocol, SpreadsheetImportDraft, SpreadsheetImportImage, SpreadsheetImportTemplate
 from ..forms.recording_images import RecordingImageUploadForm
 from ..recording_images import discard_image_files, image_available, read_image, save_import_images
@@ -120,6 +121,9 @@ def import_recordings(request, project_pk, experiment_pk, draft_id=None):
 
     # Serialize wizard edits too, so another tab cannot silently overwrite a review.
     with transaction.atomic():
+        # Commit takes the same lock before its draft/catalogue locks.
+        if request.method == "POST" and request.POST.get("step") == "review":
+            parentage_lock()
         draft = get_object_or_404(SpreadsheetImportDraft.objects.select_for_update(), pk=draft_id, owner=request.user, experiment=experiment)
         if draft.expires_at <= timezone.now():
             return render(request, "lab/import_recordings.html", {**context, "expired": True}, status=410)
@@ -202,6 +206,8 @@ def import_recordings(request, project_pk, experiment_pk, draft_id=None):
                         if result.get("shared_images"):
                             summary += f" Attached {result['shared_images']} shared images to each recording."
                         messages.success(request, summary)
+                        for warning in result.get("warnings", []):
+                            messages.warning(request, warning)
                         return redirect(recordings_url)
                     except (ValidationError, IntegrityError) as exc:
                         errors.extend(exc.messages if isinstance(exc, ValidationError) else ["An animal changed or an ID is now in use. Refresh the review and resolve it before importing."])

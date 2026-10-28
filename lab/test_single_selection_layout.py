@@ -34,7 +34,7 @@ class SingleSelectionLayoutTests(TestCase):
             response = self.get(url)
             self.assertEqual(response.status_code, 200)
             html = Markup(response.content.decode())
-            self.assertEqual([node.attrs["data-mouse-tab"] for node in html.find("button", role="tab")], ["ids", "shared", "procedures", "services"])
+            self.assertEqual([node.attrs["data-mouse-tab"] for node in html.find("button", role="tab")], ["ids", "shared", "family", "procedures", "services"])
             self.assertIn("Animal details", html.find("button", id="mouse-tab-shared")[0].text)
             self.assertFalse(html.find("section", id="mouse-panel-individual"))
             local = html.find("input", name=self.stem + "_local_identifier")[0]
@@ -65,7 +65,7 @@ class SingleSelectionLayoutTests(TestCase):
     def test_multiple_selection_keeps_individual_tab_and_prefills_shared_status(self):
         response = self.get(self.urls[0], [self.mouse, self.other])
         html = Markup(response.content.decode())
-        self.assertEqual(len(html.find("button", role="tab")), 5)
+        self.assertEqual(len(html.find("button", role="tab")), 6)
         self.assertTrue(html.find("section", id="mouse-panel-individual"))
         self.assertFalse(html.find("section", id="mouse-individual-details"))
         self.assertEqual(response.context["form"]["status"].value(), "Alive")

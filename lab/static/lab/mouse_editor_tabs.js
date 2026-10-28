@@ -19,12 +19,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selected && focus) tab.focus();
         });
         panels.forEach(panel => { panel.hidden = panel.dataset.mouseTabPanel !== key; });
+        editor.dispatchEvent(new CustomEvent('mouse-editor:tab-activated', {bubbles: true, detail: {tab: key}}));
         if (summaryEditLink) {
             const editUrl = new URL(summaryEditLink.href, window.location.href);
             const summaryUrl = new URL(editUrl.searchParams.get('return_url'), window.location.href);
             summaryUrl.searchParams.set('mouse_editor_tab', key);
             const localSummaryUrl = summaryUrl.pathname + summaryUrl.search + summaryUrl.hash;
-            editUrl.searchParams.set('mouse_editor_tab', key);
+            editUrl.searchParams.set('mouse_editor_tab', tabs.some(tab => tab.dataset.mouseTab === 'individual' && !tab.hidden) ? 'individual' : 'shared');
             editUrl.searchParams.set('return_url', localSummaryUrl);
             summaryEditLink.href = editUrl.pathname + editUrl.search + editUrl.hash;
             window.history.replaceState(window.history.state, '', localSummaryUrl);
@@ -96,6 +97,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (tab) tab.hidden = single;
         editor.querySelectorAll('[data-multiple-mice-only]').forEach(element => { element.hidden = single; });
         (single ? singleSlot : multipleSlot).appendChild(widget);
+        const genetics = editor.querySelector('[data-genetics-editor]');
+        const geneticsSlot = editor.querySelector(single ? '[data-single-genetics-slot]' : '[data-multiple-genetics-slot]');
+        if (genetics && geneticsSlot) geneticsSlot.appendChild(genetics);
         if (single && activeInput.value === 'individual') activate('shared');
         else activate(activeInput.value);
         markErrors();

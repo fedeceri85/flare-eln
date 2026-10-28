@@ -1,10 +1,11 @@
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.test import Client, TestCase, override_settings
@@ -50,6 +51,31 @@ class RecordingImageTests(TestCase):
 
     def gallery(self):
         return self.client.get(self.url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+
+    def test_table_counts_registered_attachments_without_touching_files(self):
+        image = self.add_image()
+        with patch("lab.recording_images.image_available", side_effect=AssertionError("Table checked image files")), patch("lab.recording_images.image_path", side_effect=AssertionError("Table resolved a file path")):
+            response = self.client.get(self.list_url)
+        self.assertContains(response, "Images (1)")
+        image_path(image).unlink()
+        payload = self.gallery().json()
+        self.assertEqual(payload["registered_count"], 1)
+        self.assertEqual(payload["unavailable_count"], 1)
+        self.assertEqual(payload["images"], [])
+        response = self.client.get(self.url)
+        self.assertContains(response, "currently unavailable")
+
+    def test_attachment_audit_reports_without_modifying_files_or_records(self):
+        healthy = self.add_image()
+        missing = self.add_image(name="missing.png")
+        image_path(missing).unlink()
+        before = image_path(healthy).read_bytes()
+        output = StringIO()
+        call_command("audit_recording_images", stdout=output)
+        self.assertIn("Checked 2 registered attachments; 1 unavailable", output.getvalue())
+        self.assertEqual(RecordingImage.objects.count(), 2)
+        self.assertEqual(image_path(healthy).read_bytes(), before)
+        self.assertFalse(image_path(missing).exists())
 
     def test_default_upload_compression_download(self):
         response = self.client.post(self.url, {"action": "upload", "images": [upload(size=(3000, 1500))]}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
@@ -133,7 +159,8 @@ class RecordingImageTests(TestCase):
         self.assertEqual(self.gallery().json()["images"], [])
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Images (1)")
+        self.assertContains(response, "Images (1)")
+        self.assertEqual(self.gallery().json()["unavailable_count"], 1)
         self.assertEqual(self.client.get(reverse("lab:recording_image_file", args=[image.pk])).status_code, 404)
         self.assertTrue(RecordingImage.objects.filter(pk=image.pk).exists())
         path.write_bytes(data)

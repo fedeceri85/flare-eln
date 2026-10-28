@@ -15,6 +15,8 @@ ANIMAL_FIELDS = [
     ("date_of_birth", "Birth date", ["birth date", "dob", "date of birth"]),
     ("tattoo", "Local identifier (tattoo, ear clip)", ["ear tag", "tattoo", "ear clip", "local id", "local identifier"]),
     ("breeding_pair", "Breeding pair", ["breeding pair"]),
+    ("mother_external_id", "Mother ID", ["mum", "mum id", "mother", "mother id", "dam", "dam id"]),
+    ("father_external_id", "Father ID", ["dad", "dad id", "father", "father id", "sire", "sire id"]),
     ("sex", "Sex", ["sex"]),
     ("crossing", "Strain / crossing", ["strain", "crossing"]),
     ("notes", "Animal notes", ["animal notes"]),

@@ -3,6 +3,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from ..models import Mouse, Procedure, ProcedureType, Protocol
+from ..test_navigation import Markup
 from ._support import AuthenticatedTestCase, create_test_crossing, crossing_post_data
 
 
@@ -209,7 +210,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["record_count"]["end"], 31)
+        self.assertEqual(response.context["record_count"]["end"], 32)
         self.assertEqual(response.context["page_size_control"]["current"], 50)
 
     def test_protocol_page_combines_crossing_and_crossing_type(self):
@@ -233,7 +234,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertContains(response, "Line A<br>Wild Type", html=True)
         self.assertContains(response, "n/a<br>n/a", html=True)
 
-    def test_current_year_filter_is_checked_and_default_on(self):
+    def test_current_year_filter_is_unchecked_by_default(self):
         response = self.client.get(
             reverse(
                 "lab:procedure_page_licence_protocol",
@@ -249,9 +250,9 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
             if field["name"] == "show_current_year"
         )
 
-        self.assertTrue(current_year_field["checked"])
+        self.assertFalse(current_year_field["checked"])
         self.assertContains(response, self.mouse_a1.mouse_id)
-        self.assertNotContains(response, self.old_mouse_a1.mouse_id)
+        self.assertContains(response, self.old_mouse_a1.mouse_id)
 
     def test_crossing_filter_uses_crossing_autocomplete(self):
         response = self.client.get(
@@ -307,6 +308,27 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertContains(response, self.mouse_a1.mouse_id)
         self.assertContains(response, self.old_mouse_a1.mouse_id)
 
+    def test_checked_current_year_filter_excludes_previous_year_animals(self):
+        response = self.client.get(
+            reverse(
+                "lab:procedure_page_licence_protocol",
+                kwargs={
+                    "licence_reference": self.licence_a,
+                    "protocol_number": self.protocol_a1.protocol_number,
+                },
+            )
+            + "?show_current_year=1"
+        )
+        current_year_field = next(
+            field
+            for field in response.context["filter_form"]["fields"]
+            if field["name"] == "show_current_year"
+        )
+
+        self.assertTrue(current_year_field["checked"])
+        self.assertContains(response, self.mouse_a1.mouse_id)
+        self.assertNotContains(response, self.old_mouse_a1.mouse_id)
+
     def test_current_year_filter_includes_current_year_procedure_date(self):
         old_protocol_mouse = Mouse.objects.create(
             mouse_id="MOUSE-P201-CURRENT-PROCEDURE",
@@ -327,6 +349,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
                     "protocol_number": self.protocol_a1.protocol_number,
                 },
             )
+            + "?show_current_year=1"
         )
 
         self.assertContains(response, old_protocol_mouse.mouse_id)
@@ -372,7 +395,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
             mouse=self.mouse_a1,
             procedure_type=self.procedure_type,
             date=date(self.current_year, 7, 1),
-            lab_member="OLD",
+            lab_member="EARLIER-MEMBER",
             lab_book_page="1",
         )
         Procedure.objects.create(
@@ -397,7 +420,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertContains(response, "2 procedures total")
         self.assertContains(response, "NEW")
         self.assertContains(response, "Page 2")
-        self.assertNotContains(response, "OLD")
+        self.assertNotContains(response, "EARLIER-MEMBER")
         self.assertNotContains(response, "Page 1")
 
     def test_protocol_page_marks_procedure_checkmarks_when_severity_exceeded(self):
@@ -465,7 +488,13 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertContains(response, f'href="{add_litter_url}?return_url=')
         self.assertContains(response, f'action="{edit_selected_url}"')
         self.assertContains(response, 'data-animal-action="selected-mice-form"', count=1)
-        self.assertContains(response, 'data-animal-selected-label="View animals"')
+        self.assertContains(response, 'data-animal-selected-label="View selected"')
+        markup = Markup(response.content.decode())
+        all_animals = next(link for link in markup.find('a') if link.text.strip() == 'View all animals')
+        selected_action = markup.find('a', **{'data-animal-action': 'selected-mice-form'})[0]
+        self.assertEqual(all_animals.attrs['href'], reverse('lab:mice_page'))
+        self.assertNotIn('button', all_animals.attrs.get('class', ''))
+        self.assertIs(all_animals.parent, selected_action.parent)
         self.assertNotContains(response, 'form="selected-mice-form"')
 
     def test_add_mouse_scoped_protocol_cannot_be_changed(self):

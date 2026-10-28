@@ -251,6 +251,10 @@ class Mouse(models.Model):
         verbose_name="Added by",
     )
     mouse_id = models.CharField(max_length=100, primary_key=True)
+    mother_external_id = models.CharField(max_length=255, blank=True, default="", db_index=True)
+    mother = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="maternal_offspring")
+    father_external_id = models.CharField(max_length=255, blank=True, default="", db_index=True)
+    father = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="paternal_offspring")
     ID_TEMPORARY = "temporary"
     ID_ASSIGNED = "assigned"
     ID_UNKNOWN = "unknown"
@@ -353,6 +357,12 @@ class Mouse(models.Model):
 
     def __str__(self):
             return self.mouse_id
+
+    def clean(self):
+        super().clean()
+        if self.mother_id or self.father_id:
+            from .parentage import validate_mouse_parentage
+            validate_mouse_parentage(self)
 
     @property
     def genetics_crossing_display(self):
@@ -784,6 +794,9 @@ class RecordingType(models.Model):
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     active = models.BooleanField(default=True)
+
+    hide_data_paths_in_table = models.BooleanField(default=False)
+    hide_notes_in_table = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["name"]
