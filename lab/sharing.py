@@ -80,11 +80,10 @@ def share_animals(mouse_ids, tab, user):
     mice = list(Mouse.objects.select_for_update().filter(pk__in=mouse_ids).order_by("pk"))
     if len(mice) != len(mouse_ids):
         raise ValidationError("One or more selected animals are no longer available.")
-    tab = tab if tab in ANIMAL_TABS else ("shared" if len(mice) == 1 else "individual")
-    if len(mice) == 1 and tab == "individual":
-        tab = "shared"
+    # A code identifies the animals, independently of the tab used to share them.
+    tab = "shared" if len(mice) == 1 else "individual"
     identities = [SharedAnimalIdentity.objects.get_or_create(mouse=mouse)[0] for mouse in mice]
-    key = sha256((tab + ":" + ",".join(sorted(str(identity.pk) for identity in identities))).encode()).hexdigest()
+    key = sha256((",".join(sorted(str(identity.pk) for identity in identities))).encode()).hexdigest()
     return allocate_share(SharedLink.ANIMALS, user, identities=identities, selection_key=key, tab=tab)
 
 

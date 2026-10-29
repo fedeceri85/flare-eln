@@ -55,11 +55,46 @@ class SharingTests(TestCase):
         payload = response.json()
         self.assertEqual(payload['url'], 'http://testserver/s/' + payload['code'] + '/')
         second = self.client.post(reverse('lab:create_animal_share'), {
-            'selected_mouse': [self.b.pk, self.a.pk, self.a.pk], 'mouse_editor_tab': 'procedures',
+            'selected_mouse': [self.b.pk, self.a.pk, self.a.pk], 'mouse_editor_tab': 'family',
         })
         self.assertEqual(second.json(), payload)
         self.assertEqual(SharedLink.objects.count(), 1)
         self.assertEqual(ShareCodeCounter.objects.get(kind='m').allocated, 1)
+
+    def test_animal_code_is_the_same_across_all_tabs_and_users(self):
+        for ids, default_tab in (([self.a.pk], 'shared'), ([self.a.pk, self.b.pk], 'individual')):
+            link = self.mouse_share(ids, tab='services')
+            for tab in ('shared', 'individual', 'family', 'procedures', 'services', ''):
+                with self.subTest(ids=ids, tab=tab):
+                    reused = share_animals(list(reversed(ids)), tab, self.other_user)
+                    self.assertEqual(reused.pk, link.pk)
+                    self.assertEqual(reused.animal_tab, default_tab)
+        self.assertEqual(SharedLink.objects.count(), 2)
+        self.assertEqual(ShareCodeCounter.objects.get(kind='m').allocated, 2)
+
+    def test_existing_tab_codes_keep_working_and_oldest_is_reused(self):
+        from importlib import import_module
+        from django.apps import apps
+
+        original = self.mouse_share([self.a.pk, self.b.pk], tab='family')
+        original.animal_tab = 'family'
+        original.selection_key = 'legacy-family-key'
+        original.save()
+        alias = SharedLink.objects.create(
+            kind='m', code='m-legacy-alias', lookup_key='mlegacyalias',
+            selection_key='legacy-services-key', animal_tab='services', created_by=self.user,
+        )
+        alias.animals.set(original.animals.all())
+        migration = import_module('lab.migrations.0065_animal_share_selection_codes')
+        from types import SimpleNamespace
+        migration.canonicalize_animal_codes(apps, SimpleNamespace(connection=connection))
+        self.assertEqual(self.mouse_share([self.b.pk, self.a.pk], tab='procedures').pk, original.pk)
+        original.refresh_from_db()
+        alias.refresh_from_db()
+        self.assertEqual(original.animal_tab, 'individual')
+        self.assertIsNone(alias.selection_key)
+        for link in (original, alias):
+            self.assertEqual(self.client.get(self.link_url(link)).status_code, 302)
 
     def test_recording_code_reuses_target_and_opens_selected_recording(self):
         url = reverse('lab:create_recording_share', args=[self.recording.pk])
@@ -70,12 +105,12 @@ class SharingTests(TestCase):
         link = SharedLink.objects.get(code=payload['code'])
         self.assertRedirects(self.client.get(self.link_url(link)), selected_recording_url(self.recording), fetch_redirect_response=False)
 
-    def test_animal_code_preserves_tab_and_shows_latest_records(self):
+    def test_animal_code_opens_default_tab_and_shows_latest_records(self):
         link = self.mouse_share([self.a.pk, self.b.pk], tab='procedures')
         response = self.client.get(self.link_url(link))
         query = parse_qs(urlsplit(response.url).query)
         self.assertEqual(set(query['selected_mouse']), {self.a.pk, self.b.pk})
-        self.assertEqual(query['mouse_editor_tab'], ['procedures'])
+        self.assertEqual(query['mouse_editor_tab'], ['individual'])
         Mouse.objects.filter(pk=self.a.pk).update(notes='Updated after sharing')
         self.assertContains(self.client.get(response.url), 'Updated after sharing')
 
