@@ -41,9 +41,7 @@ from ..models import (
     Recording,
 )
 from ..procedure_bulk import (
-    creation_context,
     editor_context,
-    handle_create_procedures,
     handle_procedure_action,
 )
 from ..ui import (
@@ -84,6 +82,11 @@ from .common import (
 
 @parentage_transaction
 def apply_bulk_mouse_updates(mice, form):
+    drafts = form.cleaned_data.get("procedure_drafts", [])
+    if drafts:
+        locked = list(Mouse.objects.select_for_update().filter(pk__in=[mouse.pk for mouse in mice]).order_by("pk"))
+        if len(locked) != len(mice):
+            raise ValidationError("The animal selection changed. Reload the editor before saving procedures.")
     if form.cleaned_data.get("parentage_updates"):
         current = list(Mouse.objects.select_for_update().filter(pk__in=[mouse.pk for mouse in mice]).order_by("pk"))
         if parent_group_version(current) != form._parent_group_version:
@@ -161,6 +164,14 @@ def apply_bulk_mouse_updates(mice, form):
         temporary_ids[old_id] = temporary_id
     for old_id, new_id in renames.items():
         rename_mouse_identity(temporary_ids[old_id], new_id)
+
+    if drafts:
+        final_mice = list(Mouse.objects.select_related("protocol").filter(pk__in=[renames.get(mouse.pk, mouse.pk) for mouse in mice]))
+        if len(final_mice) != len(mice) or any(not mouse.protocol.allows_regulated_procedures for mouse in final_mice):
+            raise ValidationError("One or more selected animals no longer allow regulated procedures. No changes were saved.")
+        for mouse in final_mice:
+            for values in drafts:
+                Procedure.objects.create(mouse=mouse, **values)
 
 
 def create_mouse_procedure(mouse, form):
@@ -343,6 +354,7 @@ def create_litter_mice(selected_protocol, form, *, added_by=None):
             tattoo=row["tattoo"],
             marking_type=row["marking_type"],
             sex=row["sex"],
+            colour=details.get("colour", ""),
             status=details["status"],
             protocol_start_date=details.get("protocol_start_date"),
             cull_date=details.get("cull_date"),
@@ -612,7 +624,7 @@ def _edit_selected_mice(request, selected_protocol=None):
         return redirect(return_url)
 
     if request.method == "POST" and "create_procedures" in request.POST:
-        return handle_create_procedures(request, selected_mice, selected_protocol, return_url)
+        return JsonResponse({"ok": False, "error": "Add procedures to the pending list, then press Save changes."}, status=400)
 
     if request.method == "POST" and "existing_procedure_action" in request.POST:
         return handle_procedure_action(request, selected_mice, selected_protocol, return_url)
@@ -666,7 +678,7 @@ def _edit_selected_mice(request, selected_protocol=None):
             except IntegrityError:
                 form.add_error(None, "The animal changes conflict with an existing record. No changes were saved. Review the local identifiers and shared details.")
             else:
-                messages.success(request, f"{len(selected_mice)} animals were updated successfully.")
+                messages.success(request, "Changes saved successfully.")
                 for warning in getattr(form, "parentage_warnings", []):
                     messages.warning(request, warning)
                 renames = form.cleaned_data.get("mouse_id_renames", {})
@@ -703,7 +715,8 @@ def _edit_selected_mice(request, selected_protocol=None):
         "lab/edit_selected_mice.html",
         {
             **editor_context(request, selected_mice, selected_protocol, return_url=bulk_return_url),
-            **creation_context(selected_mice, return_url=bulk_return_url),
+            "litter_procedure_form": BulkProcedureCreateForm(),
+            "procedure_fields_enabled": can_add_bulk_procedure,
             "form": form,
             "initial_edit_tab": "individual" if len(selected_mice) > 1 else "shared",
             "selected_mice": selected_mice,

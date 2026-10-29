@@ -3,6 +3,7 @@ gunicorn==23.0.0
 psycopg2-binary==2.9.12
 pandas
 openpyxl
+reportlab==4.5.1
 whitenoise
 Pillow>=12.0,<13
 xkcdpass==1.30.0

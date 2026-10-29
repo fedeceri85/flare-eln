@@ -21,7 +21,9 @@ class OpenShareCodeForm(forms.Form):
 
 
 def share_payload(request, link):
-    return {"code": link.code, "url": request.build_absolute_uri(reverse("lab:shared_view", args=[link.code]))}
+    url = request.build_absolute_uri(reverse("lab:shared_view", args=[link.code]))
+    # Public sharing links use HTTPS even when the proxy forwards HTTP to Django.
+    return {"code": link.code, "url": "https://" + url.split("://", 1)[1]}
 
 
 @require_POST

@@ -53,7 +53,7 @@ class SharingTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload['url'], 'http://testserver/s/' + payload['code'] + '/')
+        self.assertEqual(payload['url'], 'https://testserver/s/' + payload['code'] + '/')
         second = self.client.post(reverse('lab:create_animal_share'), {
             'selected_mouse': [self.b.pk, self.a.pk, self.a.pk], 'mouse_editor_tab': 'family',
         })

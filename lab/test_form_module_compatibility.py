@@ -44,8 +44,8 @@ class FormModuleCompatibilityTests(SimpleTestCase):
             "ProjectForm": ["name", "lab_member", "description", "start_date", "end_date", "active"],
             "ExperimentForm": ["name", "description", "start_date", "end_date", "archived", "recording_type_query"],
             "RecordingForm": ["mice", "recording_date", "data_paths", "notes"],
-            "MouseEditForm": ["date_of_birth", "marking_type", "tattoo", "breeding_pair", "crossing_definition", "sex", "status", "protocol_start_date", "cull_date", "protocol", "severity", "notes"],
-            "LitterCreateForm": ["marking_type", "no_id_available", "mouse_id_prefix", "mouse_numbers", "breeding_pair", "date_of_birth", "crossing_definition", "status", "protocol", "protocol_start_date", "cull_date", "severity", "notes", "procedure_drafts"],
+            "MouseEditForm": ["date_of_birth", "marking_type", "tattoo", "breeding_pair", "crossing_definition", "sex", "colour", "status", "protocol_start_date", "cull_date", "protocol", "severity", "notes"],
+            "LitterCreateForm": ["marking_type", "no_id_available", "mouse_id_prefix", "mouse_numbers", "breeding_pair", "colour", "date_of_birth", "crossing_definition", "status", "protocol", "protocol_start_date", "cull_date", "severity", "notes", "procedure_drafts"],
             "BaseProcedureForm": ["procedure_type", "date", "lab_member", "lab_book_page"],
         }
         for name, names in expected.items():

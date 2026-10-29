@@ -50,6 +50,43 @@ def summary_field(label, mice, values, keys=None):
     }
 
 
+def animal_genotype_details(mouse, labels):
+    """Use the same complete genotype presentation in summaries and reports."""
+    crossing = mouse.crossing_definition
+    lines = [membership.line for membership in crossing.crossing_lines.all()] if crossing else []
+    line_ids = {line.pk for line in lines}
+    calls = {call.mouse_line_id: call for call in mouse.genotype_calls.all()}
+    results = []
+    for line in lines:
+        call = calls.get(line.pk)
+        code = call.zygosity if call else "unknown"
+        results.append({
+            "line_id": line.pk,
+            "code": code,
+            "label": line.name,
+            "value": labels.get(code, code),
+            "uncertain": bool(call and call.is_uncertain),
+        })
+    # Retain historical calls even if they are no longer part of the crossing.
+    for call in calls.values():
+        if call.mouse_line_id not in line_ids:
+            results.append({
+                "line_id": call.mouse_line_id,
+                "code": call.zygosity,
+                "label": call.mouse_line.name,
+                "value": labels.get(call.zygosity, call.zygosity),
+                "uncertain": call.is_uncertain,
+            })
+    legacy = mouse.genotype if not crossing else ""
+    genotype = "; ".join(
+        f"{result['label']}: {result['value']}" + (" (uncertain)" if result["uncertain"] else "")
+        for result in results
+    )
+    if legacy:
+        genotype = "; ".join(filter(None, [genotype, legacy]))
+    return results, legacy, genotype
+
+
 def build_animal_summary(mice):
     mice = list(mice)
     if not mice:
@@ -79,36 +116,7 @@ def build_animal_summary(mice):
     individual_rows = []
     genotypes = []
     for mouse in mice:
-        crossing = mouse.crossing_definition
-        lines = [membership.line for membership in crossing.crossing_lines.all()] if crossing else []
-        line_ids = {line.pk for line in lines}
-        calls = {call.mouse_line_id: call for call in mouse.genotype_calls.all()}
-        results = []
-        for line in lines:
-            call = calls.get(line.pk)
-            code = call.zygosity if call else "unknown"
-            results.append({
-                "line_id": line.pk,
-                "label": line.name,
-                "value": labels.get(code, code),
-                "uncertain": bool(call and call.is_uncertain),
-            })
-        # Retain historical calls even if they are no longer part of the crossing.
-        for call in calls.values():
-            if call.mouse_line_id not in line_ids:
-                results.append({
-                    "line_id": call.mouse_line_id,
-                    "label": call.mouse_line.name,
-                    "value": labels.get(call.zygosity, call.zygosity),
-                    "uncertain": call.is_uncertain,
-                })
-        legacy = mouse.genotype if not crossing else ""
-        genotype = "; ".join(
-            f"{result['label']}: {result['value']}" + (" (uncertain)" if result["uncertain"] else "")
-            for result in results
-        )
-        if legacy:
-            genotype = "; ".join(filter(None, [genotype, legacy]))
+        results, legacy, genotype = animal_genotype_details(mouse, labels)
         genotypes.append(genotype or "—")
         individual_rows.append({
             "mouse_id": mouse.pk,

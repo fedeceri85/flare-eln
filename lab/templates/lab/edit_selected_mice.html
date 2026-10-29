@@ -122,7 +122,7 @@
     </form>
 
     <section class="bulk-section procedure-editor" id="mouse-panel-procedures" data-mouse-tab-panel="procedures">
-        {% include "lab/components/new_procedure_editor.html" %}
+        {% include "lab/components/litter_procedure_editor.html" with procedure_editor_scope="animal" %}
     </section>
 
     <section class="bulk-section procedure-editor" id="mouse-panel-existing-procedures" data-mouse-tab-panel="procedures">
@@ -146,7 +146,7 @@
     <script src="{% static 'lab/shared_mouse_details.js' %}"></script>
     <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=preserve-edit-tab-1"></script>
     <script src="{% static 'lab/existing_procedures.js' %}"></script>
-    <script src="{% static 'lab/new_procedures.js' %}"></script>
+    <script src="{% static 'lab/litter_procedures.js' %}?v=pending-animal-procedures-1"></script>
     <script src="{% static 'lab/new_animal_recording.js' %}"></script>
     {% include "lab/components/crossing_selector_assets.html" %}
     <script src="{% static 'lab/mouse_row_editor.js' %}?v=litter-overrides-1"></script>

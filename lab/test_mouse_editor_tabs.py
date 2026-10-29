@@ -50,7 +50,7 @@ class MouseEditorTabTests(TestCase):
                 creation = html.find("select", name="new_procedure-procedure_type")[0]
                 self.assertTrue(creation.within("section", id="mouse-panel-procedures"))
                 self.assertFalse(creation.within("form", id="primary-form"))
-                self.assertTrue(creation.within("form", id="new-procedure-form"))
+                self.assertTrue(creation.within("form", id="litter-procedure-form"))
                 existing_form = html.find("form", **{"data-existing-procedure-editor": None})[0]
                 self.assertTrue(existing_form.within("section", id="mouse-panel-existing-procedures"))
                 self.assertFalse(existing_form.within("form", id="primary-form"))

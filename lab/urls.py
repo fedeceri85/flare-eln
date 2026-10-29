@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from .views import parentage as parentage_views
 from .views.maintenance import maintenance
 from .views import sharing as sharing_views
+from .views.animal_reports import animal_report
+from .views.recording_reports import recording_report
 from django.urls import path, register_converter
 
 from . import converters, views
@@ -18,6 +20,8 @@ def protected(view):
 
 
 urlpatterns = [
+    path("projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/report/", protected(recording_report), name="recording_report"),
+    path("mice/report/", protected(animal_report), name="animal_report"),
     path("s/<str:code>/", protected(sharing_views.shared_view), name="shared_view"),
     path("share/open/", protected(sharing_views.open_share_code), name="open_share_code"),
     path("share/animals/", protected(sharing_views.create_animal_share), name="create_animal_share"),

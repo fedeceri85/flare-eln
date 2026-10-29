@@ -1,14 +1,16 @@
+import json
 from datetime import date
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from .forms import BulkMouseUpdateForm, individual_mouse_field_prefix
 from .models import Mouse, Procedure, ProcedureType, Protocol
-from .procedure_bulk import handle_create_procedures
 from .test_navigation import Markup
+from .views.mice import apply_bulk_mouse_updates
 
 
 @override_settings(ALLOWED_HOSTS=["testserver"])
@@ -23,99 +25,90 @@ class BulkProcedureCreationTests(TestCase):
         self.urls = [reverse("lab:edit_selected_mice_all"), reverse("lab:edit_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])]
         self.url = self.urls[0]
 
-    def payload(self, **extra):
-        return {"create_procedures": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
-                "new_procedure-procedure_type": self.kind.pk, "new_procedure-date": "2026-10-21",
-                "new_procedure-lab_member": "AB", "new_procedure-lab_book_page": "007", **extra}
+    def draft(self, **extra):
+        return {"procedure_type": self.kind.pk, "date": "2026-10-21", "lab_member": "AB", "lab_book_page": "007", **extra}
 
-    def post(self, data):
-        return self.client.post(self.url, data, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+    def payload(self, drafts=None, **extra):
+        return {"apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
+                "procedure_drafts": json.dumps([self.draft()] if drafts is None else drafts), **extra}
 
-    def test_independent_form_with_inline_add_button_on_both_routes(self):
+    def test_pending_editor_is_separate_but_queue_belongs_to_main_form(self):
         for url in self.urls:
             response = self.client.get(url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
             html = Markup(response.content.decode())
+            queue = html.find("input", name="procedure_drafts")[0]
+            self.assertTrue(queue.within("form", id="primary-form"))
             control = html.find("select", name="new_procedure-procedure_type")[0]
-            self.assertTrue(control.within("form", id="new-procedure-form"))
+            self.assertTrue(control.within("form", id="litter-procedure-form"))
             self.assertFalse(control.within("form", id="primary-form"))
-            add = next(node for node in html.find("button") if node.text.strip() == "Add procedure")
-            self.assertTrue(add.within("fieldset", **{"data-new-procedure-inputs": None}))
-            self.assertTrue(add.within("form", id="new-procedure-form"))
+            self.assertContains(response, "Pending procedures")
             for form in html.find("form"):
                 self.assertFalse(form.within("form"))
+        self.assertFalse(Procedure.objects.exists())
 
-    def test_creation_updates_only_procedures_and_refreshes_existing_list_on_both_routes(self):
-        original = Procedure.objects.create(mouse=self.mice[0], procedure_type=self.kind, notes="Original procedure")
+    def test_procedure_only_save_commits_without_animal_changes_on_both_routes(self):
         for url in self.urls:
-            self.url = url
-            before = Procedure.objects.count()
-            response = self.post(self.payload(apply_bulk_edit="1", update_status="on", status="Culled",
-                                               notes_action="replace", notes="Wrong", update_protocol="on", protocol=self.restricted.pk))
-            self.assertEqual(response.status_code, 200, response.content)
-            self.assertEqual(Procedure.objects.count(), before + 2)
-            self.assertIn("Added 2 procedure records", response.json()["creation_html"])
-            self.assertIn("New procedure type", response.json()["existing_html"])
-            self.assertIn("existing_procedures-delete_snapshot_", response.json()["existing_html"])
-            created = Procedure.objects.filter(lab_member="AB")
-            self.assertTrue(all(record.date == date(2026, 10, 21) and record.lab_book_page == "007" for record in created))
-            for mouse in self.mice:
-                mouse.refresh_from_db()
-                self.assertEqual((mouse.status, mouse.notes, mouse.protocol_id), ("Alive", "Keep notes", self.protocol.pk))
-            original.refresh_from_db()
-            self.assertEqual(original.notes, "Original procedure")
-
-    def test_main_save_ignores_new_and_legacy_procedure_values(self):
-        for url in self.urls:
-            data = self.payload(apply_bulk_edit="1", update_status="on", status="Culled",
-                                procedure_type=self.kind.pk, procedure_date="invalid",
-                                **{"new_procedure-date": "invalid"})
-            del data["create_procedures"]
-            response = self.client.post(url, data)
+            response = self.client.post(url, self.payload())
             self.assertEqual(response.status_code, 302)
-            self.assertEqual(Procedure.objects.count(), 0)
-            self.assertTrue(all(Mouse.objects.get(pk=mouse.pk).status == "Culled" for mouse in self.mice))
-
-    def test_validation_is_inline_and_does_not_save(self):
-        for extra in ({"new_procedure-procedure_type": ""}, {"new_procedure-procedure_type": "99999"},
-                      {"new_procedure-date": "invalid"}, {"new_procedure-lab_member": "X" * 101}):
-            response = self.post(self.payload(**extra))
-            self.assertEqual(response.status_code, 400)
-            self.assertIn("error-summary", response.json()["creation_html"])
-            self.assertNotIn("existing_html", response.json())
-        self.assertEqual(Procedure.objects.count(), 0)
-
-    def test_optional_values_can_be_blank(self):
-        response = self.post(self.payload(**{"new_procedure-date": "", "new_procedure-lab_member": "", "new_procedure-lab_book_page": ""}))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Procedure.objects.count(), 4)
         for record in Procedure.objects.all():
-            self.assertIsNone(record.date)
-            self.assertEqual((record.lab_member, record.lab_book_page), ("", ""))
+            self.assertEqual((record.date, record.lab_member, record.lab_book_page), (date(2026, 10, 21), "AB", "007"))
+        for mouse in self.mice:
+            mouse.refresh_from_db()
+            self.assertEqual((mouse.status, mouse.notes, mouse.protocol_id), ("Alive", "Keep notes", self.protocol.pk))
 
-    def test_creation_protocol_restrictions_are_checked_against_persisted_mice(self):
-        Mouse.objects.filter(pk=self.mice[1].pk).update(protocol=self.restricted)
-        response = self.post(self.payload(update_protocol="on", protocol=self.protocol.pk))
+    def test_empty_save_can_finish_after_recordings_or_existing_procedures_saved(self):
+        for url in self.urls:
+            self.assertEqual(self.client.post(url, self.payload([])).status_code, 302)
+        self.assertFalse(Procedure.objects.exists())
+
+    def test_old_immediate_creation_post_no_longer_commits(self):
+        response = self.client.post(self.url, {"create_procedures": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
+                                              "new_procedure-procedure_type": self.kind.pk}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(Procedure.objects.count(), 0)
-        self.assertIn("creation is disabled", response.json()["creation_html"])
+        self.assertFalse(Procedure.objects.exists())
 
-    def test_missing_or_wrong_protocol_mouse_selection_cannot_create(self):
-        response = self.post(self.payload(selected_mouse=["missing"]))
+    def test_multiple_procedures_and_animal_changes_commit_together(self):
+        response = self.client.post(self.url, self.payload([self.draft(), self.draft(lab_member="CD")],
+                                                         update_status="on", status="Culled"))
         self.assertEqual(response.status_code, 302)
-        outside = Mouse.objects.create(mouse_id="Outside", protocol=self.restricted)
-        self.url = self.urls[1]
-        response = self.post(self.payload(selected_mouse=[self.mice[0].pk, outside.pk]))
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(Procedure.objects.count(), 0)
+        self.assertEqual(Procedure.objects.count(), 4)
+        self.assertEqual(set(Procedure.objects.values_list("lab_member", flat=True)), {"AB", "CD"})
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Culled"})
 
-    def test_scope_is_rechecked_after_initial_mouse_lookup(self):
+    def test_validation_keeps_pending_list_and_never_partially_saves(self):
+        for invalid in ({"procedure_type": "999999"}, {"date": "invalid"}, {"lab_member": "X" * 101}):
+            drafts = [self.draft(**invalid)]
+            response = self.client.post(self.url, self.payload(drafts, update_status="on", status="Culled"))
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("procedure_drafts", response.context["form"].errors)
+            self.assertEqual(json.loads(response.context["form"]["procedure_drafts"].value()), drafts)
+            self.assertFalse(Procedure.objects.exists())
+            self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Alive"})
+        response = self.client.post(self.url, self.payload(update_protocol="on", protocol="999999"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.context["form"]["procedure_drafts"].value()), [self.draft()])
+        self.assertFalse(Procedure.objects.exists())
+
+    def test_final_protocol_restrictions_block_all_changes(self):
+        response = self.client.post(self.url, self.payload(update_protocol="on", protocol=self.restricted.pk,
+                                                         update_status="on", status="Culled"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("procedure_drafts", response.context["form"].errors)
+        self.assertFalse(Procedure.objects.exists())
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Alive"})
+        self.assertEqual(set(Mouse.objects.values_list("protocol_id", flat=True)), {self.protocol.pk})
+
+    def test_protocol_rechecked_at_commit_after_concurrent_change(self):
+        form = BulkMouseUpdateForm(self.payload(), selected_mice=self.mice)
+        self.assertTrue(form.is_valid(), form.errors)
         Mouse.objects.filter(pk=self.mice[1].pk).update(protocol=self.restricted)
-        request = RequestFactory().post(self.urls[1], self.payload(), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
-        request.user = self.user
-        response = handle_create_procedures(request, self.mice, self.protocol)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(Procedure.objects.count(), 0)
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            apply_bulk_mouse_updates(self.mice, form)
+        self.assertFalse(Procedure.objects.exists())
 
-    def test_database_error_rolls_back_all_created_records(self):
+    def test_database_failure_rolls_back_procedures_and_animal_changes(self):
         create = Procedure.objects.create
         calls = []
         def fail_on_second(**kwargs):
@@ -124,12 +117,25 @@ class BulkProcedureCreationTests(TestCase):
                 raise IntegrityError("simulated")
             return create(**kwargs)
         with patch.object(Procedure.objects, "create", side_effect=fail_on_second):
-            response = self.post(self.payload())
-        self.assertEqual(response.status_code, 409)
-        self.assertEqual(Procedure.objects.count(), 0)
-        self.assertIn("No procedures were added", response.json()["creation_html"])
+            response = self.client.post(self.url, self.payload(update_status="on", status="Culled"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No changes were saved")
+        self.assertFalse(Procedure.objects.exists())
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Alive"})
+        self.assertEqual(json.loads(response.context["form"]["procedure_drafts"].value()), [self.draft()])
 
-    def test_native_post_cannot_add_and_lose_unsaved_mouse_inputs(self):
-        response = self.client.post(self.url, self.payload())
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(Procedure.objects.count(), 0)
+    def test_renamed_animals_receive_pending_procedures(self):
+        name = individual_mouse_field_prefix(self.mice[0]) + "_mouse_id"
+        response = self.client.post(self.url, self.payload(confirm_mouse_ids="on", **{name: "Renamed animal"}))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(set(Procedure.objects.values_list("mouse_id", flat=True)), {"Renamed animal", self.mice[1].pk})
+
+    def test_optional_details_and_malformed_lists(self):
+        response = self.client.post(self.url, self.payload([self.draft(date="", lab_member="", lab_book_page="")]))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(all(record.date is None and record.lab_member == "" and record.lab_book_page == "" for record in Procedure.objects.all()))
+        for value in ('{}', '[null]', 'invalid', json.dumps([self.draft()] * 101)):
+            response = self.client.post(self.url, self.payload([], procedure_drafts=value))
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("procedure_drafts", response.context["form"].errors)
+        self.assertEqual(Procedure.objects.count(), 2)

@@ -65,6 +65,25 @@ class SpreadsheetImportTests(TestCase):
     def url(self, draft=None):
         return reverse("lab:import_recordings_draft" if draft else "lab:import_recordings", args=[self.project.pk, self.experiment.pk, *([draft.pk] if draft else [])])
 
+    def test_colour_import_creates_animals_and_requires_approval_for_existing(self):
+        for heading in ("Colour", "Color", "Coat colour", "Coat color"):
+            with self.subTest(heading=heading):
+                draft = self.draft(f"Date,Animal ID,{heading}\n28.04.26,OFFICIAL-1,Black\n")
+                self.assertIn("animal:colour", draft.configuration["bindings"])
+                preview = self.reviewed(draft)
+                commit_import(draft.pk, self.user, self.experiment, [])
+                self.mouse.refresh_from_db()
+                self.assertEqual(self.mouse.colour, "")
+        draft = self.draft("Date,Animal ID,Colour\n28.04.26,OFFICIAL-1,Black\n28.04.26,NEW-COLOUR,Brown and white\n")
+        draft.configuration["defaults"].update(protocol_id=self.protocol.pk, crossing_id=self.crossing.pk)
+        preview = self.reviewed(draft)
+        approvals = [change["token"] for change in preview["changes"] if change["field"] == "colour"]
+        self.assertEqual(len(approvals), 1)
+        commit_import(draft.pk, self.user, self.experiment, approvals)
+        self.mouse.refresh_from_db()
+        self.assertEqual(self.mouse.colour, "Black")
+        self.assertEqual(Mouse.objects.get(pk="NEW-COLOUR").colour, "Brown and white")
+
     def test_supplied_genotyping_workbook(self):
         path = Path(__file__).resolve().parents[2] / "docs" / "EAR CLIP SHEET Gria2 x GCaMP6f x NeuroD1-cre 16.10.26.xlsx"
         with path.open("rb") as file:

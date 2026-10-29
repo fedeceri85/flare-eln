@@ -126,6 +126,8 @@ def group_details(draft, table, group):
                 convert = lambda value: {"m": "M", "male": "M", "f": "F", "female": "F"}.get(str(value).casefold(), value)
             elif key == "status":
                 convert = lambda value: {s.casefold(): s for s, _ in Mouse.STATUS_CHOICES}.get(str(value).casefold(), value)
+            elif key == "colour":
+                convert = lambda value: typed_value(str(value).strip(), MouseEditForm.base_fields["colour"], definition["date_order"])
             elif key == "severity":
                 convert = lambda value: typed_value(str(value).strip(), MouseEditForm.base_fields["severity"], definition["date_order"])
             if key in {"mother_external_id", "father_external_id"}:

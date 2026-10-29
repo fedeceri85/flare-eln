@@ -108,6 +108,9 @@ def animal_summary_context(request, mice, *, summary_url, edit_url):
     return {
         **summary,
         "selected_mice": mice,
+        "animal_report_url": url_with_query_params(
+            reverse("lab:animal_report"), selected_mouse=[mouse.pk for mouse in mice], return_url=summary_url,
+        ),
         "share_animals_url": url_with_query_params(
             reverse("lab:create_animal_share"), selected_mouse=[mouse.pk for mouse in mice],
         ),

@@ -3,7 +3,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const stored = document.getElementById("id_procedure_drafts");
     if (!form || !stored) return;
     const importing = form.dataset?.procedureScope === "import";
-    const scope = importing ? "import" : "litter";
+    const editingAnimals = form.dataset?.procedureScope === "animal";
+    const scope = importing ? "import" : editingAnimals ? "selection" : "litter";
     const names = ["procedure_type", "date", "lab_member", "lab_book_page"];
     const fields = Object.fromEntries(names.map(name => [name, form.elements.namedItem("new_procedure-" + name)]));
     const rows = document.querySelector("[data-litter-procedures-rows]");
@@ -83,9 +84,34 @@ document.addEventListener("DOMContentLoaded", function () {
         else drafts.push(draft);
         reset();
         render(true);
-        const save = importing ? "complete the import" : "save the litter";
+        const save = importing ? "complete the import" : editingAnimals ? "press Save changes" : "save the litter";
         status.textContent = updated ? "Procedure updated. " + save[0].toUpperCase() + save.slice(1) + " to create these records." : "Procedure added. Add another, or " + save + " to create these records.";
     });
     cancel.querySelector("button").addEventListener("click", () => { reset(); status.textContent = "Editing cancelled."; });
+    if (editingAnimals) {
+        let saving = false;
+        stored.form.addEventListener("submit", event => {
+            if (saving) {
+                event.preventDefault();
+                return;
+            }
+            if (editing !== null) {
+                event.preventDefault();
+                status.textContent = "Update the procedure or cancel editing it before saving.";
+                document.querySelector('[data-mouse-tab="procedures"]')?.click();
+                fields.procedure_type.focus();
+                return;
+            }
+            saving = true;
+            Promise.resolve().then(() => { if (event.defaultPrevented) saving = false; });
+        });
+        window.addEventListener("pageshow", () => { saving = false; });
+        window.addEventListener("beforeunload", event => {
+            if (drafts.length && !saving) {
+                event.preventDefault();
+                event.returnValue = "";
+            }
+        });
+    }
     render();
 });

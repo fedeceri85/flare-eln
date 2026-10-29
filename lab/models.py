@@ -271,6 +271,7 @@ class Mouse(models.Model):
     ]
     marking_type = models.CharField(max_length=10, choices=MARKING_CHOICES, default="other", verbose_name="Local ID type")
     tattoo = models.CharField(max_length=100, blank=True, verbose_name="Local identifier")
+    colour = models.CharField(max_length=100, blank=True, verbose_name="Colour")
     genotype = models.CharField(max_length=100, blank=True)
     crossing = models.CharField(max_length=100, blank=True)
     breeding_pair = models.CharField(max_length=100, blank=True)

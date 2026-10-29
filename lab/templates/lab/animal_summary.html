@@ -18,6 +18,7 @@
             {% include "lab/components/mouse_editor_tabs.html" %}
             <a class="button button-primary" href="{{ edit_animals_url }}" data-mouse-summary-edit>Edit animals</a>
             <button type="button" class="button button-share" data-share-url="{{ share_animals_url }}" data-share-animals>{% include "lab/components/share_icon.html" %} Share animal{% if selected_mice|length != 1 %}s{% endif %}</button>
+            <a class="button button-report" href="{{ animal_report_url }}" data-animal-report>Generate report</a>
         </div>
 
         <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared">

@@ -86,6 +86,12 @@ class LitterIdentityTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         return form
 
+    def test_colour_is_saved_with_individual_overrides(self):
+        form = self.valid_form(colour="Brown", pup_2_override_colour_enabled="on",
+                               pup_2_override_colour="White")
+        mice, _ = create_litter_mice(self.protocol, form)
+        self.assertEqual([mouse.colour for mouse in mice], ["Brown", "White"])
+
     def test_form_replaces_old_controls_and_includes_other(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)

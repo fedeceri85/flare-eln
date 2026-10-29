@@ -140,6 +140,12 @@ MICE_PAGE_TABLE_COLUMN_SPECS = [
         "cell_class": "compact-text-cell",
     },
     {
+        "key": "colour",
+        "label": "Colour",
+        "sort": "colour",
+        "cell_class": "compact-text-cell",
+    },
+    {
         "key": "get_sex_display",
         "label": "Sex",
         "sort": "sex",
@@ -1172,10 +1178,8 @@ def build_recordings_table(
                                 "aria_label": f"Select recording {recording.pk}",
                                 "checked": is_selected,
                             }
-                            if can_modify
-                            else None
                         ),
-                        "value": EMPTY_VALUE if not can_modify else "",
+                        "value": "",
                     },
                     *base_cells,
                     *[

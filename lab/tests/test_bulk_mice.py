@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from urllib.parse import parse_qs, urlencode, urlsplit
 from django.test import override_settings
@@ -129,7 +130,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
 
         adds = [button for button in html.find("button") if button.text.strip() == "Add procedure"]
         self.assertEqual(len(adds), 1)
-        self.assertTrue(adds[0].within("form", id="new-procedure-form"))
+        self.assertTrue(adds[0].within("form", id="litter-procedure-form"))
         self.assertFalse(adds[0].within("form", id="primary-form"))
         self.assertTrue(adds[0].within("section", id="mouse-panel-procedures"))
         service_cells = [cell for cell in html.find("td") if cell.text.strip() == "Genotyping"
@@ -938,18 +939,16 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         response = self.client.post(
             reverse("lab:edit_selected_mice_all") + "?" + urlencode({"selected_mouse": self.mouse_1.pk}),
             {
-                "create_procedures": "1",
+                "apply_bulk_edit": "1",
                 "return_url": self.return_url,
                 "selected_mouse": [self.mouse_1.pk],
-                "new_procedure-procedure_type": self.procedure_type.pk,
-                "new_procedure-date": "2026-07-20",
-                "new_procedure-lab_member": "AB",
-                "new_procedure-lab_book_page": "42",
+                "procedure_drafts": json.dumps([{"procedure_type": self.procedure_type.pk,
+                                                  "date": "2026-07-20", "lab_member": "AB", "lab_book_page": "42"}]),
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         procedure = Procedure.objects.get(
             mouse=self.mouse_1,
             procedure_type=self.procedure_type,
@@ -970,18 +969,16 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         response = self.client.post(
             reverse("lab:edit_selected_mice_all") + "?" + urlencode({"selected_mouse": self.mouse_1.pk}),
             {
-                "create_procedures": "1",
+                "apply_bulk_edit": "1",
                 "return_url": self.return_url,
                 "selected_mouse": [self.mouse_1.pk],
-                "new_procedure-procedure_type": self.procedure_type.pk,
-                "new_procedure-date": "2026-07-21",
-                "new_procedure-lab_member": "CD",
-                "new_procedure-lab_book_page": "99",
+                "procedure_drafts": json.dumps([{"procedure_type": self.procedure_type.pk,
+                                                  "date": "2026-07-21", "lab_member": "CD", "lab_book_page": "99"}]),
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(
             Procedure.objects.filter(
                 mouse=self.mouse_1,

@@ -28,6 +28,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
     MOUSE_FIELDS = [
         "date_of_birth",
         "breeding_pair",
+        "colour",
         "crossing_search",
         "status",
         "protocol",
@@ -59,6 +60,8 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         required=False, max_length=100, label="Breeding pair",
         help_text="Required when No ID available is checked.",
     )
+
+    colour = forms.CharField(required=False, max_length=100, label="Colour")
 
     date_of_birth = forms.DateField(
         required=False,
@@ -213,7 +216,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
     def configure_individual_detail_overrides(self):
         self.individual_detail_rows = []
         self.individual_detail_fields = {}
-        names = ["date_of_birth", "breeding_pair", "status", "severity", "cull_date",
+        names = ["date_of_birth", "breeding_pair", "colour", "status", "severity", "cull_date",
                  "protocol", "protocol_start_date", "crossing_definition", "notes"]
         for number in self.numbers:
             items = []
@@ -267,7 +270,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
 
     def individual_values(self, number):
         values = {name: self.cleaned_data.get(name) for name in
-                  ("date_of_birth", "breeding_pair", "status", "severity", "cull_date", "protocol",
+                  ("date_of_birth", "breeding_pair", "colour", "status", "severity", "cull_date", "protocol",
                    "protocol_start_date", "crossing_definition", "notes")}
         for item in self.individual_detail_fields.get(number, []):
             if self.cleaned_data.get(item["checkbox"].name):
@@ -340,7 +343,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         return [
             {"title": title, "fields": [self[name] for name in names]}
             for title, names in (
-                ("Origin", ("date_of_birth", "breeding_pair")),
+                ("Origin", ("date_of_birth", "breeding_pair", "colour")),
                 ("Animal status", ("status", "severity", "cull_date")),
                 ("Protocol", ("protocol", "protocol_start_date")),
             )

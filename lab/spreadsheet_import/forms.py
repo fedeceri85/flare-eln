@@ -232,6 +232,7 @@ class AnimalsForm(forms.Form):
                 "mouse_id": forms.CharField(required=False, label="Animal ID (unique)", max_length=100, widget=forms.TextInput(attrs={"data-import-animal-search": reverse("lab:mouse_lookup"), "autocomplete": "off"})),
                 "date_of_birth": forms.DateField(required=False, label="Birth date override", widget=forms.DateInput(attrs={"type": "date"})),
                 "tattoo": forms.CharField(required=False, max_length=100, label="Local identifier override (tattoo, ear clip)"),
+                "colour": forms.CharField(required=False, max_length=100, label="Colour override"),
                 "breeding_pair": forms.CharField(required=False, max_length=100, label="Breeding pair override"),
                 "sex": forms.ChoiceField(required=False, choices=[("", "Use mapped value"), *Mouse.SEX_CHOICES], label="Sex override"),
                 "status": forms.ChoiceField(required=False, choices=[("", "Use mapped value / Alive for new animals"), *Mouse.STATUS_CHOICES], label="Status override"),
@@ -306,7 +307,7 @@ class AnimalsForm(forms.Form):
             action = self.cleaned_data[f"{key}_mode"]
             result = {"mode": "link" if action == "link" else "create", "mouse_id": self.cleaned_data.get(f"{key}_mouse_id", "") if action != "generate" else "", "generate_id": action == "generate"}
             details = {}
-            for name in ("date_of_birth", "tattoo", "breeding_pair", "sex", "status", "cull_date", "severity", "protocol", "crossing_definition", "mother_external_id", "father_external_id"):
+            for name in ("date_of_birth", "tattoo", "breeding_pair", "sex", "colour", "status", "cull_date", "severity", "protocol", "crossing_definition", "mother_external_id", "father_external_id"):
                 value = self.cleaned_data.get(f"{key}_{name}", "")
                 if value is None:
                     value = ""

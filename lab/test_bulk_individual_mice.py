@@ -53,6 +53,14 @@ class BulkIndividualMouseTests(TestCase):
             mouse.refresh_from_db()
         return form
 
+    def test_colour_shared_update_individual_override_and_clear(self):
+        self.apply({"update_colour": "on", "colour": "Black",
+                    self.name(1, "override_colour_enabled"): "on",
+                    self.name(1, "override_colour"): "Black and white"})
+        self.assertEqual([mouse.colour for mouse in self.mice], ["Black", "Black and white"])
+        self.apply({"update_colour": "on", "colour": ""})
+        self.assertEqual([mouse.colour for mouse in self.mice], ["", ""])
+
     def set_local_identifiers(self, values=("001", "left-right")):
         for mouse, value in zip(self.mice, values):
             mouse.tattoo = value

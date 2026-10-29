@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from .forms import BulkProcedureCreateForm, ExistingProcedureBulkForm
+from .forms import ExistingProcedureBulkForm
 from .models import Mouse, Procedure, ProcedureType
 
 SALT = "lab.existing-procedure-bulk.v1"
@@ -177,52 +177,3 @@ def handle_procedure_action(request, mice, protocol=None, return_url=""):
         "ok": status == 200,
         "html": render_to_string("lab/components/existing_procedure_editor.html", context, request=request),
     }, status=status)
-
-
-def creation_context(mice, form=None, return_url="", message=""):
-    return {
-        "new_procedure_form": form if form is not None else BulkProcedureCreateForm(),
-        "new_procedure_mice": mice,
-        "new_procedure_return_url": return_url,
-        "new_procedure_message": message,
-        "can_add_new_procedure": all(mouse.protocol.allows_regulated_procedures for mouse in mice),
-    }
-
-
-def handle_create_procedures(request, mice, protocol=None, return_url=""):
-    form = BulkProcedureCreateForm(request.POST)
-    status = 400
-    message = ""
-    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
-        form.add_error(None, "Enable JavaScript to add procedures without leaving the animal editor.")
-    elif form.is_valid():
-        try:
-            with transaction.atomic():
-                current_mice = list(Mouse.objects.select_for_update().select_related("protocol").filter(
-                    pk__in=[mouse.pk for mouse in mice],
-                ).order_by("pk"))
-                if len(current_mice) != len(mice) or (protocol and any(mouse.protocol_id != protocol.pk for mouse in current_mice)):
-                    raise ValidationError("The animal selection changed. Review the selected animals before adding procedures.")
-                if any(not mouse.protocol.allows_regulated_procedures for mouse in current_mice):
-                    raise ValidationError("Regulated procedure creation is disabled for one or more selected animals.")
-                values = {name: form.cleaned_data[name] for name in form.Meta.fields}
-                for mouse in current_mice:
-                    Procedure.objects.create(mouse=mouse, **values)
-            message = f"Added {len(mice)} procedure records. Animal changes have not been saved."
-            form = BulkProcedureCreateForm()
-            status = 200
-        except ValidationError as error:
-            form.add_error(None, error)
-        except IntegrityError:
-            form.add_error(None, "No procedures were added. Review the procedure details and try again.")
-            status = 409
-    result = {"ok": status == 200, "creation_html": render_to_string(
-        "lab/components/new_procedure_editor.html",
-        creation_context(mice, form, return_url, message), request=request,
-    )}
-    if status == 200:
-        result["existing_html"] = render_to_string(
-            "lab/components/existing_procedure_editor.html",
-            editor_context(request, mice, protocol, return_url=return_url), request=request,
-        )
-    return JsonResponse(result, status=status)

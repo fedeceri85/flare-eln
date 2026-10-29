@@ -1,0 +1,19 @@
+{% extends "lab/base.html" %}
+{% block title %}Export recordings{% endblock %}
+{% block page_title %}Export recordings{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block page_subtitle %}<p>{{ project.name }} — {{ experiment.name }}</p>{% endblock %}
+{% block content %}
+    <p>{{ total_count }} recording{{ total_count|pluralize }} in this experiment; {{ selected_count }} selected.</p>
+    <p>Entire experiment includes all pages and recordings hidden by filters. The report includes all configured recording fields, including hidden and retired fields, plus recording paths and notes.</p>
+    <form method="post" action="{% url 'lab:recording_report' project.pk experiment.pk %}" class="form-card">
+        {% csrf_token %}
+        {% for recording_id in selected_ids %}<input type="hidden" name="selected_recording" value="{{ recording_id }}">{% endfor %}
+        <input type="hidden" name="return_url" value="{{ return_url }}">
+        {% include "lab/components/form_fields.html" %}
+        <div class="actions">
+            <button class="button button-primary" type="submit" name="download" value="1">Download report</button>
+            <a class="button" href="{{ return_url }}">Back to recordings</a>
+        </div>
+    </form>
+{% endblock %}

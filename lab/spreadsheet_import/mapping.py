@@ -18,6 +18,7 @@ ANIMAL_FIELDS = [
     ("mother_external_id", "Mother ID", ["mum", "mum id", "mother", "mother id", "dam", "dam id"]),
     ("father_external_id", "Father ID", ["dad", "dad id", "father", "father id", "sire", "sire id"]),
     ("sex", "Sex", ["sex"]),
+    ("colour", "Colour", ["colour", "color", "coat colour", "coat color", "fur colour", "fur color"]),
     ("crossing", "Strain / crossing", ["strain", "crossing"]),
     ("notes", "Animal notes", ["animal notes"]),
     ("status", "Animal status", ["status"]),

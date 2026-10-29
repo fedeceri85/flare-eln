@@ -14,6 +14,7 @@ from ..models import (
     genotype_category_choices,
 )
 from .parentage import configure_parent_controls, clean_parent_controls
+from .procedures import validate_procedure_drafts
 from .genetics import (
     active_crossings_queryset,
     crossing_choice_label,
@@ -25,8 +26,13 @@ from .genetics import (
 
 
 class BulkMouseUpdateForm(forms.Form):
+    procedure_drafts = forms.JSONField(required=False, initial=list, widget=forms.HiddenInput)
+
+    def clean_procedure_drafts(self):
+        return validate_procedure_drafts(self.cleaned_data.get("procedure_drafts"))
+
     MOUSE_UPDATE_GROUPS = (
-        ("Origin", ("date_of_birth", "breeding_pair")),
+        ("Origin", ("date_of_birth", "breeding_pair", "colour")),
         ("Animal status", ("status", "severity", "cull_date")),
         ("Protocol", ("protocol", "protocol_start_date")),
     )
@@ -40,8 +46,12 @@ class BulkMouseUpdateForm(forms.Form):
         ("update_crossing", "crossing_search"),
         ("update_date_of_birth", "date_of_birth"),
         ("update_breeding_pair", "breeding_pair"),
+        ("update_colour", "colour"),
     ]
 
+
+    update_colour = forms.BooleanField(required=False, label="Update colour")
+    colour = forms.CharField(required=False, max_length=100, label="Colour")
 
     confirm_mouse_ids = forms.BooleanField(required=False, label="Confirm Animal ID changes")
 
@@ -534,22 +544,15 @@ class BulkMouseUpdateForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         cleaned_data["mouse_id_renames"] = self.clean_mouse_ids(cleaned_data)
-        has_parent_update = clean_parent_controls(self)
-        has_mouse_update = has_parent_update or bool(cleaned_data["mouse_id_renames"]) or any(
-            cleaned_data.get(update_field)
-            for update_field, _ in self.MOUSE_UPDATE_FIELDS
-        )
-        has_notes_update = cleaned_data.get("notes_action") in {"append", "replace"}
+        clean_parent_controls(self)
         if not self.single_mouse_mode and self.selected_crossing and any(
             uses_shared_genotype(self, line) and cleaned_data.get(genotype_field_name(line))
             for line in self.selected_crossing.ordered_lines()
         ):
             cleaned_data["update_genotype"] = True
         cleaned_data["individual_updates"] = self.clean_individual_updates(cleaned_data)
-        has_mouse_update = has_mouse_update or bool(cleaned_data["individual_updates"])
         update_crossing = cleaned_data.get("update_crossing")
         update_genotype = cleaned_data.get("update_genotype")
-        has_mouse_update = has_mouse_update or bool(update_genotype)
 
         if cleaned_data.get("update_status") and not cleaned_data.get("status") and "status" not in self.errors:
             self.add_error("status", "Select Alive or Culled.")
@@ -633,8 +636,12 @@ class BulkMouseUpdateForm(forms.Form):
                 "Enter notes to append, or choose Leave unchanged.",
             )
 
-        if not has_mouse_update and not has_notes_update:
-            raise forms.ValidationError("Select at least one animal change before saving.")
+        if cleaned_data.get("procedure_drafts"):
+            for mouse in self.selected_mice:
+                individual = cleaned_data["individual_updates"].get(mouse.pk, {}).get("fields", {})
+                protocol = individual.get("protocol", cleaned_data.get("protocol") if cleaned_data.get("update_protocol") else mouse.protocol)
+                if protocol is not None and not protocol.allows_regulated_procedures:
+                    self.add_error("procedure_drafts", f"{mouse.pk}: this animal’s protocol does not allow the pending procedures.")
 
         self.validate_local_identifiers(cleaned_data)
         return cleaned_data

@@ -29,6 +29,8 @@
 
             <a class="button" href="{% url 'lab:import_recordings' project.pk experiment.pk %}">Import from spreadsheet</a>
 
+            <button class="button" type="submit" form="selected-recording-form" formaction="{% url 'lab:recording_report' project.pk experiment.pk %}" name="configure_export" value="1">Export recordings</button>
+
             <button class="button button-danger" type="submit" form="selected-recording-form" formaction="{% url 'lab:delete_selected_recordings' project.pk experiment.pk %}">Delete selected</button>
         </div>
     </div>

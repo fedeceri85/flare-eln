@@ -1,0 +1,20 @@
+{% extends "lab/base.html" %}
+
+{% block title %}Generate animal report{% endblock %}
+{% block page_title %}Generate animal report{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block page_subtitle %}<p>{{ selected_mice|length }} animal{{ selected_mice|length|pluralize }} selected</p>{% endblock %}
+
+{% block content %}
+    <p>The report includes identifiers, sex, colour, birth date, breeding pair, parents, genotype and notes, grouped by strain. A share code links back to the selected animals.</p>
+    <form method="post" action="{% url 'lab:animal_report' %}" class="form-card">
+        {% csrf_token %}
+        {% for mouse in selected_mice %}<input type="hidden" name="selected_mouse" value="{{ mouse.pk }}">{% endfor %}
+        <input type="hidden" name="return_url" value="{{ return_url }}">
+        {% include "lab/components/form_fields.html" %}
+        <div class="actions">
+            <button class="button button-primary" type="submit">Download report</button>
+            <a class="button" href="{{ return_url }}">Back to animal summary</a>
+        </div>
+    </form>
+{% endblock %}

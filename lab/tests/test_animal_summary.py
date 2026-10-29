@@ -51,6 +51,16 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         return response, Markup(response.content.decode())
 
+    def test_colour_is_visible_in_summary_and_editor(self):
+        self.mice[0].colour = "Black and white"
+        self.mice[0].save(update_fields=["colour"])
+        response, _ = self.summary()
+        self.assertContains(response, "Colour")
+        self.assertContains(response, "Black and white")
+        response = self.client.get(self.edit_url, {"selected_mouse": self.mice[0].pk})
+        self.assertContains(response, 'name="colour"')
+        self.assertContains(response, 'value="Black and white"')
+
     def test_summary_uses_familiar_tabs_and_has_no_editable_fields(self):
         response, markup = self.summary()
         self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")],
@@ -60,7 +70,11 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertIs(edit.parent, tablist.parent)
         share = markup.find("button", **{"data-share-animals": None})[0]
         siblings = [node for node in markup.elements if node.parent is edit.parent]
-        self.assertEqual(siblings[-2:], [edit, share])
+        report = markup.find("a", **{"data-animal-report": None})[0]
+        self.assertEqual(siblings[-3:], [edit, share, report])
+        report_url = urlsplit(report.attrs["href"])
+        self.assertEqual(report_url.path, reverse("lab:animal_report"))
+        self.assertEqual(parse_qs(report_url.query)["selected_mouse"], [mouse.pk for mouse in self.mice])
         share_url = urlsplit(share.attrs["data-share-url"])
         self.assertEqual(share_url.path, reverse("lab:create_animal_share"))
         self.assertEqual(parse_qs(share_url.query)["selected_mouse"], [mouse.pk for mouse in self.mice])
