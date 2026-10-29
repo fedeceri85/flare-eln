@@ -1082,6 +1082,7 @@ def build_recording_type_table(recording_type, recordings, *, include_animals=Fa
                     ],
                     {"class": "action-cell", "actions": [
                         {"value": "See in Experiment", "url": selected_recording_url(recording)},
+                        {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
                         *([recording_image_action(recording, attachment_counts[recording.pk])] if attachment_counts.get(recording.pk) else []),
                     ]},
                 ],
@@ -1195,6 +1196,7 @@ def build_recordings_table(
                         "class": "action-cell",
                         "actions": [
                             *([{"value": "View", "url": edit_url}] if can_modify else []),
+                            {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
                             *([recording_image_action(recording, image_count)] if image_count else []),
                         ],
                     },

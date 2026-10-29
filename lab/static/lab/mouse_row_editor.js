@@ -28,15 +28,30 @@
                 if (currentRequest !== requestNumber) return;
                 if (typeof result.html !== "string") throw new Error("Invalid preview");
                 // Keep edits made while the request was in flight, including unchecked boxes.
-                const live = new Map();
-                rows.querySelectorAll("input, select").forEach(function (field) {
-                    live.set(field.name, field.type === "checkbox" ? field.checked : field.value);
-                });
-                rows.innerHTML = result.html;
-                rows.querySelectorAll("input, select").forEach(function (field) {
-                    if (!live.has(field.name)) return;
-                    if (field.type === "checkbox") field.checked = live.get(field.name);
-                    else field.value = live.get(field.name);
+                const regions = [{element: rows, html: result.html}, ...(options.extraRegions || []).map(region => ({
+                    element: region.element, html: result[region.key],
+                }))];
+                regions.forEach(({element, html}) => {
+                    if (!element || typeof html !== "string") return;
+                    const live = new Map();
+                    const expanded = new Set();
+                    element.querySelectorAll("details[open]").forEach(detail => {
+                        const field = detail.querySelector("input, select, textarea");
+                        if (field) expanded.add(field.name);
+                    });
+                    element.querySelectorAll("input, select, textarea").forEach(field => {
+                        live.set(field.name, field.type === "checkbox" ? field.checked : field.value);
+                    });
+                    element.innerHTML = html;
+                    element.querySelectorAll("input, select, textarea").forEach(field => {
+                        if (!live.has(field.name)) return;
+                        if (field.type === "checkbox") field.checked = live.get(field.name);
+                        else field.value = live.get(field.name);
+                    });
+                    element.querySelectorAll("details").forEach(detail => {
+                        const field = detail.querySelector("input, select, textarea");
+                        if (field && expanded.has(field.name)) detail.open = true;
+                    });
                 });
                 if (options.afterRefresh) options.afterRefresh(result);
                 status.textContent = options.successMessage(result);
@@ -80,6 +95,7 @@
                 if (!pending) refresh();
             }
         });
+        return {refresh, scheduleRefresh};
     }
     window.MouseRowEditor = {create};
 })();

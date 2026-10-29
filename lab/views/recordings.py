@@ -1,6 +1,5 @@
 'Recordings views and helpers.'
 
-from urllib.parse import urlencode
 from uuid import uuid4
 
 from django.contrib import messages
@@ -92,7 +91,6 @@ def recording_mouse_selection_redirect(request, form, project, experiment, form_
     form_url = url_with_query_params(
         form_url,
         draft=token,
-        duplicate=request.GET.get("duplicate"),
         mice=recording_mice_query_value(form.selected_mouse_ids()),
         mouse=None,
     )
@@ -450,10 +448,6 @@ def recordings_page(request, project_pk, experiment_pk):
                 "lab:add_recording",
                 args=[project.pk, experiment.pk],
             ),
-            "duplicate_recording_url": reverse(
-                "lab:duplicate_recording",
-                args=[project.pk, experiment.pk],
-            ),
             "experiments_url": experiments_url,
             "experiments_link_label": experiments_link_label,
         },
@@ -599,18 +593,6 @@ def add_recording(request, project_pk, experiment_pk):
         )
         return redirect(recordings_url)
 
-    source_recording = None
-    duplicate_id = request.GET.get("duplicate")
-
-    if duplicate_id:
-        source_recording = recording_for_experiment_or_404(
-            experiment,
-            duplicate_id,
-        )
-        if source_recording.recording_type_id != experiment.recording_type_id:
-            raise Http404("Recording does not belong to this experiment type.")
-        require_recording_modify_permission(request.user, source_recording)
-
     media_form = RecordingImageUploadForm(
         request.POST if request.method == "POST" else None,
         request.FILES if request.method == "POST" else None,
@@ -646,7 +628,6 @@ def add_recording(request, project_pk, experiment_pk):
     else:
         form = RecordingForm(
             experiment=experiment,
-            source_recording=source_recording,
             owner=request.user,
             selected_mice=selected_mice,
             initial=recording_form_draft_initial(request),
@@ -666,7 +647,6 @@ def add_recording(request, project_pk, experiment_pk):
             "form": form,
             "project": project,
             "experiment": experiment,
-            "source_recording": source_recording,
             "media_form": media_form,
             "return_url": return_url,
             "selected_mice": form.selected_mice_for_display(),
@@ -674,43 +654,6 @@ def add_recording(request, project_pk, experiment_pk):
         },
     )
 
-
-@require_POST
-def duplicate_recording(request, project_pk, experiment_pk):
-    project, experiment = experiment_for_project_or_404(
-        project_pk,
-        experiment_pk,
-    )
-    return_url = safe_return_url(
-        request,
-        experiment_recordings_url(project, experiment),
-    )
-    selected_recordings = request.POST.getlist("selected_recording")
-
-    if len(selected_recordings) != 1:
-        messages.error(
-            request,
-            "Select exactly one recording to duplicate.",
-        )
-        return redirect(return_url)
-
-    recording = get_object_or_404(
-        experiment.recordings,
-        pk=selected_recordings[0],
-    )
-    require_recording_modify_permission(request.user, recording)
-    add_url = reverse(
-        "lab:add_recording",
-        args=[project.pk, experiment.pk],
-    )
-    query = urlencode(
-        {
-            "duplicate": recording.pk,
-            "return_url": return_url,
-        }
-    )
-
-    return redirect(f"{add_url}?{query}")
 
 
 def edit_recording(request, project_pk, experiment_pk, recording_pk):

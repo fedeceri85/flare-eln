@@ -28,7 +28,10 @@ class ParentMatchDialogTests(TestCase):
     def test_matching_parent_creation_returns_directly_without_linking_or_popup(self):
         with patch('lab.family_maintenance.scan_missing_family_links', side_effect=AssertionError('Creation scanned retrospective links')):
             response = self.create()
-        self.assertRedirects(response, self.destination, fetch_redirect_response=False)
+        self.assertEqual(urlsplit(response.url).path, reverse('lab:view_selected_mice_all'))
+        query = parse_qs(urlsplit(response.url).query)
+        self.assertEqual(query['selected_mouse'], ['New-1', 'New-2'])
+        self.assertEqual(query['return_url'], [self.destination])
         self.assertEqual(Mouse.objects.filter(mouse_id__startswith='New-').count(), 2)
         self.child.refresh_from_db()
         self.assertIsNone(self.child.mother_id)
@@ -39,8 +42,10 @@ class ParentMatchDialogTests(TestCase):
 
     def test_recording_return_still_includes_created_animals(self):
         response = self.create(return_url='/mice/?mice=Existing%20child', return_with_mouse='1')
-        self.assertEqual(urlsplit(response.url).path, '/mice/')
-        values = parse_qs(urlsplit(response.url).query)['mice'][0]
+        self.assertEqual(urlsplit(response.url).path, reverse('lab:view_selected_mice_all'))
+        destination = parse_qs(urlsplit(response.url).query)['return_url'][0]
+        self.assertEqual(urlsplit(destination).path, '/mice/')
+        values = parse_qs(urlsplit(destination).query)['mice'][0]
         for animal_id in ('Existing child', 'New-1', 'New-2'):
             self.assertIn(animal_id, values)
 

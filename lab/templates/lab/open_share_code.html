@@ -1,0 +1,11 @@
+{% extends 'lab/base.html' %}
+{% block title %}Enter code{% endblock %}
+{% block page_title %}Open shared record{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block content %}
+<form method="get" class="form-card">
+    {% if code_error %}<p class="message message-error" role="alert">{{ code_error }}</p>{% endif %}
+    {% include 'lab/components/form_fields.html' %}
+    <div class="actions"><button type="submit" class="button button-primary">Open</button></div>
+</form>
+{% endblock %}

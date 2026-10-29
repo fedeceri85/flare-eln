@@ -108,11 +108,14 @@ def animal_summary_context(request, mice, *, summary_url, edit_url):
     return {
         **summary,
         "selected_mice": mice,
+        "share_animals_url": url_with_query_params(
+            reverse("lab:create_animal_share"), selected_mouse=[mouse.pk for mouse in mice],
+        ),
         "read_only": True,
         "active_tab": active_tab,
         "edit_animals_url": url_with_query_params(
             edit_url, selected_mouse=[mouse.pk for mouse in mice],
-            mouse_editor_tab=entry_tab, return_url=summary_url,
+            mouse_editor_tab=active_tab, return_url=summary_url,
         ) if mice else "",
     }
 

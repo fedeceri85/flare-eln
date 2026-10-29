@@ -36,7 +36,7 @@ class FamilyMaintenanceTests(TestCase):
     def test_non_staff_access_settings_tab_and_scan_is_read_only(self):
         with patch('lab.parentage.graph_state', side_effect=AssertionError('Opening Settings scanned the database')):
             response = self.client.get(self.url)
-        self.assertContains(response, 'Scan database')
+        self.assertContains(response, 'Find matching parents')
         self.assertContains(response, 'it does not change any animals')
         self.assertContains(self.client.get(reverse('lab:settings_page')), self.url)
         scan = self.scan()

@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from .forms import BulkMouseUpdateForm, LitterCreateForm, MouseEditForm, genotype_field_name
 from .models import Mouse, MouseLine, ProcedureType, Protocol, Species, resolve_crossing
-from .utils import parse_mouse_numbers
+from .utils import parse_mouse_numbers, crossing_id_code, generate_mouse_id, litter_id_prefix, mouse_id_base
 from .views import apply_bulk_mouse_updates, create_litter_mice
 
 
@@ -24,6 +24,42 @@ class MouseNumberParsingTests(SimpleTestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_mouse_numbers(value)
         self.assertEqual(len(parse_mouse_numbers("1-500")), 500)
+
+
+class CompactAutomaticIdTests(TestCase):
+    def test_crossing_abbreviation_and_word_boundaries(self):
+        examples = {
+            "RyR1 flox x GCaMP6f flox x Atoh1 Cre": "RyR1fGCAt",
+            "RyR1 FLOX ko Cre": "RyR1fkc",
+            "RyR1 flox": "RyR1f",
+            "Creb1 x Foxp2 KO": "Creb1Fo",
+            "RyR1 flox × Atoh1 Cre": "RyR1fAt",
+            "Gene-X KO": "GeneXk",
+            "  RyR1___fLoX__  ": "RyR1f",
+            "RyR1_KO_": "RyR1k",
+            "RyR1-Cre--": "RyR1c",
+        }
+        for text, expected in examples.items():
+            with self.subTest(text=text):
+                self.assertEqual(crossing_id_code(text), expected)
+
+    def test_prefix_preview_and_collision_suffix_use_the_same_rule(self):
+        species = Species.objects.create(name="Compact IDs")
+        lines = [MouseLine.objects.create(species=species, name=name) for name in
+                 ("RyR1 flox", "GCaMP6f flox", "Atoh1 Cre")]
+        crossing, _ = resolve_crossing(species, lines)
+        dob = date(2026, 10, 28)
+        expected = "261028_RyR1fGCAt_pair12_03"
+        self.assertEqual(litter_id_prefix(dob, "Pair 12", crossing) + "03", expected)
+        self.assertEqual(mouse_id_base(dob, "Pair 12", crossing, "03"), expected)
+        self.assertEqual(generate_mouse_id(dob, "Pair 12", crossing, "03"), expected)
+        protocol = Protocol.objects.create(protocol_number=98, licence_reference="COMPACT", name="Compact")
+        mouse = Mouse.objects.create(mouse_id=expected, protocol=protocol)
+        self.assertEqual(generate_mouse_id(dob, "Pair 12", crossing, "03"), expected + "_1")
+        lines[0].name = "Renamed Cre"
+        lines[0].save()
+        mouse.refresh_from_db()
+        self.assertEqual(mouse.pk, expected)
 
 
 @override_settings(ALLOWED_HOSTS=["testserver"])
@@ -87,10 +123,10 @@ class LitterIdentityTests(TestCase):
 
     def test_generated_prefix_is_visible_and_enforced_on_server(self):
         form = self.valid_form(no_id_available="on", mouse_id_prefix="IGNORE-ME-")
-        self.assertEqual(form.cleaned_data["mouse_id_prefix"], "20261021_bp-4_gene-a-x-gene-b_")
+        self.assertEqual(form.cleaned_data["mouse_id_prefix"], "261021_GeneAGe_bp4_")
         self.assertIn('readonly', str(form["mouse_id_prefix"]))
         mice, _ = create_litter_mice(self.protocol, form)
-        self.assertEqual(mice[0].pk, "20261021_bp-4_gene-a-x-gene-b_1")
+        self.assertEqual(mice[0].pk, "261021_GeneAGe_bp4_1")
 
     def test_generated_prefix_requires_birth_date_and_breeding_pair(self):
         form = LitterCreateForm(self.payload(no_id_available="on", date_of_birth="", breeding_pair=""))
@@ -129,11 +165,11 @@ class LitterIdentityTests(TestCase):
             f"pup_1_{gene}": "het", f"pup_1_{gene}_uncertain": "on",
         }), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         result = response.json()
-        self.assertIn("20261021_bp-4_gene-a-x-gene-b_1", result["html"])
+        self.assertIn("261021_GeneAGe_bp4_1", result["html"])
         self.assertIn('value="blue"', result["html"])
         self.assertIn('value="het" selected', result["html"])
         self.assertIn('checked', result["html"])
-        self.assertEqual(result["prefix"], "20261021_bp-4_gene-a-x-gene-b_")
+        self.assertEqual(result["prefix"], "261021_GeneAGe_bp4_")
         self.assertFalse(Mouse.objects.exists())
 
     def test_save_creates_batch_and_optional_procedures(self):

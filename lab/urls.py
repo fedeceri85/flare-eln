@@ -2,6 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from .views import parentage as parentage_views
 from .views.maintenance import maintenance
+from .views import sharing as sharing_views
 from django.urls import path, register_converter
 
 from . import converters, views
@@ -17,6 +18,10 @@ def protected(view):
 
 
 urlpatterns = [
+    path("s/<str:code>/", protected(sharing_views.shared_view), name="shared_view"),
+    path("share/open/", protected(sharing_views.open_share_code), name="open_share_code"),
+    path("share/animals/", protected(sharing_views.create_animal_share), name="create_animal_share"),
+    path("share/recordings/<int:recording_pk>/", protected(sharing_views.create_recording_share), name="create_recording_share"),
     path("import-images/<uuid:image_id>/", protected(views.import_image_file), name="import_image_file"),
     path("projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/import/<uuid:draft_id>/images/", protected(views.import_shared_images), name="import_shared_images"),
     path("settings/image-storage/", protected(views.image_storage_settings), name="image_storage_settings"),
@@ -229,14 +234,6 @@ urlpatterns = [
         ),
         protected(views.select_recording_mouse),
         name="select_recording_mouse",
-    ),
-    path(
-        (
-            "projects/<int:project_pk>/experiments/<int:experiment_pk>/"
-            "recordings/duplicate/"
-        ),
-        protected(views.duplicate_recording),
-        name="duplicate_recording",
     ),
     path(
         "projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/delete-selected/",

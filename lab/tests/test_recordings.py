@@ -46,10 +46,6 @@ class RecordingsPageTests(AuthenticatedTestCase):
             "lab:select_recording_mouse",
             args=[self.project.pk, self.experiment.pk],
         )
-        self.duplicate_recording_url = reverse(
-            "lab:duplicate_recording",
-            args=[self.project.pk, self.experiment.pk],
-        )
         self.delete_selected_url = reverse("lab:delete_selected_recordings", args=[self.project.pk, self.experiment.pk])
         self.sequence_field = RecordingField.objects.get(recording_type=self.imaging_type, key="sequence_number")
         self.objective_field = RecordingField.objects.get(
@@ -188,10 +184,9 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertContains(response, 'href="/"')
         self.assertContains(response, "Back to Experiments")
         self.assertContains(response, "Add one recording")
-        self.assertContains(response, "Duplicate selected recording")
+        self.assertNotContains(response, "Duplicate selected recording")
         self.assertContains(response, 'name="selected_recording"')
         self.assertContains(response, self.add_recording_url)
-        self.assertContains(response, self.duplicate_recording_url)
         self.assertContains(response, self.edit_newer_recording_url)
         self.assertNotContains(response, self.delete_newer_recording_url)
         self.assertContains(response, "Delete selected")
@@ -718,7 +713,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
             ).exists()
         )
 
-    def test_add_mouse_from_selector_returns_to_recording_form_with_new_mouse(self):
+    def test_add_mouse_from_selector_opens_summary_with_recording_return_link(self):
         crossing, lines = create_test_crossing(("Recording mouse",))
         response = self.client.post(
             reverse("lab:add_litter_all"),
@@ -744,10 +739,14 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            response["Location"],
-            f"{self.add_recording_url}?mice=REC-NEW-MOUSE",
-        )
+        parts = urlsplit(response["Location"])
+        self.assertEqual(parts.path, reverse("lab:view_selected_mice_all"))
+        query = parse_qs(parts.query)
+        self.assertEqual(query["selected_mouse"], ["REC-NEW-MOUSE"])
+        self.assertEqual(query["return_url"], [f"{self.add_recording_url}?mice=REC-NEW-MOUSE"])
+        summary = self.client.get(response["Location"])
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.context["return_url"], query["return_url"][0])
         self.assertTrue(Mouse.objects.filter(pk="REC-NEW-MOUSE").exists())
 
     def test_add_recording_creates_recording_with_experiment_type(self):
@@ -905,33 +904,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
             ).exists()
         )
 
-    def test_duplicate_selected_recording_prefills_add_form(self):
-        response = self.client.post(
-            self.duplicate_recording_url,
-            {
-                "return_url": self.recordings_url,
-                "selected_recording": [self.newer_recording.pk],
-            },
-        )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(self.add_recording_url, response["Location"])
-        self.assertIn(f"duplicate={self.newer_recording.pk}", response["Location"])
-
-        response = self.client.get(response["Location"])
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/data/imaging/newer")
-        self.assertContains(response, "responsive cell")
-        self.assertContains(response, "20x")
-        self.assertContains(response, "30.0")
-        self.assertContains(response, "600")
-
-        form = response.context["form"]
-        self.assertNotIn("sequence_number", form.fields)
-        self.assertEqual(form[f"value_{self.sequence_field.pk}"].value(), 2)
-
-    def test_edit_and_duplicate_forms_join_multiple_paths_with_newlines(self):
+    def test_edit_form_joins_multiple_paths_with_newlines(self):
         self.newer_recording.data_paths = [
             r"C:\recordings\first",
             r"\\server\share\second",
@@ -944,21 +918,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
 
         edit_response = self.client.get(self.edit_newer_recording_url)
 
-        duplicate_response = self.client.post(
-            self.duplicate_recording_url,
-            {
-                "return_url": self.recordings_url,
-                "selected_recording": [self.newer_recording.pk],
-            },
-        )
-        duplicate_response = self.client.get(duplicate_response["Location"])
-
         self.assertEqual(
             edit_response.context["form"].fields["data_paths"].initial,
-            expected_initial,
-        )
-        self.assertEqual(
-            duplicate_response.context["form"].fields["data_paths"].initial,
             expected_initial,
         )
 
@@ -1162,45 +1123,18 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertEqual(Recording.objects.filter(experiment=self.experiment).count(), 2)
         self.assertEqual(self.newer_recording.mice.count(), 1)
 
-    def test_other_user_cannot_duplicate_recording(self):
-        User = get_user_model()
-        other_user = User.objects.create_user(
-            username="duplicate-other-user",
-            password="password",
-        )
-        self.client.force_login(other_user)
 
-        response = self.client.post(
-            self.duplicate_recording_url,
-            {
-                "return_url": self.recordings_url,
-                "selected_recording": [self.newer_recording.pk],
-            },
-        )
+    def test_removed_duplicate_route_is_unavailable(self):
+        url = self.recordings_url.rstrip('/') + '/duplicate/'
+        count = Recording.objects.count()
+        response = self.client.post(url, {'selected_recording': [self.newer_recording.pk]})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Recording.objects.count(), count)
 
-        self.assertEqual(response.status_code, 403)
-
-    def test_duplicate_selected_requires_exactly_one_recording(self):
-        response = self.client.post(
-            self.duplicate_recording_url,
-            {
-                "return_url": self.recordings_url,
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], self.recordings_url)
-
-        response = self.client.post(
-            self.duplicate_recording_url,
-            {
-                "return_url": self.recordings_url,
-                "selected_recording": [
-                    self.newer_recording.pk,
-                    self.older_recording.pk,
-                ],
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], self.recordings_url)
+    def test_old_duplicate_query_does_not_prefill_new_recording(self):
+        response = self.client.get(self.add_recording_url, {'duplicate': self.newer_recording.pk})
+        self.assertEqual(response.status_code, 200)
+        form = response.context['form']
+        self.assertFalse(form['notes'].value())
+        self.assertFalse(form['data_paths'].value())
+        self.assertEqual(form.selected_mouse_ids(), [])

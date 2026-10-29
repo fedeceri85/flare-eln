@@ -211,7 +211,7 @@ class SpreadsheetImportTests(TestCase):
         draft.state["animals"] = {group["key"]: initial_resolution(group, draft.configuration)}
         draft.configuration["defaults"].update(protocol_id=self.protocol.pk, crossing_id=self.crossing.pk)
         preview = self.reviewed(draft)
-        self.assertIn("20260401", preview["animals"][0]["mouse_id"])
+        self.assertIn("260401", preview["animals"][0]["mouse_id"])
         commit_import(draft.pk, self.user, self.experiment, [])
         self.assertEqual(Mouse.objects.get(tattoo="LOCAL").id_status, Mouse.ID_TEMPORARY)
         self.assertEqual(Mouse.objects.get(tattoo="LOCAL").marking_type, "other")
@@ -249,7 +249,7 @@ class SpreadsheetImportTests(TestCase):
         preview = self.reviewed(draft)
         self.assertEqual([animal["mouse_id"] for animal in preview["animals"][:2]], ["OFFICIAL-1", "SUPPLIED-ID"])
         generated = preview["animals"][2]["mouse_id"]
-        self.assertIn("20260401", generated)
+        self.assertIn("260401", generated)
         self.assertTrue(preview["animals"][2]["generate_id"])
         result = commit_import(draft.pk, self.user, self.experiment, [])
         self.assertEqual(result["created_animals"], 2)
@@ -287,7 +287,7 @@ class SpreadsheetImportTests(TestCase):
         response = self.client.get(self.url(draft), {"step": "animals"})
         group = response.context["form"].groups[0]
         self.assertEqual(group["mode_field"].value(), "generate")
-        self.assertIn("20260401", group["proposed_id"])
+        self.assertIn("260401", group["proposed_id"])
         self.assertContains(response, group["proposed_id"])
         self.assertNotContains(response, "Generate ID</span>")
         self.assertEqual(Mouse.objects.count(), 1)

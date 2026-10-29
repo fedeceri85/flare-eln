@@ -91,6 +91,46 @@ class GeneticsCatalogueTests(TestCase):
             self.assertEqual(self.client.get(self.url, {'per_page': bad}).context['page_size'], 25)
         self.assertEqual(self.client.get(self.url, {'page': 'bad'}).context['catalogue_page'].number, 1)
 
+    def test_letter_groups_cover_case_accents_numbers_symbols_and_crossings(self):
+        names = ['apple', 'Álpha accent', '  Apple spaced', '129S1', '#Reference', 'Ωmega']
+        for name in names:
+            MouseLine.objects.create(species=self.species, name=name)
+        expected = {
+            'A': {'Alpha', 'apple', 'Álpha accent', '  Apple spaced'},
+            'B': {'beta'}, '0-9': {'129S1'}, 'other': {'#Reference', 'Ωmega'},
+        }
+        for tab, field in (('lines', 'name'), ('crossings', 'display_name')):
+            for letter, values in expected.items():
+                with self.subTest(tab=tab, letter=letter):
+                    response = self.client.get(self.url, {'tab': tab, 'letter': letter})
+                    found = {getattr(item, field) for item in response.context['catalogue_page']}
+                    if tab == 'crossings' and letter == 'A':
+                        values = values | {'Alpha x beta'}
+                    self.assertEqual(found, values)
+                    self.assertContains(response, 'catalogue-letter-index')
+                    self.assertContains(response, 'aria-current="true"')
+        empty = self.client.get(self.url, {'letter': 'Z'})
+        self.assertEqual(empty.context['catalogue_page'].paginator.count, 0)
+        self.assertContains(empty, 'No lines match these filters')
+        invalid = self.client.get(self.url, {'letter': 'invalid'})
+        self.assertEqual(invalid.context['active_letter'], 'all')
+
+    def test_letter_filter_preserves_pagination_search_and_row_limits(self):
+        MouseLine.objects.bulk_create([MouseLine(species=self.species, name=f'Apple {i:03}') for i in range(60)])
+        response = self.client.get(self.url, {'letter': 'A', 'q': 'Apple', 'per_page': 25, 'page': 2})
+        self.assertEqual(len(response.context['catalogue_page']), 25)
+        self.assertEqual(response.context['catalogue_page'].paginator.count, 60)
+        self.assertEqual(response.context['catalogue_page'].number, 2)
+        for entry in response.context['tabs'] + response.context['letter_links']:
+            query = parse_qs(urlsplit(entry['url']).query)
+            self.assertEqual(query['q'], ['Apple'])
+            self.assertEqual(query['per_page'], ['25'])
+            self.assertNotIn('page', query)
+        self.assertEqual(parse_qs(urlsplit(response.context['tabs'][1]['url']).query)['letter'], ['A'])
+        hidden = {item['name']: item['value'] for item in response.context['page_size_control']['hidden_fields']}
+        self.assertEqual(hidden['letter'], 'A')
+        self.assertNotIn('page', hidden)
+
     def test_species_filter_and_empty_search(self):
         rat = Species.objects.create(name='Rat')
         MouseLine.objects.create(species=rat, name='Alpha rat')

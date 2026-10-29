@@ -28,7 +28,7 @@ def settings_page(request):
         "description": "Rename or delete spreadsheet column templates for each experiment type.",
         "url": reverse("lab:import_templates"),
     }]
-    cards.append({"title": "Maintenance", "description": "Find and resolve missing family links across the workspace.", "url": reverse("lab:maintenance")})
+    cards.append({"title": "Maintenance", "description": "Find matching animal records and link recorded parent IDs across the workspace.", "url": reverse("lab:maintenance")})
     if request.user.is_staff:
         cards.extend([
           #  {"title": "Image storage", "description": "Choose the folder for new recording images.", "url": reverse("lab:image_storage_settings")},

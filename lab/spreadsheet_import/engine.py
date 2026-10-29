@@ -316,7 +316,7 @@ def build_review(draft, approvals=None, *, parentage_context=None):
                     if identity in reserved_identities:
                         raise ValidationError("Two new animals have the same birth date, breeding pair, crossing and local ID. Resolve them as one animal or correct their details.")
                     reserved_identities.add(identity)
-                    animal_id = generate_mouse_id(cleaned["date_of_birth"], cleaned["breeding_pair"], crossing.display_name, cleaned["tattoo"])
+                    animal_id = generate_mouse_id(cleaned["date_of_birth"], cleaned["breeding_pair"], crossing, cleaned["tattoo"])
                     base, number = animal_id, 1
                     while animal_id in reserved_ids or Mouse.objects.filter(pk=animal_id).exists():
                         animal_id = f"{base}_{number}"

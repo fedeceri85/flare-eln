@@ -1,3 +1,40 @@
+// Delegate range selection so refreshed tables receive the same behaviour.
+document.addEventListener("DOMContentLoaded", function () {
+    const anchors = new WeakMap();
+    const rowSelector = "[data-row-checkbox], [data-procedure-row-checkbox]";
+    document.addEventListener("click", function (event) {
+        const checkbox = event.target.closest(rowSelector);
+        if (!checkbox) {
+            const control = event.target.closest("[data-select-all], [data-table-select-all-button], [data-procedure-select-all]");
+            if (control) {
+                const card = control.closest(".table-card");
+                if (card) anchors.delete(card);
+                else control.closest("form")?.querySelectorAll(".table-card").forEach(table => anchors.delete(table));
+            }
+            return;
+        }
+        if (checkbox.disabled) return;
+        const table = checkbox.closest(".table-card");
+        if (!table) return;
+        const rows = Array.from(table.querySelectorAll(rowSelector));
+        const anchorIndex = rows.indexOf(anchors.get(table));
+        const index = rows.indexOf(checkbox);
+        if (event.shiftKey && anchorIndex !== -1) {
+            const changed = [];
+            rows.slice(Math.min(anchorIndex, index), Math.max(anchorIndex, index) + 1).forEach(row => {
+                if (!row.disabled && !row.closest("[hidden]") && row.checked !== checkbox.checked) {
+                    row.checked = checkbox.checked;
+                    changed.push(row);
+                }
+            });
+            // Notify counters, action links and procedure preview invalidation
+            // after the entire range has reached its final state.
+            changed.forEach(row => row.dispatchEvent(new Event("change", {bubbles: true})));
+        }
+        anchors.set(table, checkbox);
+    });
+});
+
 document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".table-card").forEach(function (tableCard) {
         const selectAll = tableCard.querySelector("[data-select-all]");

@@ -24,7 +24,7 @@ def maintenance(request):
     if scan and (scan.get('owner') != request.user.pk or scan.get('version') != SCAN_VERSION or time() - scan.get('created', 0) > SCAN_LIFETIME):
         request.session.pop(SESSION_KEY, None)
         scan = None
-        messages.info(request, 'The previous family-link scan expired. Scan the database again for current matches.')
+        messages.info(request, 'The previous parent search expired. Choose Find matching parents again for current matches.')
     errors = []
     if request.method == 'POST':
         if request.POST.get('action') == 'scan':
@@ -34,9 +34,9 @@ def maintenance(request):
             return redirect('lab:maintenance')
         try:
             if not scan or request.POST.get('scan_id') != scan['id']:
-                raise ValidationError('This scan is no longer current. Scan the database again before resolving links.')
+                raise ValidationError('This scan is no longer current. Choose Find matching parents again before linking parents.')
             if scan.get('stale'):
-                raise ValidationError('Scan the database again before resolving links.')
+                raise ValidationError('Choose Find matching parents again before linking parents.')
             try:
                 page = Paginator(scan['entries'], PAGE_SIZE).page(request.POST.get('current_page', '1'))
             except InvalidPage:
@@ -50,14 +50,14 @@ def maintenance(request):
             if request.POST.get('action') == 'resolve':
                 result = resolve_missing_family_links(scan['fingerprint'], scan['selected'])
                 request.session.pop(SESSION_KEY, None)
-                messages.success(request, f"Linked {result['links']} parent relationship(s) across {result['animals']} animal(s). Run another scan whenever more parent records are added.")
+                messages.success(request, f"Linked {result['links']} parent relationship(s) across {result['animals']} animal(s). Choose Find matching parents again whenever more parent records are added.")
                 for warning in result['warnings']:
                     messages.warning(request, warning)
                 return redirect('lab:maintenance')
             if 'next_page' in request.POST:
                 target = Paginator(scan['entries'], PAGE_SIZE).get_page(request.POST['next_page']).number
                 return redirect(url_with_query_params(reverse('lab:maintenance'), page=target))
-            raise ValidationError('Choose Scan database or Resolve selected links.')
+            raise ValidationError('Choose Find matching parents or Link selected parents.')
         except ValidationError as exc:
             errors = exc.messages
             if getattr(exc, 'code', '') == 'stale' and scan:

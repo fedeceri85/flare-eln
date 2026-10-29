@@ -16,7 +16,7 @@ class ParentInput(forms.TextInput):
         return super().render(name, value, attrs, renderer)
 
 
-def configure_parent_controls(form, mice=(), bulk=False):
+def configure_parent_controls(form, mice=(), bulk=False, new_animals=()):
     mice = list(mice)
     groups = group_mice_by_parents(mice) if mice else [{'key': 'new', 'mice': []}]
     form.parent_groups, form.individual_parent_controls, form._parent_specs = [], [], []
@@ -34,9 +34,10 @@ def configure_parent_controls(form, mice=(), bulk=False):
         previous = members[0] if members else None
         initial_ref = getattr(previous, f'{role}_id') if previous else None
         initial_text = (initial_ref or getattr(previous, f'{role}_external_id')) if previous else ''
-        if bulk:
+        toggled = bulk or individual
+        if toggled:
             form.fields[toggle] = forms.BooleanField(required=False, label=f'{"Override" if individual else "Update"} {role}')
-        enabled = not bulk or (form.is_bound and form.fields[toggle].clean(form.data.get(form.add_prefix(toggle))))
+        enabled = not toggled or (form.is_bound and form.fields[toggle].clean(form.data.get(form.add_prefix(toggle))))
         form.fields[text_name] = forms.CharField(required=False, max_length=255, label=f'{role.title()} ID', disabled=not enabled,
             widget=ParentInput(attrs={'data-parent-text': '', 'autocomplete': 'off', 'data-parent-lookup': reverse('lab:mouse_lookup'),
                                      'data-parent-exclude': members[0].pk if len(members) == 1 else ''}))
@@ -47,10 +48,10 @@ def configure_parent_controls(form, mice=(), bulk=False):
         form.initial[text_name], form.initial[ref_name] = initial_text, initial_ref
         if enabled and form.is_bound and not str(form.data.get(form.add_prefix(text_name), '')).strip():
             form.data[form.add_prefix(ref_name)] = ''
-        form._parent_specs.append({'role': role, 'text_name': text_name, 'ref_name': ref_name, 'toggle': toggle if bulk else None,
+        form._parent_specs.append({'role': role, 'text_name': text_name, 'ref_name': ref_name, 'toggle': toggle if toggled else None,
                                    'members': members, 'individual': individual, 'initial_text': initial_text, 'initial_ref': initial_ref})
-        return {'role': role, 'text': form[text_name], 'reference': form[ref_name], 'checkbox': form[toggle] if bulk else None,
-                'had_parent': bool(initial_text or initial_ref), 'has_overrides': bulk and len(mice) > 1 and not individual,
+        return {'role': role, 'text': form[text_name], 'reference': form[ref_name], 'checkbox': form[toggle] if toggled else None,
+                'had_parent': bool(initial_text or initial_ref), 'has_overrides': bool((bulk and len(mice) > 1 or new_animals) and not individual),
                 'target': f'animal {previous.pk}' if len(members) == 1 else f'this group of {len(members)} animals' if members else 'these new animals'}
 
     for group in groups:
@@ -64,6 +65,10 @@ def configure_parent_controls(form, mice=(), bulk=False):
                 form.individual_parent_controls.append(row)
         form.parent_groups.append({'key': group['key'], 'mouse_ids': [mouse.pk for mouse in group['mice']],
                                    'count': len(group['mice']), 'controls': controls, 'overrides': overrides})
+    form.creation_parent_rows = []
+    for number, mouse in new_animals:
+        form.creation_parent_rows.append({'mouse_id': mouse.pk,
+            'controls': [add(role, f'pup_{number}_parent_', [mouse], True) for role in ROLES]})
     form.parent_controls = form.parent_groups[0]['controls']
 
 

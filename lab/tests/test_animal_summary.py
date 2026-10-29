@@ -58,7 +58,13 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         edit = markup.find("a", **{"data-mouse-summary-edit": None})[0]
         tablist = markup.find("div", role="tablist")[0]
         self.assertIs(edit.parent, tablist.parent)
-        self.assertIs([node for node in markup.elements if node.parent is edit.parent][-1], edit)
+        share = markup.find("button", **{"data-share-animals": None})[0]
+        siblings = [node for node in markup.elements if node.parent is edit.parent]
+        self.assertEqual(siblings[-2:], [edit, share])
+        share_url = urlsplit(share.attrs["data-share-url"])
+        self.assertEqual(share_url.path, reverse("lab:create_animal_share"))
+        self.assertEqual(parse_qs(share_url.query)["selected_mouse"], [mouse.pk for mouse in self.mice])
+        self.assertIn("button-share", share.attrs["class"])
         self.assertFalse(edit.within("div", role="tablist"))
         self.assertIn("button-primary", edit.attrs["class"])
         content = [node for node in markup.elements if node.within("div", **{"data-mouse-editor": None})]
@@ -205,7 +211,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
         edit_query = parse_qs(urlsplit(edit_link).query)
         self.assertEqual(edit_query["selected_mouse"], [mouse.pk for mouse in self.mice])
-        self.assertEqual(edit_query["mouse_editor_tab"], ["individual"])
+        self.assertEqual(edit_query["mouse_editor_tab"], ["procedures"])
         summary_return = edit_query["return_url"][0]
         self.assertEqual(parse_qs(urlsplit(summary_return).query), {
             "return_url": [self.list_state], "mouse_editor_tab": ["procedures"],
@@ -214,7 +220,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         editor = self.client.get(edit_link)
         self.assertEqual(editor.status_code, 200)
         editor_markup = Markup(editor.content.decode())
-        self.assertEqual(editor_markup.find("input", name="mouse_editor_tab")[0].attrs["value"], "individual")
+        self.assertEqual(editor_markup.find("input", name="mouse_editor_tab")[0].attrs["value"], "procedures")
         result = self.client.post(self.edit_url, {
             "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
             "return_url": summary_return, "mouse_editor_tab": "procedures",
@@ -330,7 +336,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         markup = Markup(response.content.decode())
         panel = markup.find("section", id="mouse-panel-services")[0]
         tab = markup.find("button", **{"data-mouse-tab": "services"})[0]
-        self.assertIn("Services & recordings", tab.text)
+        self.assertIn("Experimental records", tab.text)
         return markup, panel
 
     def test_services_lists_all_linked_recording_types_once_and_excludes_unrelated_records(self):
@@ -411,7 +417,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertEqual(response.context["active_tab"], "services")
         edit_link = markup.find("a", **{"data-mouse-summary-edit": None})[0].attrs["href"]
         query = parse_qs(urlsplit(edit_link).query)
-        self.assertEqual(query["mouse_editor_tab"], ["individual"])
+        self.assertEqual(query["mouse_editor_tab"], ["services"])
         self.assertEqual(parse_qs(urlsplit(query["return_url"][0]).query)["mouse_editor_tab"], ["services"])
         editor = self.client.get(edit_link)
         _, editor_panel = self.services_panel(editor)
@@ -452,7 +458,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertEqual(urlsplit(edit_link).path, expected_edit_url)
         query = parse_qs(urlsplit(edit_link).query)
         self.assertEqual(query["selected_mouse"], selection)
-        self.assertEqual(query["mouse_editor_tab"], ["individual"])
+        self.assertEqual(query["mouse_editor_tab"], ["services"])
         summary_return = query["return_url"][0]
         self.assertEqual(parse_qs(urlsplit(summary_return).query)["return_url"], [list_state])
         self.assertEqual(parse_qs(urlsplit(summary_return).query)["selected_mouse"], selection)

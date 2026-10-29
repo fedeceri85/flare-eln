@@ -50,7 +50,7 @@ document.querySelectorAll('[data-crossing-order]').forEach(function (form) {
 
     function filterUrl() {
         const url = new URL(window.location.href);
-        ['species', 'q', 'tab', 'per_page'].forEach(function (name) {
+        ['species', 'q', 'tab', 'per_page', 'letter'].forEach(function (name) {
             url.searchParams.set(name, form.elements.namedItem(name).value);
         });
         ['page', 'edit_line', 'edit_crossing', 'panel'].forEach(name => url.searchParams.delete(name));
@@ -69,6 +69,7 @@ document.querySelectorAll('[data-crossing-order]').forEach(function (form) {
             if (!updated) throw new Error('Missing results');
             results.innerHTML = updated.innerHTML;
             form.elements.namedItem('tab').value = updated.dataset.activeTab;
+            form.elements.namedItem('letter').value = updated.dataset.activeLetter;
             form.elements.namedItem('per_page').value = updated.dataset.pageSize;
             bindCataloguePanels(results);
             // The shared rows selector uses a normal submit outside this page.
@@ -120,12 +121,13 @@ document.querySelectorAll('[data-crossing-order]').forEach(function (form) {
         schedule(filterUrl(), 0);
     });
     results.addEventListener('click', function (event) {
-        const link = event.target.closest('.protocol-tabs a, .pagination a');
+        const link = event.target.closest('.protocol-tabs a, .pagination a, .catalogue-letter-index a');
         if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
         const url = new URL(link.href, window.location.href);
         if (url.origin !== window.location.origin) return;
         event.preventDefault();
         form.elements.namedItem('tab').value = url.searchParams.get('tab') || 'lines';
+        form.elements.namedItem('letter').value = url.searchParams.get('letter') || 'all';
         ['species', 'q', 'per_page'].forEach(name => url.searchParams.set(name, form.elements.namedItem(name).value));
         schedule(url, 0);
     });

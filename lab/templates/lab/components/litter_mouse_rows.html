@@ -3,7 +3,10 @@
 {% elif form.mouse_rows %}
     <p>{{ form.mouse_rows|length }} animal{{ form.mouse_rows|length|pluralize }}.</p>
     <div class="litter-rows-scroll">
-        {% include "lab/components/individual_mouse_table.html" with rows=form.mouse_rows crossing=form.selected_crossing.display_name empty_genotype_message="Select a crossing to enter genotype results." %}
+        {% regroup form.mouse_rows by crossing as crossing_groups %}
+        {% for group in crossing_groups %}
+            {% include "lab/components/individual_mouse_table.html" with rows=group.list crossing=group.grouper empty_genotype_message="Select a crossing to enter genotype results." %}
+        {% endfor %}
     </div>
 {% else %}
     <p>Enter animal numbers above to build the individual rows.</p>

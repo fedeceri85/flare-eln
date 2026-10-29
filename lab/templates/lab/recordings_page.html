@@ -29,13 +29,6 @@
 
             <a class="button" href="{% url 'lab:import_recordings' project.pk experiment.pk %}">Import from spreadsheet</a>
 
-            <button
-                class="button"
-                type="submit"
-                form="selected-recording-form"
-            >
-                Duplicate selected recording
-            </button>
             <button class="button button-danger" type="submit" form="selected-recording-form" formaction="{% url 'lab:delete_selected_recordings' project.pk experiment.pk %}">Delete selected</button>
         </div>
     </div>
@@ -61,7 +54,7 @@
     <form
         id="selected-recording-form"
         method="post"
-        action="{{ duplicate_recording_url }}"
+        action="{% url 'lab:delete_selected_recordings' project.pk experiment.pk %}"
     >
         {% csrf_token %}
         <input

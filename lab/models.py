@@ -1075,3 +1075,36 @@ class SpreadsheetImportImage(models.Model):
     class Meta:
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["storage_location", "filename"], name="import_image_file_idx")]
+
+
+class SharedAnimalIdentity(models.Model):
+    """Permanent sharing identity; a deleted Animal ID can never adopt its links."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    mouse = models.OneToOneField(
+        Mouse, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="sharing_identity",
+    )
+
+
+class SharedLink(models.Model):
+    ANIMALS = "m"
+    RECORDING = "r"
+    kind = models.CharField(max_length=1, choices=[(ANIMALS, "Animals"), (RECORDING, "Recording")])
+    code = models.CharField(max_length=64, unique=True)
+    lookup_key = models.CharField(max_length=64, unique=True)
+    selection_key = models.CharField(max_length=64, null=True, blank=True, unique=True)
+    animals = models.ManyToManyField(SharedAnimalIdentity, blank=True)
+    recording = models.OneToOneField(
+        Recording, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="shared_link",
+    )
+    animal_tab = models.CharField(max_length=24, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ShareCodeCounter(models.Model):
+    """Allocation totals include retired codes, which must never be recycled."""
+    kind = models.CharField(max_length=1, primary_key=True)
+    allocated = models.PositiveBigIntegerField(default=0)
+    use_three_words = models.BooleanField(default=False)

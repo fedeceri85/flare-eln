@@ -67,7 +67,7 @@
         </div>
         <section class="bulk-section shared-mouse-details">
             <h2 class="visually-hidden">Shared litter details</h2>
-            <p class="bulk-help">These details apply to every animal. Set each animal’s local identifier, sex and genotype below.</p>
+            <p class="bulk-help">Set common details here, then use individual overrides for any animals that differ.</p>
 
             <div class="shared-detail-groups">
                 {% for group in form.shared_mouse_field_groups %}
@@ -86,13 +86,19 @@
                 <summary>Notes (optional)</summary>
                 {% include "lab/components/shared_mouse_input.html" with field=form.notes %}
             </details>
+            <div data-litter-detail-overrides {% if not form.show_detail_overrides %}hidden{% endif %}>
+                {% include "lab/components/individual_animal_overrides.html" %}
+            </div>
         </section>
 
         </div>
 
         <section class="bulk-section family-details" id="mouse-panel-family" data-mouse-tab-panel="family">
-            <h2 class="visually-hidden">Family details</h2>
+            <h2 class="visually-hidden">Parents and offspring</h2>
             {% include "lab/components/parent_editor.html" %}
+            <div data-litter-parent-overrides {% if not form.show_parent_overrides %}hidden{% endif %}>
+                {% include "lab/components/litter_parent_overrides.html" %}
+            </div>
         </section>
 
         <section id="mouse-panel-individual" data-mouse-tab-panel="individual" {% if form.single_mouse_mode %}hidden{% endif %}>
@@ -106,7 +112,7 @@
         </section>
 
     <section class="bulk-section" id="mouse-panel-services" data-mouse-tab-panel="services">
-        <h2 class="visually-hidden">Services &amp; recordings</h2>
+        <h2 class="visually-hidden">Experimental records</h2>
         <p>Save the animals before adding service records.</p>
     </section>
     </div>
@@ -114,13 +120,13 @@
 
 {% block scripts %}
     {% include "lab/components/remove_parent_dialog.html" %}
-    <script src="{% static 'lab/parentage.js' %}?v=parent-autocomplete-2"></script>
-    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=genotype-entry-1"></script>
+    <script src="{% static 'lab/parentage.js' %}?v=litter-overrides-1"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=preserve-edit-tab-1"></script>
     {{ protocol_procedure_permissions|json_script:"protocol-procedure-permissions" }}
     <script src="{% static 'lab/litter_protocol_permissions.js' %}"></script>
     {% include "lab/components/crossing_selector_assets.html" %}
-    <script src="{% static 'lab/mouse_row_editor.js' %}"></script>
-    <script src="{% static 'lab/litter_mouse_rows.js' %}"></script>
+    <script src="{% static 'lab/mouse_row_editor.js' %}?v=litter-overrides-1"></script>
+    <script src="{% static 'lab/litter_mouse_rows.js' %}?v=litter-overrides-1"></script>
     <script src="{% static 'lab/mouse_genotype_editor.js' %}"></script>
     <script src="{% static 'lab/litter_genotypes.js' %}"></script>
     <script src="{% static 'lab/litter_procedures.js' %}"></script>

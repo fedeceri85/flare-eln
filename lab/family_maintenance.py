@@ -42,7 +42,7 @@ def resolve_missing_family_links(expected, selected):
     context = ParentageContext()
     scan = scan_missing_family_links(context)
     if scan['fingerprint'] != expected:
-        raise ValidationError('Animal information changed since this scan. Scan the database again before resolving links.', code='stale')
+        raise ValidationError('Animal information changed since this scan. Choose Find matching parents again before linking parents.', code='stale')
     eligible = {entry['key']: entry for entry in scan['entries'] if entry['eligible']}
     selected = set(selected)
     if not selected or not selected <= eligible.keys():

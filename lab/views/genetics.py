@@ -1,6 +1,8 @@
 'Genetics views and helpers.'
 
 from urllib.parse import urlencode
+import string
+import unicodedata
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -203,6 +205,15 @@ def delete_crossing_from_request(request):
     return redirect(lines_crossings_url(species, request, "crossings"))
 
 
+def catalogue_letter(name):
+    first = unicodedata.normalize("NFKD", name.lstrip()[:1]).upper()[:1]
+    if first in string.ascii_uppercase and first:
+        return first
+    if first.isdecimal():
+        return "0-9"
+    return "other"
+
+
 def lines_crossings_page(request):
     if not request.user.is_staff:
         raise PermissionDenied
@@ -301,11 +312,29 @@ def lines_crossings_page(request):
     except (ValueError, TypeError):
         size = 25
     size = size if size in (25, 50, 75, 100) else 25
-    page = Paginator(lines if tab == "lines" else crossings, size).get_page(request.GET.get("page"))
+    letters = ["0-9", *string.ascii_uppercase, "other"]
+    letter = request.GET.get("letter", "all")
+    if letter not in ["all", *letters]:
+        letter = "all"
+    catalogue = lines if tab == "lines" else crossings
+    name_field = "name" if tab == "lines" else "display_name"
+    # Classify lightweight names before pagination, fetching full objects only
+    # for the current page. Unicode accents and leading whitespace are handled
+    # consistently without depending on the database collation.
+    names = list(catalogue.values_list("pk", name_field))
+    names = [(pk, name, catalogue_letter(name)) for pk, name in names]
+    if letter != "all":
+        names = [row for row in names if row[2] == letter]
+    ranks = {key: index for index, key in enumerate(letters)}
+    names.sort(key=lambda row: (ranks[row[2]], unicodedata.normalize("NFKD", row[1].lstrip()).casefold(), row[0]))
+    page = Paginator([row[0] for row in names], size).get_page(request.GET.get("page"))
+    page_ids = list(page.object_list)
+    objects = {item.pk: item for item in catalogue.filter(pk__in=page_ids)}
+    page.object_list = [objects[pk] for pk in page_ids]
     params = request.GET.copy()
     for key in ("edit_line", "edit_crossing", "panel", "page"):
         params.pop(key, None)
-    for key, value in {"species": species.pk, "q": query, "tab": tab, "per_page": size}.items():
+    for key, value in {"species": species.pk, "q": query, "tab": tab, "per_page": size, "letter": letter}.items():
         params[key] = value
     def link(**values):
         result = params.copy()
@@ -313,6 +342,8 @@ def lines_crossings_page(request):
             result[key] = value
         return "?" + result.urlencode()
     for item in page:
+        item.catalogue_letter = catalogue_letter(getattr(item, name_field))
+        item.catalogue_letter_label = "Other" if item.catalogue_letter == "other" else item.catalogue_letter
         if tab == "lines":
             item.edit_url = link(edit_line=item.pk) + "#catalogue-editor"
         else:
@@ -334,6 +365,9 @@ def lines_crossings_page(request):
         "selected_species": species, "species_options": Species.objects.order_by(Lower("name"), "pk"),
         "line_form": line_form, "crossing_form": crossing_form, "line_query": query,
         "active_tab": tab, "catalogue_page": page, "page_size": size,
+        "active_letter": letter,
+        "letter_links": [{"label": "All" if key == "all" else "Other" if key == "other" else key,
+                          "active": key == letter, "url": link(letter=key)} for key in ["all", *letters]],
         "tabs": [{"label": label, "active": key == tab, "url": link(tab=key)} for key, label in (("lines", "Lines"), ("crossings", "Crossings"))],
         "page_size_control": {"name": "per_page", "label": "Rows", "hidden_fields": hidden, "options": [{"value": n, "label": n, "selected": n == size} for n in (25, 50, 75, 100)]},
         "pagination": build_pagination(page, params), "line_lookup_url": reverse("lab:line_lookup"),

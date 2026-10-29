@@ -1,3 +1,7 @@
+29/10/2026
+- Added shareable link creation, allowing sharing group of animals or individual recordings. 
+- Shortened automatic animal ids. 
+
 27/10/2026
 - Added optional external and linked mother/father IDs, family summaries, grouped offspring, and explicit matching of external parent IDs.
 - Added parent matching and approvals to spreadsheet imports within the existing workflow.

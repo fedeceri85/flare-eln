@@ -91,14 +91,13 @@ class RecordingDraftTests(TestCase):
         response = self.client.get(self.edit_url, {"draft": token})
         self.assertEqual(response.context["form"]["notes"].value(), "Saved notes")
 
-    def test_repeated_selection_and_duplicate_context_are_preserved(self):
-        url = f"{self.add_url}?duplicate={self.recording.pk}"
+    def test_repeated_selection_preserves_the_same_draft(self):
+        url = self.add_url
         resumed, _ = self.round_trip(url, {"notes": "First entry"})
         resumed_again, response = self.round_trip(resumed, {
             "notes": "Revised entry", "mice": self.mouse.pk,
         })
         self.assertEqual(response.context["form"]["notes"].value(), "Revised entry")
-        self.assertEqual(response.context["source_recording"], self.recording)
         self.assertEqual(
             parse_qs(urlsplit(resumed).query)["draft"],
             parse_qs(urlsplit(resumed_again).query)["draft"],

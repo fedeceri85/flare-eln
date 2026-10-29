@@ -13,7 +13,12 @@
             if (remove) remove();
         });
     }
-    document.querySelectorAll('[data-parent-control]').forEach((root, index) => {
+    let parentControlIndex = 0;
+    function bindParentControls(scope) {
+    scope.querySelectorAll('[data-parent-control]').forEach(root => {
+        if (root.dataset.parentBound) return;
+        root.dataset.parentBound = 'true';
+        const index = parentControlIndex++;
         const text = root.querySelector('[data-parent-text]');
         const reference = root.querySelector('[data-parent-reference]');
         const state = root.querySelector('[data-parent-state]');
@@ -157,4 +162,7 @@
         if (toggle) toggle.addEventListener('change', () => { clearTimeout(suggestionTimer); sequence += 1; close(); refresh(); });
         close(); refresh();
     });
+    }
+    bindParentControls(document);
+    document.addEventListener('litter:overrides-updated', () => bindParentControls(document));
 })();

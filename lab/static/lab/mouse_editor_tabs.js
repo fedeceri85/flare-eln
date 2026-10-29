@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const summaryUrl = new URL(editUrl.searchParams.get('return_url'), window.location.href);
             summaryUrl.searchParams.set('mouse_editor_tab', key);
             const localSummaryUrl = summaryUrl.pathname + summaryUrl.search + summaryUrl.hash;
-            editUrl.searchParams.set('mouse_editor_tab', tabs.some(tab => tab.dataset.mouseTab === 'individual' && !tab.hidden) ? 'individual' : 'shared');
+            editUrl.searchParams.set('mouse_editor_tab', key);
             editUrl.searchParams.set('return_url', localSummaryUrl);
             summaryEditLink.href = editUrl.pathname + editUrl.search + editUrl.hash;
             window.history.replaceState(window.history.state, '', localSummaryUrl);

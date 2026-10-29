@@ -1676,3 +1676,36 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .genotype-individual-choice input { flex: 0 0 auto; width: auto; }
 .genotype-global-editor select:disabled, .individual-mouse-table select:disabled { background: #f3f5f7; color: #748393; opacity: 1; }
 .animal-tabbed [data-multiple-mice-slot] > .bulk-section { margin: 0; padding: 0; border: 0; box-shadow: none; }
+
+/* Sharing is a secondary action alongside editing. */
+.button-share { display: inline-flex; align-items: center; gap: 7px; color: #17685e; background: #eef8f5; border-color: #acd5cb; }
+.button-share:hover { background: #def0e9; border-color: #6dab9a; }
+.animal-tabs-navigation > .button-share { flex: 0 0 auto; margin-bottom: 8px; }
+.share-icon { flex: 0 0 auto; vertical-align: middle; }
+.table-row-action .share-icon { margin-right: 4px; }
+.share-status { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 12px 20px; border-radius: 8px; background: #153d36; color: white; box-shadow: 0 4px 20px #0002; }
+@media (max-width: 900px) { .animal-tabs-navigation { flex-wrap: wrap; } .animal-tabs-navigation .mouse-editor-tabs { flex-basis: 100%; } }
+
+.catalogue-letter-index { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0; }
+.catalogue-letter-index a { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; min-height: 36px; padding: 3px 7px; border-radius: 4px; color: var(--blue); text-decoration: underline; text-underline-offset: 4px; }
+.catalogue-letter-index a:hover { background: var(--blue-soft); }
+.catalogue-letter-index a.active { background: var(--blue-soft); font-weight: 750; box-shadow: inset 0 -2px var(--blue); }
+.catalogue-letter-index a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.genetics-catalogue .catalogue-letter-heading th { background: var(--blue-soft); color: var(--blue); padding: 8px 12px; font-weight: 750; }
+
+/* Word share codes remain readable when spoken, copied, or written in a notebook. */
+.share-dialog { box-sizing: border-box; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 26px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface, white); color: var(--ink); box-shadow: 0 20px 70px #17395c33; }
+.share-dialog::backdrop { background: #13293d88; }
+.share-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.share-dialog-heading h2 { margin: 0; }
+.share-code-label { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.share-code-display { padding: 22px 18px; margin: 0 0 18px; border: 1px solid #acd5cb; border-radius: 10px; background: #eef8f5; color: #17685e; font-size: clamp(24px, 4vw, 34px); line-height: 1.4; font-weight: 750; text-align: center; overflow-wrap: anywhere; user-select: all; }
+.share-code-display:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.share-copy-actions { margin-bottom: 18px; }
+.share-destination-link { display: block; overflow-wrap: anywhere; font-size: 13px; text-underline-offset: 3px; }
+.share-dialog-status { min-height: 1.4em; margin-bottom: 0; color: #17685e; }
+.open-code-dialog { width: min(440px, calc(100vw - 32px)); }
+.open-code-dialog input { font-size: 18px; }
+.open-code-link { white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 600px) { .share-dialog { padding: 20px; } .share-dialog-heading { margin-bottom: 18px; } }
+.share-dialog [hidden] { display: none !important; }

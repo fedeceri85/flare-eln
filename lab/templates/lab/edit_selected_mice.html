@@ -111,7 +111,7 @@
         </section>
 
         <section class="bulk-section family-details" id="mouse-panel-family" data-mouse-tab-panel="family">
-            <h2 class="visually-hidden">Family details</h2>
+            <h2 class="visually-hidden">Parents and offspring</h2>
             {% include "lab/components/parent_editor.html" %}
         </section>
 
@@ -142,14 +142,14 @@
     {% include "lab/components/recording_image_dialog.html" %}
     <script src="{% static 'lab/recording_images.js' %}?v=recording-images-4"></script>
     {% include "lab/components/remove_parent_dialog.html" %}
-    <script src="{% static 'lab/parentage.js' %}?v=parent-autocomplete-2"></script>
+    <script src="{% static 'lab/parentage.js' %}?v=litter-overrides-1"></script>
     <script src="{% static 'lab/shared_mouse_details.js' %}"></script>
-    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=genotype-entry-1"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=preserve-edit-tab-1"></script>
     <script src="{% static 'lab/existing_procedures.js' %}"></script>
     <script src="{% static 'lab/new_procedures.js' %}"></script>
     <script src="{% static 'lab/new_animal_recording.js' %}"></script>
     {% include "lab/components/crossing_selector_assets.html" %}
-    <script src="{% static 'lab/mouse_row_editor.js' %}"></script>
+    <script src="{% static 'lab/mouse_row_editor.js' %}?v=litter-overrides-1"></script>
     <script src="{% static 'lab/mouse_genotype_editor.js' %}"></script>
     <script src="{% static 'lab/bulk_mouse_rows.js' %}"></script>
 {% endblock %}

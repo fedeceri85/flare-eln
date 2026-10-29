@@ -1,0 +1,34 @@
+<dialog class="share-dialog" data-share-dialog aria-labelledby="share-dialog-title">
+    <div class="share-dialog-heading">
+        <h2 id="share-dialog-title">Share</h2>
+        <button type="button" class="button" data-share-close aria-label="Close sharing dialog">Close</button>
+    </div>
+    {% csrf_token %}
+    <p data-share-loading role="status">Creating share code…</p>
+    <p class="message message-error" data-share-error role="alert" hidden></p>
+    <div data-share-content hidden>
+        <p class="share-code-label">Shared code</p>
+        <p class="share-code-display" data-share-code tabindex="0"></p>
+        <div class="actions share-copy-actions">
+            <button type="button" class="button button-primary" data-share-copy-code>Copy code</button>
+            <button type="button" class="button" data-share-copy-link>Copy link</button>
+        </div>
+        <a class="share-destination-link" data-share-link></a>
+    </div>
+    <p class="share-dialog-status" data-share-status role="status" aria-live="polite"></p>
+    <button type="button" class="button" data-share-retry hidden>Try again</button>
+</dialog>
+<dialog class="share-dialog open-code-dialog" data-code-dialog aria-labelledby="open-code-title">
+    <div class="share-dialog-heading">
+        <h2 id="open-code-title">Open shared record</h2>
+        <button type="button" class="button" data-code-close aria-label="Close enter code dialog">Close</button>
+    </div>
+    <form method="get" action="{% url 'lab:open_share_code' %}" data-code-form>
+        <div class="form-field">
+            <label for="shared-code-input">Shared code</label>
+            <input id="shared-code-input" type="text" name="code" placeholder="m-maple-otter" required maxlength="80" autocomplete="off" autocapitalize="none" spellcheck="false" data-code-input aria-describedby="open-code-error" autofocus>
+        </div>
+        <p class="message message-error" id="open-code-error" data-code-error role="alert" hidden></p>
+        <div class="actions"><button type="submit" class="button button-primary" data-code-submit>Open</button></div>
+    </form>
+</dialog>

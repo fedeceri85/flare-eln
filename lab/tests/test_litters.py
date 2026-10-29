@@ -3,6 +3,7 @@ from datetime import date
 from django.test import override_settings
 from django.urls import reverse
 from ..utils import parse_mouse_numbers
+from ..views.common import url_with_query_params
 from ..models import Mouse, MouseGenotype, Procedure, ProcedureType, Protocol
 from ._support import AuthenticatedTestCase, create_test_crossing, crossing_post_data
 
@@ -157,7 +158,10 @@ class AddLitterTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], self.protocol_url)
+        self.assertEqual(response["Location"], url_with_query_params(
+            reverse("lab:view_selected_mice_all"), selected_mouse=["L-100", "L-101", "L-102"],
+            return_url=self.protocol_url,
+        ))
 
         mice = list(Mouse.objects.filter(protocol=self.protocol).order_by("mouse_id"))
         self.assertEqual(
@@ -228,7 +232,10 @@ class AddLitterTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], self.protocol_url)
+        self.assertEqual(response["Location"], url_with_query_params(
+            reverse("lab:view_selected_mice_all"), selected_mouse=["P104-10"],
+            return_url=self.protocol_url,
+        ))
 
         mouse = Mouse.objects.get(mouse_id="P104-10")
         self.assertEqual(mouse.protocol, self.protocol)
@@ -249,13 +256,13 @@ class AddLitterTests(AuthenticatedTestCase):
         self.assertEqual(
             list(Mouse.objects.order_by("mouse_id").values_list("mouse_id", flat=True)),
             [
-                "20260102_line-a_gad2_5",
-                "20260102_line-a_gad2_6",
+                "260102_Gad2_linea_5",
+                "260102_Gad2_linea_6",
             ],
         )
 
     def test_add_litter_rejects_duplicate_generated_ids(self):
-        Mouse.objects.create(mouse_id="20260102_line-a_gad2_5", protocol=self.protocol)
+        Mouse.objects.create(mouse_id="260102_Gad2_linea_5", protocol=self.protocol)
         response = self.client.post(self.add_litter_url, self.litter_payload(
             mouse_numbers="5", no_id_available="on",
         ))

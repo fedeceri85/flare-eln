@@ -1,0 +1,9 @@
+<details class="individual-parent-overrides" {% if form.parentage_errors %}open{% endif %}>
+    <summary>Individual parent overrides</summary>
+    <p class="bulk-help">Set common parents above, then check Override mother or Override father for animals that differ. A checked blank ID leaves that parent unknown for that animal.</p>
+    {% for row in form.creation_parent_rows %}
+    <details><summary>{{ row.mouse_id }}</summary>
+        {% include "lab/components/parent_controls.html" with controls=row.controls %}
+    </details>
+    {% empty %}<p>Enter animal numbers to build individual parent overrides.</p>{% endfor %}
+</details>

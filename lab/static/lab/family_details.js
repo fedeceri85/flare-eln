@@ -15,7 +15,7 @@
             root.dataset.familyLoaded = 'true';
             status.textContent = '';
         } catch (_) {
-            status.textContent = 'Could not load family information. Please retry.';
+            status.textContent = 'Could not load parents and offspring. Please retry.';
             retry.hidden = false;
         } finally {
             root.dataset.familyLoading = 'false';

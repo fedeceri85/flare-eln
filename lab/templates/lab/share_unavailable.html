@@ -1,0 +1,8 @@
+{% extends 'lab/base.html' %}
+{% block title %}Shared record unavailable{% endblock %}
+{% block page_title %}Shared record unavailable{% endblock %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block content %}
+<p role="status">{{ share_error }}</p>
+<a class="button" href="{% url 'lab:open_share_code' %}" data-open-code>Enter another code</a>
+{% endblock %}

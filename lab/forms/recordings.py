@@ -132,7 +132,6 @@ class RecordingForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.experiment = kwargs.pop("experiment")
         self.instance = kwargs.pop("instance", None)
-        self.source_recording = kwargs.pop("source_recording", None)
         self.owner = kwargs.pop("owner", None)
         selected_mice = kwargs.pop("selected_mice", None)
         selected_mouse = kwargs.pop("selected_mouse", None)
@@ -145,7 +144,7 @@ class RecordingForm(forms.Form):
 
         self.recording_type = self.experiment.recording_type
         self.dynamic_fields = []
-        initial_recording = self.instance or self.source_recording
+        initial_recording = self.instance
         self.mouse_queryset = (
             Mouse.objects
             .select_related("crossing_definition")

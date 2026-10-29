@@ -4,6 +4,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from ..models import Mouse, Procedure, ProcedureType, Protocol
+from ..views.common import url_with_query_params
 from ._support import AuthenticatedTestCase, create_test_crossing, crossing_post_data
 
 
@@ -225,7 +226,10 @@ class MicePageTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], self.mice_url)
+        self.assertEqual(response["Location"], url_with_query_params(
+            reverse("lab:view_selected_mice_all"), selected_mouse=["MICE-ADDED-NO-PROTOCOL"],
+            return_url=self.mice_url,
+        ))
 
         mouse = Mouse.objects.get(pk="MICE-ADDED-NO-PROTOCOL")
         self.assertEqual(mouse.protocol, self.non_regulated_protocol)
@@ -304,7 +308,7 @@ class MicePageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
-            Mouse.objects.filter(mouse_id="20260102_line-a_mut1-x-mut2_1").exists()
+            Mouse.objects.filter(mouse_id="260102_Mut1Mu_linea_1").exists()
         )
 
     def test_mouse_id_preview_uses_structured_crossing_without_species_or_cross_separator(self):
@@ -324,8 +328,8 @@ class MicePageTests(AuthenticatedTestCase):
         self.assertEqual(
             response.json(),
             {
-                "base_id": "20260102_mut1mut2_linea_7",
-                "final_id": "20260102_mut1mut2_linea_7",
+                "base_id": "260102_Mut1Mu_linea_7",
+                "final_id": "260102_Mut1Mu_linea_7",
             },
         )
 
@@ -380,7 +384,10 @@ class MicePageTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], self.mice_url)
+        self.assertEqual(response["Location"], url_with_query_params(
+            reverse("lab:view_selected_mice_all"), selected_mouse=["LITTER-30", "LITTER-31"],
+            return_url=self.mice_url,
+        ))
 
         mice = list(
             Mouse.objects

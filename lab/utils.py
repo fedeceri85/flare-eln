@@ -1,30 +1,50 @@
 import re
+import unicodedata
 
 from django.utils.text import slugify
 
 from .models import Mouse
 
 
-def generate_mouse_id(date_of_birth, breeding_pair, crossing, tattoo):
-    breeding_pair = slugify(breeding_pair).replace("-", "")
-    crossing = slugify(crossing).replace("-", "").replace("x","")
-    tattoo = tattoo.upper().replace(" ", "")
-
-    base = f"{date_of_birth:%Y%m%d}_{crossing}_{breeding_pair}_{tattoo}"
-
-    mouse_id = base
-    counter = 1
-
-    while Mouse.objects.filter(mouse_id=mouse_id).exists():
-        mouse_id = f"{base}_{counter}"
-        counter += 1
-
-    return mouse_id
+def crossing_id_code(crossing):
+    """Short label in saved line order; accept legacy text callers too."""
+    names = ([line.name for line in crossing.ordered_lines()]
+             if hasattr(crossing, "ordered_lines")
+             else re.split(r"\s+[xX]\s+|×", str(crossing)))
+    parts = []
+    for index, name in enumerate(names):
+        if index == 0:
+            # Underscores and punctuation separate allele markers too. Keep
+            # meaningful substrings such as Creb1 and Foxp2 intact.
+            name = re.sub(
+                r"(?<![A-Za-z0-9])(flox|ko|cre)(?![A-Za-z0-9])",
+                lambda match: {"flox": "f", "ko": "k", "cre": "c"}[match.group().lower()],
+                name.strip(), flags=re.IGNORECASE,
+            )
+        # Preserve case and meaningful letters (including x inside a line).
+        compact = re.sub(r"[^A-Za-z0-9]", "", unicodedata.normalize("NFKD", name))
+        parts.append(compact if index == 0 else "".join(c for c in compact if c.isalpha())[:2])
+    return "".join(parts) or "crossing"
 
 
 def litter_id_prefix(date_of_birth, breeding_pair, crossing):
-    """A visible, deterministic prefix for animals without assigned IDs."""
-    return f"{date_of_birth:%Y%m%d}_{slugify(breeding_pair)}_{slugify(crossing)}_"
+    """Shared visible prefix for newly generated animal IDs."""
+    pair = slugify(breeding_pair).replace("-", "")
+    return f"{date_of_birth:%y%m%d}_{crossing_id_code(crossing)}_{pair}_"
+
+
+def mouse_id_base(date_of_birth, breeding_pair, crossing, tattoo):
+    return litter_id_prefix(date_of_birth, breeding_pair, crossing) + tattoo.upper().replace(" ", "")
+
+
+def generate_mouse_id(date_of_birth, breeding_pair, crossing, tattoo):
+    base = mouse_id_base(date_of_birth, breeding_pair, crossing, tattoo)
+    mouse_id = base
+    counter = 1
+    while Mouse.objects.filter(mouse_id=mouse_id).exists():
+        mouse_id = f"{base}_{counter}"
+        counter += 1
+    return mouse_id
 
 
 def parse_mouse_numbers(value):

@@ -1,5 +1,7 @@
 """Litter creation and pending procedure validation."""
 
+from copy import deepcopy
+
 from django import forms
 
 from ..utils import litter_id_prefix, parse_mouse_numbers
@@ -116,7 +118,6 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         self.instance = Mouse()
         super().__init__(*args, **kwargs)
 
-        configure_parent_controls(self)
         self.fields["protocol"].required = True
         self.fields["protocol"].empty_label = "Select a protocol"
         self.fields["protocol"].queryset = Protocol.objects.all().order_by(
@@ -151,7 +152,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             try:
                 dob = self.fields["date_of_birth"].clean(self.data.get(self.add_prefix("date_of_birth")))
                 pair = self.data.get(self.add_prefix("breeding_pair"), "").strip()
-                prefix = litter_id_prefix(dob, pair, self.selected_crossing.display_name) if dob and pair and self.selected_crossing else ""
+                prefix = litter_id_prefix(dob, pair, self.selected_crossing) if dob and pair and self.selected_crossing else ""
             except forms.ValidationError:
                 prefix = ""
             self.data = self.data.copy()
@@ -159,6 +160,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             self.fields["mouse_id_prefix"].widget.attrs["readonly"] = True
         self.single_mouse_mode = len(self.numbers) <= 1
         configure_genotype_modes(self, individual_default=True)
+        self.configure_individual_detail_overrides()
         self.mouse_rows = []
         choices = genotype_category_choices()
         for number in self.numbers:
@@ -169,19 +171,21 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             }.items():
                 field.widget.attrs["aria-label"] = f"Animal {number}: {field.label}"
                 self.fields[f"{stem}_{suffix}"] = field
+            row_crossing = self.individual_crossing(number) or self.selected_crossing
+            row_lines = row_crossing.ordered_lines() if row_crossing else []
             genotype_fields = []
-            for line in self.crossing_lines:
+            for line in row_lines:
                 name = f"{stem}_{genotype_field_name(line)}"
                 shared_name = genotype_field_name(line)
                 legacy_apply = "apply_shared_genotype" in self.data and not self.data.get(self.add_prefix("genotype_modes_present"))
                 if (self.is_bound
                         and (self.add_prefix(name) not in self.data or legacy_apply
-                             or (not self.single_mouse_mode and uses_shared_genotype(self, line)))):
+                             or (not self.single_mouse_mode and shared_name in self.genotype_fields and uses_shared_genotype(self, line)))):
                     # Seed new rows, preserving every explicitly posted individual result.
                     self.data[self.add_prefix(name)] = self.data.get(self.add_prefix(shared_name), "unknown")
                     uncertainty_name = self.add_prefix(f"{name}_uncertain")
                     if (uncertainty_name not in self.data or legacy_apply
-                            or (not self.single_mouse_mode and uses_shared_genotype(self, line))):
+                            or (not self.single_mouse_mode and shared_name in self.genotype_fields and uses_shared_genotype(self, line))):
                         self.data[uncertainty_name] = self.data.get(
                             self.add_prefix(f"{shared_name}_uncertain"), "")
                 self.fields[name] = forms.ChoiceField(required=False, choices=choices, initial="unknown", label=line.name,
@@ -200,7 +204,75 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                 "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{number}',
                 "local_identifier": self[f"{stem}_marking"],
                 "sex": self[f"{stem}_sex"], "genotype_fields": genotype_fields,
+                "crossing": row_crossing.display_name if row_crossing else "",
             })
+
+        new_animals = [(number, Mouse(mouse_id=row["mouse_id"])) for number, row in zip(self.numbers, self.mouse_rows)]
+        configure_parent_controls(self, new_animals=new_animals)
+
+    def configure_individual_detail_overrides(self):
+        self.individual_detail_rows = []
+        self.individual_detail_fields = {}
+        names = ["date_of_birth", "breeding_pair", "status", "severity", "cull_date",
+                 "protocol", "protocol_start_date", "crossing_definition", "notes"]
+        for number in self.numbers:
+            items = []
+            for name in names:
+                field_name = f"pup_{number}_override_{name}"
+                toggle = f"{field_name}_enabled"
+                self.fields[toggle] = forms.BooleanField(required=False, label=f"Override {name}")
+                field = deepcopy(self.fields[name])
+                enabled = self.is_bound and forms.BooleanField(required=False).clean(self.data.get(self.add_prefix(toggle)))
+                field.disabled = self.is_bound and not enabled
+                field.required = enabled and name in {"status", "protocol", "crossing_definition"}
+                if name == "crossing_definition":
+                    field.widget = forms.Select(attrs={"data-litter-crossing-override": ""})
+                    self.fields[toggle].widget.attrs["data-litter-crossing-override"] = ""
+                if name == "notes":
+                    field.widget.attrs["rows"] = 2
+                    field.help_text = "Replaces shared notes for this animal. Leave blank to clear."
+                field.widget.attrs["aria-label"] = f"Animal {number}: {field.label} override"
+                self.fields[field_name] = field
+                items.append({"checkbox": self[toggle], "field": self[field_name], "target": name})
+            self.individual_detail_fields[number] = items
+            self.individual_detail_rows.append({
+                "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{number}', "fields": items})
+
+    @property
+    def individual_detail_errors(self):
+        for row in self.individual_detail_rows:
+            row["has_errors"] = any(item["field"].errors or item["checkbox"].errors for item in row["fields"])
+        return any(row["has_errors"] for row in self.individual_detail_rows)
+
+    @property
+    def show_detail_overrides(self):
+        return not self.single_mouse_mode or any(
+            item["checkbox"].value() for row in self.individual_detail_rows for item in row["fields"]
+        )
+
+    @property
+    def show_parent_overrides(self):
+        return not self.single_mouse_mode or any(
+            control["checkbox"].value() for row in self.creation_parent_rows for control in row["controls"]
+        )
+
+    def individual_crossing(self, number):
+        name = f"pup_{number}_override_crossing_definition"
+        if self.is_bound and self.data.get(self.add_prefix(f"{name}_enabled")):
+            try:
+                return self.fields[name].clean(self.data.get(self.add_prefix(name)))
+            except forms.ValidationError:
+                pass
+        return None
+
+    def individual_values(self, number):
+        values = {name: self.cleaned_data.get(name) for name in
+                  ("date_of_birth", "breeding_pair", "status", "severity", "cull_date", "protocol",
+                   "protocol_start_date", "crossing_definition", "notes")}
+        for item in self.individual_detail_fields.get(number, []):
+            if self.cleaned_data.get(item["checkbox"].name):
+                values[item["target"]] = self.cleaned_data.get(item["field"].name)
+        return values
 
     def clean(self):
         cleaned_data = super().clean()
@@ -232,6 +304,12 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             self.add_error("procedure_drafts", "This protocol does not allow regulated procedures.")
 
         clean_parent_controls(self)
+        for number in self.numbers:
+            values = self.individual_values(number)
+            protocol = values.get("protocol")
+            if protocol is not None and not protocol.allows_regulated_procedures and cleaned_data.get("procedure_drafts"):
+                name = f"pup_{number}_override_protocol"
+                self.add_error(name, "This animal’s protocol does not allow the listed procedures.")
         return cleaned_data
 
     @property
@@ -272,17 +350,21 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
         prefix = self.cleaned_data.get("mouse_id_prefix", "")
         for number in self.numbers:
             stem = f"pup_{number}"
+            values = self.individual_values(number)
+            crossing = values["crossing_definition"]
+            lines = crossing.ordered_lines() if crossing else []
             yield {
+                "details": values,
                 "mouse_id": f"{prefix}{number}",
                 "tattoo": self.cleaned_data.get(f"{stem}_marking", ""),
                 "marking_type": self.cleaned_data.get("marking_type", ""),
                 "sex": self.cleaned_data.get(f"{stem}_sex", ""),
                 "genotype_values": {
                     line.pk: self.cleaned_data.get(f"{stem}_{genotype_field_name(line)}") or "unknown"
-                    for line in self.crossing_lines
+                    for line in lines
                 },
                 "uncertainty_values": {
                     line.pk: self.cleaned_data.get(f"{stem}_{genotype_field_name(line)}_uncertain", False)
-                    for line in self.crossing_lines
+                    for line in lines
                 },
             }

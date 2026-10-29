@@ -317,13 +317,13 @@ class RecordingImageTests(TestCase):
         self.assertEqual(self.client.post(other_url, {"action": "remove", "image_id": image.pk}).status_code, 404)
         self.assertEqual(self.client.post(self.url, {"action": "remove", "image_id": "invalid"}).status_code, 404)
 
-    def test_duplicate_recording_does_not_copy_images(self):
+    def test_new_recording_does_not_inherit_existing_images(self):
         from ..forms import RecordingForm
         self.add_image()
-        form = RecordingForm({"recording_date": "2026-10-25", "mice": ""}, experiment=self.experiment, source_recording=self.recording, owner=self.owner)
+        form = RecordingForm({"recording_date": "2026-10-25", "mice": ""}, experiment=self.experiment, owner=self.owner)
         self.assertTrue(form.is_valid(), form.errors)
-        duplicate = form.save()
-        self.assertFalse(duplicate.images.exists())
+        new_recording = form.save()
+        self.assertFalse(new_recording.images.exists())
 
     def test_manual_add_shows_media_box_and_saves_selected_images_with_recording(self):
         url = reverse("lab:add_recording", args=[self.project.pk, self.experiment.pk])

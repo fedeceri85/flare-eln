@@ -17,6 +17,7 @@
         <div class="animal-tabs-navigation">
             {% include "lab/components/mouse_editor_tabs.html" %}
             <a class="button button-primary" href="{{ edit_animals_url }}" data-mouse-summary-edit>Edit animals</a>
+            <button type="button" class="button button-share" data-share-url="{{ share_animals_url }}" data-share-animals>{% include "lab/components/share_icon.html" %} Share animal{% if selected_mice|length != 1 %}s{% endif %}</button>
         </div>
 
         <section class="bulk-section shared-mouse-details" id="mouse-panel-shared" data-mouse-tab-panel="shared">
@@ -51,11 +52,11 @@
         </section>
 
         <section class="bulk-section family-details" id="mouse-panel-family" data-mouse-tab-panel="family" data-family-load-url="{{ family_fragment_url }}" data-family-loaded="{{ family_loaded|yesno:'true,false' }}">
-            <h2 class="visually-hidden">Family details</h2>
+            <h2 class="visually-hidden">Parents and offspring</h2>
             <div data-family-content>{% if family_loaded %}{% include "lab/components/animal_family.html" %}{% endif %}</div>
             <p role="status" aria-live="polite" data-family-status></p>
-            <button type="button" class="button" data-family-retry hidden>Retry loading family details</button>
-            {% if not family_loaded %}<noscript><a href="{{ family_url }}">View family details</a></noscript>{% endif %}
+            <button type="button" class="button" data-family-retry hidden>Retry loading parents and offspring</button>
+            {% if not family_loaded %}<noscript><a href="{{ family_url }}">View parents and offspring</a></noscript>{% endif %}
         </section>
 
         {% if not single_mouse_mode %}
@@ -105,5 +106,5 @@
     {% include "lab/components/recording_image_dialog.html" %}
     <script src="{% static 'lab/recording_images.js' %}?v=recording-images-4"></script>
     <script src="{% static 'lab/family_details.js' %}?v=maintenance-1"></script>
-    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=genotype-entry-1"></script>
+    <script src="{% static 'lab/mouse_editor_tabs.js' %}?v=preserve-edit-tab-1"></script>
 {% endblock %}

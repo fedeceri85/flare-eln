@@ -18,7 +18,6 @@ from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 
 from ..parentage import apply_parentage, parentage_transaction, parentage_lock
@@ -59,7 +58,7 @@ from ..ui import (
     read_filter_values,
     read_table_page_size,
 )
-from ..utils import generate_mouse_id
+from ..utils import generate_mouse_id, mouse_id_base
 from .common import (
     add_recording_url,
     animal_summary_context,
@@ -335,25 +334,26 @@ def create_litter_mice(selected_protocol, form, *, added_by=None):
     litter_protocol = cleaned_data.get("protocol") or selected_protocol
     mice = []
     for row in form.mouse_creation_rows():
+        details = row["details"]
         mouse = Mouse.objects.create(
             mouse_id=row["mouse_id"],
             added_by=added_by,
             id_status=Mouse.ID_TEMPORARY if cleaned_data.get("no_id_available") else Mouse.ID_ASSIGNED,
-            date_of_birth=cleaned_data.get("date_of_birth"),
+            date_of_birth=details.get("date_of_birth"),
             tattoo=row["tattoo"],
             marking_type=row["marking_type"],
             sex=row["sex"],
-            status=cleaned_data["status"],
-            protocol_start_date=cleaned_data.get("protocol_start_date"),
-            cull_date=cleaned_data.get("cull_date"),
-            protocol=litter_protocol,
-            severity=cleaned_data.get("severity", ""),
-            notes=cleaned_data.get("notes", ""),
-            breeding_pair=cleaned_data.get("breeding_pair", ""),
+            status=details["status"],
+            protocol_start_date=details.get("protocol_start_date"),
+            cull_date=details.get("cull_date"),
+            protocol=details["protocol"],
+            severity=details.get("severity", ""),
+            notes=details.get("notes", ""),
+            breeding_pair=details.get("breeding_pair", ""),
         )
         sync_mouse_structured_genetics(
             mouse,
-            cleaned_data["crossing_definition"],
+            details["crossing_definition"],
             row["genotype_values"],
             uncertainty_values=row["uncertainty_values"],
         )
@@ -365,7 +365,17 @@ def create_litter_mice(selected_protocol, form, *, added_by=None):
                 **procedure_values,
             )
 
-    form.parentage_warnings = list(dict.fromkeys([*getattr(form, "parentage_resolution_warnings", []), *apply_parentage({mouse.pk: form.cleaned_data.get("shared_parentage", {}) for mouse in mice})]))
+    parentage = {
+        mouse.pk: {
+            **form.cleaned_data.get("shared_parentage", {}),
+            **form.cleaned_data.get("parentage_updates", {}).get(mouse.pk, {}),
+        }
+        for mouse in mice
+    }
+    form.parentage_warnings = list(dict.fromkeys([
+        *getattr(form, "parentage_resolution_warnings", []),
+        *apply_parentage(parentage),
+    ]))
     return mice, litter_protocol
 
 
@@ -895,6 +905,8 @@ def add_litter(request, protocol_number=None, licence_reference=None):
             return JsonResponse({
                 "html": render_to_string("lab/components/litter_mouse_rows.html", {"form": form}, request=request),
                 "genotype_html": render_to_string("lab/components/litter_shared_genotypes.html", {"form": form}, request=request),
+                "detail_overrides_html": render_to_string("lab/components/individual_animal_overrides.html", {"form": form}, request=request),
+                "parent_overrides_html": render_to_string("lab/components/litter_parent_overrides.html", {"form": form}, request=request),
                 "mouse_count": len(form.mouse_rows),
                 "prefix": form.data.get("mouse_id_prefix", ""),
                 "errors": errors,
@@ -946,7 +958,11 @@ def add_litter(request, protocol_number=None, licence_reference=None):
                         destination = return_url
                     else:
                         destination = procedure_protocol_url(litter_protocol)
-                    return redirect(destination)
+                    return redirect(url_with_query_params(
+                        reverse("lab:view_selected_mice_all"),
+                        selected_mouse=[mouse.pk for mouse in mice],
+                        return_url=destination,
+                    ))
     else:
         form = LitterCreateForm(selected_protocol=selected_protocol)
     can_add_litter_procedure = (
@@ -1010,19 +1026,11 @@ def mouse_id_preview(request):
     if crossing is None:
         return JsonResponse({})
 
-    breeding_pair_clean = slugify(breeding_pair).replace("-", "")
-    crossing_clean = slugify(crossing.display_name).replace("-", "").replace("x", "")
-    tattoo_clean = tattoo.upper().replace(" ", "")
-    base_id = (
-        f"{date_of_birth:%Y%m%d}_"
-        f"{crossing_clean}_"
-        f"{breeding_pair_clean}_"
-        f"{tattoo_clean}"
-    )
+    base_id = mouse_id_base(date_of_birth, breeding_pair, crossing, tattoo)
     final_id = generate_mouse_id(
         date_of_birth,
         breeding_pair,
-        crossing.display_name,
+        crossing,
         tattoo,
     )
 
