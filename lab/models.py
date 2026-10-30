@@ -1109,3 +1109,33 @@ class ShareCodeCounter(models.Model):
     kind = models.CharField(max_length=1, primary_key=True)
     allocated = models.PositiveBigIntegerField(default=0)
     use_three_words = models.BooleanField(default=False)
+
+
+class UsageEvent(models.Model):
+    CODE_CREATED = "code_created"
+    CODE_REUSED = "code_reused"
+    REPORT_EXPORTED = "report_exported"
+    EVENT_CHOICES = [
+        (CODE_CREATED, "Code generated"),
+        (CODE_REUSED, "Code reused"),
+        (REPORT_EXPORTED, "Report exported"),
+    ]
+    event_type = models.CharField(max_length=24, choices=EVENT_CHOICES)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    username = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    target_type = models.CharField(max_length=16, choices=[("animals", "Animals"), ("recording", "Recording"), ("experiment", "Experiment")])
+    reference = models.CharField(max_length=64, blank=True, help_text="Share code or experiment ID.")
+    object_count = models.PositiveIntegerField(default=0, help_text="Number of animals or recordings.")
+    format = models.CharField(max_length=4, blank=True, choices=[("pdf", "PDF"), ("xlsx", "Excel")])
+    source = models.CharField(max_length=16, choices=[("sharing", "Sharing"), ("report", "Report export")])
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(fields=["event_type", "-created_at"], name="usage_type_created_idx"),
+            models.Index(fields=["user", "-created_at"], name="usage_user_created_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} - {self.username}"

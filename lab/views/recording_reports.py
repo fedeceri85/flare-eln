@@ -7,6 +7,8 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from ..models import UsageEvent
+from ..usage import record_usage
 from ..recording_reports import recording_report_data, render_recording_excel, render_recording_pdf
 from .common import experiment_for_project_or_404, experiment_recordings_url, safe_return_url
 from .recordings import order_recordings
@@ -53,6 +55,11 @@ def recording_report(request, project_pk, experiment_pk):
                 response = HttpResponse(content, content_type=content_type)
                 response["Content-Disposition"] = f'attachment; filename="experiment-{experiment.pk}-recordings-{timezone.localdate():%Y-%m-%d}.{output_format}"'
                 response["Cache-Control"] = "private, no-store"
+                record_usage(
+                    UsageEvent.REPORT_EXPORTED, request.user, source="report",
+                    target_type="experiment", reference=str(experiment.pk),
+                    object_count=len(data["rows"]), format=output_format,
+                )
                 return response
     response = render(request, "lab/recording_report.html", {
         "project": project, "experiment": experiment, "form": form,

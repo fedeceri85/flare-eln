@@ -68,12 +68,15 @@ class AnimalReportTests(AuthenticatedTestCase):
         self.assertEqual(sheet["H4"].value, "Report gene")
         self.assertIn("A3:A4", str(sheet.merged_cells))
         row = [cell.value for cell in sheet[5]]
-        self.assertEqual(row[:3], ["Animal / 001\nLocal ID: 007", "Female", "Black and white"])
+        self.assertEqual(row[:3], ["Animal / 001\n007", "F", "Black and white"])
         self.assertEqual(row[3], datetime(2026, 1, 2))
         self.assertEqual(row[4:7], ["Pair A", "DAD-1", "External mum"])
         self.assertIn("(uncertain)", row[7])
         self.assertEqual(row[8], self.mouse.notes)
         self.assertEqual(sheet["D5"].number_format, "dd/mm/yyyy")
+        for cell in (sheet["A1"], sheet["A3"], sheet["A5"], sheet["B5"], sheet["I5"]):
+            self.assertEqual(cell.alignment.horizontal, "center")
+            self.assertEqual(cell.alignment.vertical, "center")
         self.assertEqual(sheet.freeze_panes, "B5")
         self.assertEqual(workbook.worksheets[1]["H5"].value, "Legacy call")
         self.assertEqual(SharedLink.objects.count(), 1)

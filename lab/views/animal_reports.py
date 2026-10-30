@@ -8,7 +8,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from ..animal_reports import report_groups, render_excel, render_pdf
-from ..models import Mouse
+from ..models import Mouse, UsageEvent
+from ..usage import record_usage
 from ..sharing import share_animals
 from .common import safe_return_url, selected_mice_for_ids, selected_mouse_ids, url_with_query_params
 
@@ -31,7 +32,7 @@ def animal_report(request):
     if request.method == "POST" and form.is_valid():
         groups = report_groups(mice)
         try:
-            link = share_animals(mouse_ids, "", request.user)
+            link = share_animals(mouse_ids, "", request.user, source="report")
         except ValidationError as exc:
             form.add_error(None, exc)
         else:
@@ -41,6 +42,11 @@ def animal_report(request):
             response = HttpResponse(content, content_type=content_type)
             response["Content-Disposition"] = f'attachment; filename="animal-summary-{timezone.localdate():%Y-%m-%d}.{output_format}"'
             response["Cache-Control"] = "private, no-store"
+            record_usage(
+                UsageEvent.REPORT_EXPORTED, request.user, source="report",
+                target_type="animals", reference=link.code,
+                object_count=len(mice), format=output_format,
+            )
             return response
     response = render(request, "lab/animal_report.html", {
         "form": form, "selected_mice": mice, "return_url": return_url,

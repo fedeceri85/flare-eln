@@ -10,6 +10,7 @@ from xkcdpass import xkcd_password
 
 from .models import Mouse, Recording, ShareCodeCounter, SharedAnimalIdentity, SharedLink
 from .parentage import parentage_transaction
+from .usage import record_code_usage
 
 ANIMAL_TABS = {"shared", "individual", "family", "procedures", "services"}
 
@@ -40,12 +41,13 @@ def generate_share_code(kind, word_count):
     )
 
 
-def allocate_share(kind, user, *, recording=None, identities=(), selection_key=None, tab=""):
+def allocate_share(kind, user, *, recording=None, identities=(), selection_key=None, tab="", source="sharing"):
     """Called inside a transaction; serialize allocations by prefix, not COUNT(*)."""
     counter, _ = ShareCodeCounter.objects.select_for_update().get_or_create(kind=kind)
     lookup = {"recording": recording} if recording is not None else {"selection_key": selection_key}
     existing = SharedLink.objects.filter(kind=kind, **lookup).first()
     if existing is not None:
+        record_code_usage(existing, user, created=False, source=source, object_count=len(identities) if recording is None else 1)
         return existing
     limit = getattr(settings, "SHARE_CODE_TWO_WORD_LIMIT", len(share_words()) ** 2 // 2)
     if counter.allocated >= limit:
@@ -68,12 +70,13 @@ def allocate_share(kind, user, *, recording=None, identities=(), selection_key=N
                 link.animals.set(identities)
             counter.allocated += 1
             counter.save(update_fields=["allocated", "use_three_words"])
+            record_code_usage(link, user, created=True, source=source, object_count=len(identities) if recording is None else 1)
             return link
     raise ValidationError("Could not allocate a share code. Please try again.")
 
 
 @parentage_transaction
-def share_animals(mouse_ids, tab, user):
+def share_animals(mouse_ids, tab, user, *, source="sharing"):
     mouse_ids = list(dict.fromkeys(mouse_ids))
     if not mouse_ids or len(mouse_ids) > 500:
         raise ValidationError("Select between 1 and 500 animals to share.")
@@ -84,7 +87,7 @@ def share_animals(mouse_ids, tab, user):
     tab = "shared" if len(mice) == 1 else "individual"
     identities = [SharedAnimalIdentity.objects.get_or_create(mouse=mouse)[0] for mouse in mice]
     key = sha256((",".join(sorted(str(identity.pk) for identity in identities))).encode()).hexdigest()
-    return allocate_share(SharedLink.ANIMALS, user, identities=identities, selection_key=key, tab=tab)
+    return allocate_share(SharedLink.ANIMALS, user, identities=identities, selection_key=key, tab=tab, source=source)
 
 
 @transaction.atomic

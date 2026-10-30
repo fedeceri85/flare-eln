@@ -15,7 +15,7 @@ from .models import CrossingLine, genotype_category_labels
 
 HEADINGS = ("ID", "Sex", "Colour", "Date of Birth", "Breeding pair", "Dad", "Mum", "Genotype", "Notes")
 WIDTHS = (28, 11, 18, 16, 20, 22, 22, 39, 44)
-PDF_WIDTHS = (84, 45, 58, 68, 60, 65, 65)
+PDF_WIDTHS = (56, 36, 38, 60, 49, 40, 40)
 
 
 def is_missing_genotype_value(value):
@@ -70,8 +70,9 @@ def report_groups(mice):
 def render_pdf(groups, share_code):
     import reportlab
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_LEFT
-    from reportlab.lib.pagesizes import A3, A4, landscape
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
@@ -82,7 +83,7 @@ def render_pdf(groups, share_code):
     for name, filename in (("ReportVera", "Vera.ttf"), ("ReportVeraBold", "VeraBd.ttf")):
         if name not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(TTFont(name, str(fonts / filename)))
-    style = ParagraphStyle("ReportCell", fontName="ReportVera", fontSize=8, leading=11, alignment=TA_LEFT, splitLongWords=True)
+    style = ParagraphStyle("ReportCell", fontName="ReportVera", fontSize=8, leading=10, alignment=TA_CENTER, splitLongWords=True)
     heading_style = ParagraphStyle("ReportHeading", parent=style, fontName="ReportVeraBold", fontSize=8)
 
     def paragraph(value, heading=False):
@@ -91,18 +92,18 @@ def render_pdf(groups, share_code):
         return Paragraph(escape(str(value or "")).replace("\n", "<br/>"), heading_style if heading else style)
 
     buffer = BytesIO()
-    page_size = A3 if max(len(group["genotype_columns"]) for group in groups) > 3 else A4
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(page_size), leftMargin=28, rightMargin=28, topMargin=48, bottomMargin=35,
+    margin = 25 * mm
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=margin, rightMargin=margin, topMargin=margin + 20, bottomMargin=margin + 16,
                             title="Animal summary", author="FLARE-ELN")
     generated = timezone.localdate().strftime("%d/%m/%Y")
 
     def page_frame(canvas, document):
         canvas.saveState()
         canvas.setFont("ReportVeraBold", 14)
-        canvas.drawString(28, document.pagesize[1] - 28, "Animal summary")
+        canvas.drawString(margin, document.pagesize[1] - margin, "Animal summary")
         canvas.setFont("ReportVera", 8)
-        canvas.drawString(28, 19, f"FLARE-ELN | Generated {generated}")
-        canvas.drawRightString(document.pagesize[0] - 28, 19, f"Page {document.page}")
+        canvas.drawString(margin, margin, f"FLARE-ELN | Generated {generated}")
+        canvas.drawRightString(document.pagesize[0] - margin, margin, f"Page {document.page}")
         canvas.restoreState()
 
     story = []
@@ -110,6 +111,12 @@ def render_pdf(groups, share_code):
         if story:
             story.append(PageBreak())
         count = len(group["genotype_columns"])
+        # Scale every column and its text together to fit the portrait page.
+        natural_widths = [*PDF_WIDTHS, *([65] * count), 80]
+        scale = min(1, doc.width / sum(natural_widths))
+        widths = [width * scale for width in natural_widths]
+        style = ParagraphStyle("ScaledReportCell", parent=style, fontSize=8 * scale, leading=10 * scale)
+        heading_style = ParagraphStyle("ScaledReportHeading", parent=heading_style, fontSize=8 * scale, leading=10 * scale)
         last = 7 + count
         metadata = [""] * (last + 1)
         metadata[0] = paragraph("STRAIN: " + group["strain"], True)
@@ -117,9 +124,10 @@ def render_pdf(groups, share_code):
         top = [paragraph(heading, True) for heading in HEADINGS[:7]] + [paragraph("Genotype", True)] + [""] * (count - 1) + [paragraph("Notes", True)]
         bottom = [""] * 7 + [paragraph(line, True) for line in group["genotype_columns"]] + [""]
         rows = [metadata, top, bottom]
-        rows.extend([paragraph(value) for value in row] for row in group["rows"])
-        genotype_width = doc.width - sum(PDF_WIDTHS) - 120
-        widths = [*PDF_WIDTHS, *([genotype_width / count] * count), 120]
+        for row in group["rows"]:
+            sex = {"Male": "M", "Female": "F", "M": "M", "F": "F"}.get(row[1], "")
+            identity = row[0].replace("\nLocal ID: ", "\n", 1)
+            rows.append([paragraph(value) for value in (identity, sex, *row[2:])])
         table = Table(rows, colWidths=widths, repeatRows=3, splitByRow=1, splitInRow=1)
         spans = [("SPAN", (0, 0), (4, 0)), ("SPAN", (5, 0), (last, 0))]
         spans += [("SPAN", (col, 1), (col, 2)) for col in [*range(7), last]]
@@ -127,12 +135,12 @@ def render_pdf(groups, share_code):
             spans.append(("SPAN", (7, 1), (last - 1, 1)))
         table.setStyle(TableStyle([
             *spans,
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("VALIGN", (0, 1), (-1, 2), "MIDDLE"),
             ("BACKGROUND", (0, 1), (-1, 2), colors.HexColor("#e8eef3")),
             ("GRID", (0, 1), (-1, -1), .45, colors.HexColor("#8798a5")),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3 * scale), ("RIGHTPADDING", (0, 0), (-1, -1), 3 * scale),
+            ("TOPPADDING", (0, 0), (-1, -1), 7 * scale), ("BOTTOMPADDING", (0, 0), (-1, -1), 7 * scale),
         ]))
         story.append(table)
     doc.build(story, onFirstPage=page_frame, onLaterPages=page_frame)
@@ -169,13 +177,15 @@ def render_excel(groups, share_code):
         if count > 1:
             sheet.merge_cells(start_row=3, start_column=8, end_row=3, end_column=last - 1)
         for values in group["rows"]:
-            sheet.append(list(values))
+            identity = values[0].replace("\nLocal ID: ", "\n", 1)
+            sex = {"Male": "M", "Female": "F", "M": "M", "F": "F"}.get(values[1], "")
+            sheet.append([identity, sex, *values[2:]])
         for row in sheet:
             for cell in row:
                 # Animal IDs and notes are text, including leading '=' or '+'.
                 if isinstance(cell.value, str):
                     cell.data_type = "s"
-                cell.alignment = Alignment(vertical="top", wrap_text=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                 if cell.row >= 3:
                     cell.border = border
                     cell.font = Font(size=10, bold=cell.row in (3, 4))

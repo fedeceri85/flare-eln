@@ -8,6 +8,7 @@ from .models import (
     Experiment,
     Mouse,
     LoginEvent,
+    UsageEvent,
     MouseGenotype,
     MouseLine,
     Procedure,
@@ -294,3 +295,23 @@ class ProcedureInline(admin.TabularInline):
 #     @admin.display(description="Mice")
 #     def mice_display(self, obj):
 #         return obj.mice_label
+
+
+@admin.register(UsageEvent)
+class UsageEventAdmin(admin.ModelAdmin):
+    date_hierarchy = "created_at"
+    list_display = ("created_at", "event_type", "username", "target_type", "reference", "object_count", "format", "source")
+    list_filter = ("event_type", "created_at", "user", "target_type", "format", "source")
+    search_fields = ("username", "user__username", "reference")
+    list_select_related = ("user",)
+    readonly_fields = ("created_at", "event_type", "user", "username", "target_type", "reference", "object_count", "format", "source")
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
