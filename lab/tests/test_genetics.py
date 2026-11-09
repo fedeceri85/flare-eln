@@ -89,10 +89,29 @@ class LinesCrossingsPageTests(AuthenticatedTestCase):
     def login_staff(self):
         self.client.force_login(self.staff_user)
 
-    def test_normal_user_cannot_access_lines_crossings_page(self):
-        response = self.client.get(self.url)
+    def test_normal_user_can_browse_without_management_controls(self):
+        crossing, _ = create_test_crossing(("Readable Alpha", "Readable Beta"))
+        for tab, name in (("lines", "Readable Alpha"), ("crossings", crossing.display_name)):
+            with self.subTest(tab=tab):
+                response = self.client.get(self.url, {"tab": tab, "q": "Readable"})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, name)
+                self.assertNotContains(response, 'id="add-lines"')
+                self.assertNotContains(response, 'id="create-crossing"')
+                self.assertNotContains(response, 'catalogue-row-action')
 
-        self.assertEqual(response.status_code, 403)
+    def test_normal_user_cannot_mutate_catalogue(self):
+        for action in ("add_lines", "create_crossing", "rename_line", "reorder_crossing", "delete_line", "delete_crossing"):
+            with self.subTest(action=action):
+                self.assertEqual(self.client.post(self.url, {"action": action}).status_code, 403)
+
+    def test_normal_user_cannot_open_editor(self):
+        crossing, lines = create_test_crossing(("Read only line",))
+        for params in ({"edit_line": lines[0].pk}, {"edit_crossing": crossing.pk}, {"panel": "add-lines"}):
+            response = self.client.get(self.url, params)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, 'id="catalogue-editor"')
+            self.assertNotContains(response, 'id="add-lines"')
 
     def test_staff_can_access_lines_crossings_page(self):
         self.login_staff()

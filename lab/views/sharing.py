@@ -7,9 +7,10 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_safe
 
-from ..models import SharedLink
+from ..models import SharedLink, UsageEvent
 from ..sharing import normalize_share_code, share_animals, share_recording
 from ..ui import selected_recording_url
+from ..usage import record_usage
 from .common import url_with_query_params
 
 
@@ -92,6 +93,12 @@ def open_share_code(request):
             if link is not None:
                 url, error, _ = destination(link)
                 if url:
+                    record_usage(
+                        UsageEvent.CODE_ENTERED, request.user, source="sharing",
+                        target_type="animals" if link.kind == SharedLink.ANIMALS else "recording",
+                        reference=link.code,
+                        object_count=link.animals.filter(mouse__isnull=False).count() if link.kind == SharedLink.ANIMALS else 1,
+                    )
                     short_url = reverse("lab:shared_view", args=[link.code])
                     if request.headers.get("Accept") == "application/json":
                         return JsonResponse({"url": short_url})

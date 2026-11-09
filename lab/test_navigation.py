@@ -108,8 +108,8 @@ class NavigationTests(TestCase):
 
     def test_staff_navigation_respects_permissions(self):
         response, _ = self.page("home")
-        self.assertNotContains(response, reverse("lab:lines_crossings_page"))
-        self.assertEqual(self.client.get(reverse("lab:lines_crossings_page")).status_code, 403)
+        self.assertContains(response, reverse("lab:lines_crossings_page"))
+        self.assertEqual(self.client.get(reverse("lab:lines_crossings_page")).status_code, 200)
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         response, _ = self.page("lines_crossings_page")

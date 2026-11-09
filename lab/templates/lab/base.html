@@ -7,8 +7,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}FLARE-ELN{% endblock %} · FLARE-ELN</title>
-    <link rel="stylesheet" href="{% static 'lab/app.css' %}?v=animal-reports-1">
+    <link rel="stylesheet" href="{% static 'lab/app.css' %}?v=compact-table-text-1">
     <script src="{% static 'lab/app.js' %}?v=share-codes-1" defer></script>
+    <script src="{% static 'lab/table_text.js' %}?v=compact-table-text-1" defer></script>
     <script src="{% static 'lab/sharing.js' %}?v=share-codes-1" defer></script>
 </head>
 <body{% if not request.user.is_authenticated %} class="login-page"{% endif %}>

@@ -144,7 +144,7 @@ def build_navigation(context):
     links = [
         {"label": label, "url": reverse(f"lab:{view}"), "active": key == section}
         for key, label, view in SECTIONS
-        if key != "mice" and (key != "genetics" or request.user.is_staff)
+        if key != "mice"
     ]
     breadcrumbs = [{"label": "Home", "url": reverse("lab:home")}]
 

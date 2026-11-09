@@ -277,5 +277,5 @@ class GeneticsCatalogueTests(TestCase):
         self.assertEqual(secure.post(self.url, {'action': 'rename_line', 'line_id': self.a.pk, 'name': 'bad'}).status_code, 403)
         user = get_user_model().objects.create_user(username='ordinary')
         self.client.force_login(user)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
         self.assertEqual(self.client.post(self.url, {'action': 'reorder_crossing', 'crossing_id': self.crossing.pk, 'selected_lines': f'{self.b.pk},{self.a.pk}'}).status_code, 403)

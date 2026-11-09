@@ -51,6 +51,29 @@ class UsageEventTests(AuthenticatedTestCase):
         event = UsageEvent.objects.get(event_type=UsageEvent.CODE_REUSED)
         self.assertEqual((event.reference, event.target_type, event.object_count), (link.code, "recording", 1))
 
+    def test_entered_codes_record_actor_and_destination_once(self):
+        links = [share_animals([self.mouse.pk], "", self.user), share_recording(self.recording.pk, self.user)]
+        for link, accept in zip(links, ("text/html", "application/json")):
+            response = self.client.get(reverse("lab:open_share_code"), {"code": link.code.upper()}, HTTP_ACCEPT=accept)
+            self.assertEqual(response.status_code, 200 if accept == "application/json" else 302)
+            event = UsageEvent.objects.get(event_type=UsageEvent.CODE_ENTERED, reference=link.code)
+            self.assertEqual(event.user, self.user)
+            self.assertEqual(event.username, self.user.get_username())
+            self.assertEqual(event.target_type, "animals" if link == links[0] else "recording")
+            self.assertEqual(event.object_count, 1)
+            self.assertEqual(event.source, "sharing")
+            self.client.get(reverse("lab:shared_view", args=[link.code]))
+        self.assertEqual(UsageEvent.objects.filter(event_type=UsageEvent.CODE_ENTERED).count(), 2)
+
+    def test_invalid_and_unavailable_entered_codes_are_not_logged(self):
+        url = reverse("lab:open_share_code")
+        self.client.get(url)
+        self.client.get(url, {"code": "invalid"})
+        link = share_animals([self.mouse.pk], "", self.user)
+        self.mouse.delete()
+        self.assertEqual(self.client.get(url, {"code": link.code}).status_code, 410)
+        self.assertFalse(UsageEvent.objects.filter(event_type=UsageEvent.CODE_ENTERED).exists())
+
     def test_rolled_back_code_allocation_does_not_leave_an_event(self):
         with self.assertRaises(RuntimeError):
             with transaction.atomic():

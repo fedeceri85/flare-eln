@@ -1114,10 +1114,12 @@ class ShareCodeCounter(models.Model):
 class UsageEvent(models.Model):
     CODE_CREATED = "code_created"
     CODE_REUSED = "code_reused"
+    CODE_ENTERED = "code_entered"
     REPORT_EXPORTED = "report_exported"
     EVENT_CHOICES = [
         (CODE_CREATED, "Code generated"),
         (CODE_REUSED, "Code reused"),
+        (CODE_ENTERED, "Code entered"),
         (REPORT_EXPORTED, "Report exported"),
     ]
     event_type = models.CharField(max_length=24, choices=EVENT_CHOICES)

@@ -215,7 +215,8 @@ def catalogue_letter(name):
 
 
 def lines_crossings_page(request):
-    if not request.user.is_staff:
+    can_manage_catalogue = request.user.is_staff
+    if not can_manage_catalogue and request.method != "GET":
         raise PermissionDenied
     species = selected_species_from_request(request)
     tab = request.GET.get("tab", "lines")
@@ -224,10 +225,10 @@ def lines_crossings_page(request):
     editor = None
     editor_form = None
     edit_kind = None
-    if action in {"rename_line", "delete_line"} or (request.method == "GET" and request.GET.get("edit_line")):
+    if action in {"rename_line", "delete_line"} or (can_manage_catalogue and request.method == "GET" and request.GET.get("edit_line")):
         editor = catalogue_record(MouseLine, request.POST.get("line_id") if action else request.GET["edit_line"])
         species, tab, edit_kind = editor.species, "lines", "line"
-    elif action in {"reorder_crossing", "delete_crossing"} or (request.method == "GET" and request.GET.get("edit_crossing")):
+    elif action in {"reorder_crossing", "delete_crossing"} or (can_manage_catalogue and request.method == "GET" and request.GET.get("edit_crossing")):
         editor = catalogue_record(Crossing, request.POST.get("crossing_id") if action else request.GET["edit_crossing"])
         species, tab, edit_kind = editor.species, "crossings", "crossing"
     line_form = BulkMouseLineCreateForm(initial={"species": species})
@@ -362,6 +363,7 @@ def lines_crossings_page(request):
     initial_lines = [{"id": pk, "name": selected_by_id[pk].name} for pk in dict.fromkeys(selected_ids) if pk in selected_by_id]
     hidden = [{"name": key, "value": value} for key, value in params.items() if key != "per_page"]
     return render(request, "lab/lines_crossings_page.html", {
+        "can_manage_catalogue": can_manage_catalogue,
         "selected_species": species, "species_options": Species.objects.order_by(Lower("name"), "pk"),
         "line_form": line_form, "crossing_form": crossing_form, "line_query": query,
         "active_tab": tab, "catalogue_page": page, "page_size": size,

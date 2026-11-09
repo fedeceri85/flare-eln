@@ -344,6 +344,43 @@ button.button {
     word-break: break-word;
 }
 
+.table-cell-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+    max-height: 4.2em;
+}
+
+.table-cell-text.is-expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    max-height: none;
+    overflow: visible;
+}
+
+.table-cell-text-toggle {
+    display: block;
+    border: 0;
+    padding: 2px 0 0;
+    background: none;
+    color: var(--blue);
+    font: inherit;
+    font-size: 11px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.table-cell-text-toggle[hidden] { display: none; }
+
+@media print {
+    .table-cell-text { display: block; max-height: none; overflow: visible; }
+    .table-cell-text-toggle { display: none; }
+}
+
 .empty-message {
     text-align: center;
 }
