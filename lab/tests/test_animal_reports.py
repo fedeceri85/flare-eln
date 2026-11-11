@@ -5,7 +5,7 @@ from django.test import Client, override_settings
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from ..animal_reports import HEADINGS, report_groups, render_pdf
+from ..animal_reports import HEADINGS, report_groups, render_excel, render_pdf
 from ..models import GenotypeCategory, Mouse, MouseGenotype, Protocol, SharedLink
 from ..sharing import share_animals
 from ._support import AuthenticatedTestCase, create_test_crossing
@@ -68,7 +68,12 @@ class AnimalReportTests(AuthenticatedTestCase):
         self.assertEqual(sheet["H4"].value, "Report gene")
         self.assertIn("A3:A4", str(sheet.merged_cells))
         row = [cell.value for cell in sheet[5]]
-        self.assertEqual(row[:3], ["Animal / 001\n007", "F", "Black and white"])
+        self.assertEqual(row[:3], ["Animal / 001 - 007", "F", "Black and white"])
+        rich_sheet = load_workbook(BytesIO(response.content), rich_text=True).worksheets[0]
+        self.assertEqual(rich_sheet["A5"].value[0], self.mouse.pk)
+        self.assertEqual(rich_sheet["A5"].value[1].text, " - 007")
+        self.assertEqual(rich_sheet["A5"].value[1].font.color.rgb, "00808080")
+        self.assertEqual(workbook.worksheets[1]["A5"].value, self.other.pk)
         self.assertEqual(row[3], datetime(2026, 1, 2))
         self.assertEqual(row[4:7], ["Pair A", "DAD-1", "External mum"])
         self.assertIn("(uncertain)", row[7])
@@ -99,6 +104,21 @@ class AnimalReportTests(AuthenticatedTestCase):
         self.assertIsNone(sheet["I5"].value)
         self.assertTrue(sheet["J5"].value)
         self.assertTrue(render_pdf(report_groups([self.mouse]), "m-maple-otter").startswith(b"%PDF-"))
+
+    def test_id_column_grows_to_cap_and_returns_unused_width_to_notes(self):
+        for mouse_id, local_id, expected_width in (("M1", "007", 12), ("M" * 23, "L" * 7, 35), ("M" * 80, "L" * 7, 35)):
+            with self.subTest(mouse_id=mouse_id):
+                groups = report_groups([self.mouse])
+                group = groups[0]
+                group["rows"][0] = (mouse_id, *group["rows"][0][1:])
+                group["local_identifiers"] = {mouse_id: local_id}
+                sheet = load_workbook(BytesIO(render_excel(groups, "m-maple-otter"))).active
+                self.assertEqual(sheet.column_dimensions["A"].width, expected_width)
+                self.assertEqual(sheet.column_dimensions["A"].width + sheet.column_dimensions["I"].width, 86)
+                self.assertEqual(sheet["A5"].value, f"{mouse_id} - {local_id}")
+                self.assertTrue(sheet["A5"].alignment.wrap_text)
+                if len(mouse_id) > 35:
+                    self.assertGreater(sheet.row_dimensions[5].height, 23)
 
     def test_common_missing_result_synonyms_are_blank_but_real_results_remain(self):
         category = GenotypeCategory.objects.create(code="test-result", label="Placeholder")

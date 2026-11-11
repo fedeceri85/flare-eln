@@ -14,8 +14,11 @@ from .models import CrossingLine, genotype_category_labels
 
 
 HEADINGS = ("ID", "Sex", "Colour", "Date of Birth", "Breeding pair", "Dad", "Mum", "Genotype", "Notes")
-WIDTHS = (28, 11, 18, 16, 20, 22, 22, 39, 44)
-PDF_WIDTHS = (56, 36, 38, 60, 49, 40, 40)
+WIDTHS = (35, 11, 18, 16, 20, 22, 22, 39, 51)
+# At the base 8 pt size, ID fits about 35 characters including cell padding.
+PDF_WIDTHS = (186, 24, 36, 54, 48, 40, 40)
+ID_COLUMN_PADDING = 4
+LOCAL_ID_COLOUR = "808080"
 
 
 def is_missing_genotype_value(value):
@@ -37,7 +40,7 @@ def report_groups(mice):
     for mouse in mice:
         strain = mouse.genetics_crossing_display or "Not recorded"
         key = (mouse.crossing_definition_id, strain)
-        group = groups.setdefault(key, {"strain": strain, "rows": [], "lines": OrderedDict()})
+        group = groups.setdefault(key, {"strain": strain, "rows": [], "lines": OrderedDict(), "local_identifiers": {}})
         results, legacy, _genotype = animal_genotype_details(mouse, labels)
         genotype = {}
         for result in results:
@@ -49,11 +52,10 @@ def report_groups(mice):
         if legacy and not is_missing_genotype_value(legacy):
             group["lines"][None] = "Other genotype"
             genotype[None] = legacy
-        identity = mouse.pk
         if mouse.tattoo:
-            identity += f"\nLocal ID: {mouse.tattoo}"
+            group["local_identifiers"][mouse.pk] = mouse.tattoo
         group["rows"].append((
-            identity, mouse.get_sex_display() or "Unknown", mouse.colour,
+            mouse.pk, mouse.get_sex_display() or "Unknown", mouse.colour,
             mouse.date_of_birth, mouse.breeding_pair,
             mouse.father_id or mouse.father_external_id,
             mouse.mother_id or mouse.mother_external_id, genotype, mouse.notes,
@@ -65,6 +67,13 @@ def report_groups(mice):
         group["genotype_columns"] = list(columns.values())
         group["rows"] = [(*row[:7], *(row[7].get(key, "") for key in columns), row[8]) for row in group["rows"]]
     return list(groups.values())
+
+
+def report_identifiers(group):
+    for row in group["rows"]:
+        mouse_id = row[0]
+        local_id = group["local_identifiers"].get(mouse_id)
+        yield f"{mouse_id} - {local_id}" if local_id else mouse_id
 
 
 def render_pdf(groups, share_code):
@@ -93,17 +102,18 @@ def render_pdf(groups, share_code):
 
     buffer = BytesIO()
     margin = 25 * mm
-    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=margin, rightMargin=margin, topMargin=margin + 20, bottomMargin=margin + 16,
+    side_margin = 20 * mm
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=side_margin, rightMargin=side_margin, topMargin=margin + 20, bottomMargin=margin + 16,
                             title="Animal summary", author="FLARE-ELN")
     generated = timezone.localdate().strftime("%d/%m/%Y")
 
     def page_frame(canvas, document):
         canvas.saveState()
         canvas.setFont("ReportVeraBold", 14)
-        canvas.drawString(margin, document.pagesize[1] - margin, "Animal summary")
+        canvas.drawString(side_margin, document.pagesize[1] - margin, "Animal summary")
         canvas.setFont("ReportVera", 8)
-        canvas.drawString(margin, margin, f"FLARE-ELN | Generated {generated}")
-        canvas.drawRightString(document.pagesize[0] - margin, margin, f"Page {document.page}")
+        canvas.drawString(side_margin, margin, f"FLARE-ELN | Generated {generated}")
+        canvas.drawRightString(document.pagesize[0] - side_margin, margin, f"Page {document.page}")
         canvas.restoreState()
 
     story = []
@@ -111,8 +121,14 @@ def render_pdf(groups, share_code):
         if story:
             story.append(PageBreak())
         count = len(group["genotype_columns"])
-        # Scale every column and its text together to fit the portrait page.
-        natural_widths = [*PDF_WIDTHS, *([65] * count), 80]
+        # Scale columns and text together, retaining room for IDs and longer notes.
+        natural_widths = [*PDF_WIDTHS, *([52] * count), 100]
+        identity_width = min(PDF_WIDTHS[0], max(
+            [pdfmetrics.stringWidth("ID", "ReportVeraBold", 8)]
+            + [pdfmetrics.stringWidth(identity, "ReportVera", 8) for identity in report_identifiers(group)]
+        ) + ID_COLUMN_PADDING * pdfmetrics.stringWidth("0", "ReportVera", 8))
+        natural_widths[-1] += natural_widths[0] - identity_width
+        natural_widths[0] = identity_width
         scale = min(1, doc.width / sum(natural_widths))
         widths = [width * scale for width in natural_widths]
         style = ParagraphStyle("ScaledReportCell", parent=style, fontSize=8 * scale, leading=10 * scale)
@@ -126,8 +142,11 @@ def render_pdf(groups, share_code):
         rows = [metadata, top, bottom]
         for row in group["rows"]:
             sex = {"Male": "M", "Female": "F", "M": "M", "F": "F"}.get(row[1], "")
-            identity = row[0].replace("\nLocal ID: ", "\n", 1)
-            rows.append([paragraph(value) for value in (identity, sex, *row[2:])])
+            identity = escape(row[0])
+            local_id = group["local_identifiers"].get(row[0])
+            if local_id:
+                identity += f' <font color="#{LOCAL_ID_COLOUR}">- {escape(local_id)}</font>'
+            rows.append([Paragraph(identity, style), *[paragraph(value) for value in (sex, *row[2:])]])
         table = Table(rows, colWidths=widths, repeatRows=3, splitByRow=1, splitInRow=1)
         spans = [("SPAN", (0, 0), (4, 0)), ("SPAN", (5, 0), (last, 0))]
         spans += [("SPAN", (col, 1), (col, 2)) for col in [*range(7), last]]
@@ -149,6 +168,8 @@ def render_pdf(groups, share_code):
 
 def render_excel(groups, share_code):
     from openpyxl import Workbook
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+    from openpyxl.cell.text import InlineFont
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
     from openpyxl.worksheet.page import PageMargins
@@ -163,6 +184,9 @@ def render_excel(groups, share_code):
         last = 8 + count
         last_letter = get_column_letter(last)
         widths = [*WIDTHS[:7], *([22] * count), WIDTHS[-1]]
+        identity_width = min(WIDTHS[0], max([len(HEADINGS[0])] + [len(identity) for identity in report_identifiers(group)]) + ID_COLUMN_PADDING)
+        widths[-1] += widths[0] - identity_width
+        widths[0] = identity_width
         sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=last)
         sheet.cell(1, 1, "Animal summary").font = Font(size=16, bold=True)
         sheet.merge_cells("A2:E2")
@@ -177,7 +201,10 @@ def render_excel(groups, share_code):
         if count > 1:
             sheet.merge_cells(start_row=3, start_column=8, end_row=3, end_column=last - 1)
         for values in group["rows"]:
-            identity = values[0].replace("\nLocal ID: ", "\n", 1)
+            identity = values[0]
+            local_id = group["local_identifiers"].get(identity)
+            if local_id:
+                identity = CellRichText(identity, TextBlock(InlineFont(color=LOCAL_ID_COLOUR), f" - {local_id}"))
             sex = {"Male": "M", "Female": "F", "M": "M", "F": "F"}.get(values[1], "")
             sheet.append([identity, sex, *values[2:]])
         for row in sheet:
@@ -197,7 +224,7 @@ def render_excel(groups, share_code):
                 sum(max(1, ceil(len(line) / (width - 2))) for line in str(cell.value or "").split("\n"))
                 for cell, width in zip(sheet[row], widths)
             )
-            sheet.row_dimensions[row].height = min(409, max(36, 15 * lines + 8))
+            sheet.row_dimensions[row].height = min(409, max(23, 15 * lines + 8))
         for col, width in enumerate(widths, 1):
             sheet.column_dimensions[get_column_letter(col)].width = width
         sheet.freeze_panes = "B5"
