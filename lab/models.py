@@ -1116,21 +1116,23 @@ class UsageEvent(models.Model):
     CODE_REUSED = "code_reused"
     CODE_ENTERED = "code_entered"
     REPORT_EXPORTED = "report_exported"
+    AI_PROMPT = "ai_prompt"
     EVENT_CHOICES = [
         (CODE_CREATED, "Code generated"),
         (CODE_REUSED, "Code reused"),
         (CODE_ENTERED, "Code entered"),
         (REPORT_EXPORTED, "Report exported"),
+        (AI_PROMPT, "AI prompt sent"),
     ]
     event_type = models.CharField(max_length=24, choices=EVENT_CHOICES)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     username = models.CharField(max_length=150, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    target_type = models.CharField(max_length=16, choices=[("animals", "Animals"), ("recording", "Recording"), ("experiment", "Experiment")])
+    target_type = models.CharField(max_length=16, choices=[("animals", "Animals"), ("recording", "Recording"), ("experiment", "Experiment"), ("assistant", "AI assistant")])
     reference = models.CharField(max_length=64, blank=True, help_text="Share code or experiment ID.")
     object_count = models.PositiveIntegerField(default=0, help_text="Number of animals or recordings.")
     format = models.CharField(max_length=4, blank=True, choices=[("pdf", "PDF"), ("xlsx", "Excel")])
-    source = models.CharField(max_length=16, choices=[("sharing", "Sharing"), ("report", "Report export")])
+    source = models.CharField(max_length=16, choices=[("sharing", "Sharing"), ("report", "Report export"), ("ai", "AI assistant")])
 
     class Meta:
         ordering = ["-created_at", "-pk"]

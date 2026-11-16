@@ -1,0 +1,55 @@
+{% load static %}
+<section
+    class="flare-ai-chat"
+    data-flare-ai-chat
+    data-stream-url="{% url 'flare_ai:chat_stream' %}"
+    data-reset-url="{% url 'flare_ai:reset_chat' %}"
+    data-assistant-name="{{ flare_ai_assistant_name }}"
+>
+    <button
+        type="button"
+        class="flare-ai-launcher"
+        data-ai-launcher
+        aria-controls="flare-ai-drawer"
+        aria-expanded="false"
+    >Ask {{ flare_ai_assistant_name }}</button>
+    <aside
+        id="flare-ai-drawer"
+        class="flare-ai-drawer"
+        data-ai-drawer
+        aria-label="{{ flare_ai_assistant_name }} AI assistant"
+        hidden
+    >
+        <header class="flare-ai-header">
+            <div>
+                <strong>{{ flare_ai_assistant_name }}</strong>
+                <small>FLARE-AI</small>
+            </div>
+            <div class="flare-ai-header-actions">
+                <button type="button" class="account-link" data-ai-reset>Reset</button>
+                <button type="button" class="account-link" data-ai-close aria-label="Close assistant">Close</button>
+            </div>
+        </header>
+        <ol class="flare-ai-messages" data-ai-messages aria-live="polite"></ol>
+        <div class="flare-ai-suggestions" data-ai-suggestions hidden></div>
+        <div class="flare-ai-status" data-ai-status role="status"></div>
+        <button type="button" class="button flare-ai-retry" data-ai-retry hidden>Retry interrupted message</button>
+        <form class="flare-ai-form" data-ai-form>
+            {% csrf_token %}
+            <label for="flare-ai-input" class="visually-hidden">Message {{ flare_ai_assistant_name }}</label>
+            <textarea
+                id="flare-ai-input"
+                data-ai-input
+                rows="3"
+                maxlength="4000"
+                placeholder="Ask about this page or your FLARE records"
+                required
+            ></textarea>
+            <div class="flare-ai-form-actions">
+                <button type="button" class="button" data-ai-stop hidden>Stop</button>
+                <button type="submit" class="button button-primary" data-ai-send>Send</button>
+            </div>
+        </form>
+    </aside>
+</section>
+<script src="{% static 'flare_ai/chat.js' %}?v=4" defer></script>

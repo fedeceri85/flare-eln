@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import importlib.util
 import os
 from pathlib import Path
 
@@ -79,6 +80,16 @@ load_local_env_file()
 
 FLARE_VERSION = env_first("FLARE_VERSION", default="dev")
 
+# The assistant is an optional package. Keep it discoverable for Django and
+# static collection when present, while exposing no UI or routes unless enabled.
+FLARE_AI_AVAILABLE = importlib.util.find_spec("flare_ai") is not None
+FLARE_AI_ENABLED = FLARE_AI_AVAILABLE and env_bool("FLARE_AI_ENABLED", False)
+FLARE_AI_BASE_URL = env_first("FLARE_AI_BASE_URL", default="")
+FLARE_AI_API_KEY = env_first("FLARE_AI_API_KEY", default="")
+FLARE_AI_MODEL = env_first("FLARE_AI_MODEL", default="")
+FLARE_AI_GROUP_NAME = env_first("FLARE_AI_GROUP_NAME", default="FLARE AI users")
+FLARE_AI_ASSISTANT_NAME = env_first("FLARE_AI_ASSISTANT_NAME", default="Marcott-E")
+
 # Uploaded viewing copies are private and served by authenticated application views.
 RECORDING_MEDIA_ROOT = Path(env_first("FLARE_MEDIA_ROOT", default=str(BASE_DIR / "media")))
 RECORDING_MEDIA_BOUNDARY = env_first("FLARE_MEDIA_BOUNDARY", default="")
@@ -108,6 +119,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'lab.apps.LabConfig'
 ]
+if FLARE_AI_AVAILABLE:
+    INSTALLED_APPS.append("flare_ai.apps.FlareAIConfig")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -137,6 +150,10 @@ TEMPLATES = [
         },
     },
 ]
+if FLARE_AI_AVAILABLE:
+    TEMPLATES[0]["OPTIONS"]["context_processors"].append(
+        "flare_ai.context_processors.assistant"
+    )
 
 WSGI_APPLICATION = 'labdb.wsgi.application'
 

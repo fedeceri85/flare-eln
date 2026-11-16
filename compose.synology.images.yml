@@ -22,6 +22,8 @@ services:
       gunicorn labdb.wsgi:application
       --bind 0.0.0.0:8000
       --workers ${GUNICORN_WORKERS:-3}
+      --worker-class gthread
+      --threads ${GUNICORN_THREADS:-4}
       --timeout ${GUNICORN_TIMEOUT:-120}
     depends_on:
       db:
@@ -40,6 +42,12 @@ services:
       DB_PASSWORD: "${LABDB_PROD_DB_PASSWORD:?Set LABDB_PROD_DB_PASSWORD in .env}"
       FLARE_MEDIA_ROOT: /media
       FLARE_MEDIA_BOUNDARY: /media
+      FLARE_AI_ENABLED: "${FLARE_AI_ENABLED:-0}"
+      FLARE_AI_BASE_URL: "${FLARE_AI_BASE_URL:-}"
+      FLARE_AI_API_KEY: "${FLARE_AI_API_KEY:-}"
+      FLARE_AI_MODEL: "${FLARE_AI_MODEL:-}"
+      FLARE_AI_GROUP_NAME: "${FLARE_AI_GROUP_NAME:-FLARE AI users}"
+      FLARE_AI_ASSISTANT_NAME: "${FLARE_AI_ASSISTANT_NAME:-Marcott-E}"
     volumes:
       - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/external-imports:/external-imports:ro"
       - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/media:/media"

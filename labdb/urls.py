@@ -15,10 +15,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import include,path
+from django.conf import settings
+from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("lab.urls")),
 
 ]
+
+if settings.FLARE_AI_ENABLED:
+    urlpatterns.insert(1, path("ai/", include("flare_ai.urls")))
