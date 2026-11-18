@@ -79,6 +79,10 @@ def env_list(name, default=None):
 load_local_env_file()
 
 FLARE_VERSION = env_first("FLARE_VERSION", default="dev")
+# Users must log in again after eight hours.
+SESSION_COOKIE_AGE = 24 * 60 * 60
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_SAVE_EVERY_REQUEST = False
 
 # The assistant is an optional package. Keep it discoverable for Django and
 # static collection when present, while exposing no UI or routes unless enabled.

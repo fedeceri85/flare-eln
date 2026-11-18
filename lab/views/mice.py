@@ -3,6 +3,7 @@
 from copy import deepcopy
 from datetime import datetime
 from hashlib import sha256
+import time
 from urllib.parse import urlencode, urlsplit, urlunsplit
 import json
 from uuid import uuid4
@@ -24,6 +25,8 @@ from ..parentage import apply_parentage, parentage_transaction, parentage_lock
 from ..family import parent_group_version
 from ..animal_summary import build_animal_recording_sections
 from ..forms import (
+    ANIMAL_FORM_DRAFT_MAX_AGE,
+    ANIMAL_FORM_DRAFT_SESSION_KEY,
     BulkMouseDeleteConfirmForm,
     BulkMouseUpdateForm,
     BulkProcedureCreateForm,
@@ -977,7 +980,25 @@ def add_litter(request, protocol_number=None, licence_reference=None):
                         return_url=destination,
                     ))
     else:
-        form = LitterCreateForm(selected_protocol=selected_protocol)
+        form = None
+        draft_id = request.GET.get("ai_draft")
+        if draft_id:
+            drafts = request.session.get(ANIMAL_FORM_DRAFT_SESSION_KEY, {})
+            entry = drafts.get(draft_id) if isinstance(drafts, dict) else None
+            valid_entry = (
+                isinstance(entry, dict)
+                and entry.get("user_id") == str(request.user.pk)
+                and isinstance(entry.get("created_at"), (int, float))
+                and time.time() - entry["created_at"] <= ANIMAL_FORM_DRAFT_MAX_AGE
+                and isinstance(entry.get("data"), dict)
+            )
+            if valid_entry:
+                form = LitterCreateForm(entry["data"], selected_protocol=selected_protocol)
+                messages.info(request, "AI-prepared draft loaded. Review every value before saving.")
+            else:
+                messages.warning(request, "This AI-prepared animal draft is missing or expired. Start a new conversation draft.")
+        if form is None:
+            form = LitterCreateForm(selected_protocol=selected_protocol)
     can_add_litter_procedure = (
         selected_protocol is not None
         and selected_protocol.allows_regulated_procedures

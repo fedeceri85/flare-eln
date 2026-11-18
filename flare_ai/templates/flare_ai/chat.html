@@ -12,7 +12,10 @@
         data-ai-launcher
         aria-controls="flare-ai-drawer"
         aria-expanded="false"
-    >Ask {{ flare_ai_assistant_name }}</button>
+    >
+        <span class="flare-ai-launcher-emoji" aria-hidden="true">✨</span>
+        Ask {{ flare_ai_assistant_name }}
+    </button>
     <aside
         id="flare-ai-drawer"
         class="flare-ai-drawer"
@@ -36,6 +39,18 @@
         <button type="button" class="button flare-ai-retry" data-ai-retry hidden>Retry interrupted message</button>
         <form class="flare-ai-form" data-ai-form>
             {% csrf_token %}
+            <div class="flare-ai-attachment-row">
+                <button type="button" class="button flare-ai-attach" data-ai-attach>Attach</button>
+                <div class="flare-ai-attachment" data-ai-attachment hidden>
+                    <span class="flare-ai-attachment-chip" data-ai-attachment-chip></span>
+                    <button
+                        type="button"
+                        class="flare-ai-attachment-remove"
+                        data-ai-remove-attachment
+                        aria-label="Remove attached file"
+                    >Remove</button>
+                </div>
+            </div>
             <label for="flare-ai-input" class="visually-hidden">Message {{ flare_ai_assistant_name }}</label>
             <textarea
                 id="flare-ai-input"
@@ -49,7 +64,16 @@
                 <button type="button" class="button" data-ai-stop hidden>Stop</button>
                 <button type="submit" class="button button-primary" data-ai-send>Send</button>
             </div>
+            <p class="flare-ai-attachment-help" data-ai-attachment-help>Attach a CSV, XLSX, TXT or MD file (up to 10 MB).</p>
+            <input
+                type="file"
+                data-ai-file-input
+                accept=".csv,.xlsx,.txt,.md"
+                class="visually-hidden"
+                tabindex="-1"
+                aria-hidden="true"
+            >
         </form>
     </aside>
 </section>
-<script src="{% static 'flare_ai/chat.js' %}?v=4" defer></script>
+<script src="{% static 'flare_ai/chat.js' %}?v=5" defer></script>

@@ -3,15 +3,72 @@
     right: 24px;
     bottom: 15px;
     z-index: 70;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
     border: 0;
     border-radius: 999px;
-    padding: 12px 18px;
-    background: var(--blue, #215d91);
+    padding: 13px 20px;
+    background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 45%, var(--blue, #215d91) 100%);
     color: #fff;
-    box-shadow: 0 8px 28px #17395c33;
+    box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33;
     cursor: pointer;
     font: inherit;
     font-weight: 700;
+    letter-spacing: .01em;
+    transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
+    animation: flare-ai-launcher-pulse 3.2s ease-out infinite;
+}
+
+.flare-ai-launcher:hover {
+    transform: translateY(-2px) scale(1.03);
+    filter: brightness(1.07);
+    animation: none;
+    box-shadow: 0 14px 32px #4c1d9566, 0 4px 10px #17395c33;
+}
+
+.flare-ai-launcher:focus-visible {
+    outline: 3px solid #7c3aed;
+    outline-offset: 3px;
+}
+
+.flare-ai-launcher:active {
+    transform: translateY(0) scale(.98);
+    filter: brightness(.97);
+}
+
+.flare-ai-launcher-emoji {
+    display: inline-block;
+    font-size: 1.25em;
+    line-height: 1;
+    animation: flare-ai-launcher-wiggle 4.5s ease-in-out infinite;
+}
+
+@keyframes flare-ai-launcher-pulse {
+    0% {
+        box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33, 0 0 0 0 rgba(124, 58, 237, .35);
+    }
+    70% {
+        box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33, 0 0 0 14px rgba(124, 58, 237, 0);
+    }
+    100% {
+        box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33, 0 0 0 0 rgba(124, 58, 237, 0);
+    }
+}
+
+@keyframes flare-ai-launcher-wiggle {
+    0%, 88%, 100% { transform: rotate(0deg) scale(1); }
+    90% { transform: rotate(16deg) scale(1.12); }
+    93% { transform: rotate(-10deg) scale(1.05); }
+    96% { transform: rotate(6deg) scale(1.08); }
+    98% { transform: rotate(-3deg) scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .flare-ai-launcher,
+    .flare-ai-launcher-emoji { animation: none; }
+    .flare-ai-launcher { transition: none; }
+    .flare-ai-launcher:hover { transform: none; }
 }
 
 .flare-ai-drawer {
@@ -194,6 +251,70 @@
     margin-top: 8px;
 }
 
+.flare-ai-attachment-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.flare-ai-attach { white-space: nowrap; }
+
+.flare-ai-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 5px 7px 5px 11px;
+    border: 1px solid var(--border, #c7d3dc);
+    border-radius: 999px;
+    background: #eef4f8;
+}
+
+.flare-ai-attachment[hidden] { display: none; }
+
+.flare-ai-attachment-chip {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #33475a;
+    font-size: .85rem;
+}
+
+.flare-ai-attachment-remove {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 999px;
+    padding: 4px 11px;
+    background: #d5e2ec;
+    color: #215d91;
+    cursor: pointer;
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 650;
+}
+
+.flare-ai-attachment-remove:hover,
+.flare-ai-attachment-remove:focus-visible { background: #c2d5e4; }
+
+.flare-ai-attachment-help {
+    margin: 8px 0 0;
+    color: #526474;
+    font-size: .78rem;
+}
+
+.flare-ai-message-attachment {
+    margin-top: 7px;
+    padding: 5px 10px;
+    border: 1px solid var(--border, #c7d3dc);
+    border-radius: 999px;
+    background: #fff;
+    color: #33475a;
+    font-size: .8rem;
+    overflow-wrap: anywhere;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -209,4 +330,7 @@
 @media (max-width: 640px) {
     .flare-ai-drawer { inset: 0; width: 100%; }
     .flare-ai-launcher { right: 16px; bottom: 16px; }
+    .flare-ai-attachment-row { flex-direction: column; align-items: stretch; }
+    .flare-ai-attachment { width: 100%; }
+    .flare-ai-attachment-remove { margin-left: auto; }
 }

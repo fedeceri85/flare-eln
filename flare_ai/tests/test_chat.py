@@ -1,12 +1,20 @@
 import json
+from datetime import timedelta
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import TestCase, override_settings
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from django.utils.datastructures import MultiValueDict
+from django.utils import timezone
 
+from flare_ai.attachments import MAX_ATTACHMENT_BYTES, RequestAttachment, attachment_from_files
 from flare_ai.context import resolve_page_context
 from flare_ai.views import SESSION_KEY, STARTER_QUESTIONS
 from lab.models import Experiment, Project, UsageEvent
@@ -34,6 +42,15 @@ class FakeAgent:
     def run_stream_sync(self, message, **kwargs):
         self.calls.append((message, kwargs))
         return FakeStreamResult()
+
+
+class FailingAgent:
+    def __init__(self):
+        self.calls = []
+
+    def run_stream_sync(self, message, **kwargs):
+        self.calls.append((message, kwargs))
+        raise RuntimeError("provider exploded")
 
 
 @override_settings(
@@ -98,6 +115,7 @@ class ChatEndpointTests(TestCase):
         self.assertEqual(events[1]["text"], "Hello ")
         self.assertIn(conversation_id, self.client.session[SESSION_KEY])
         self.assertEqual(fake.calls[0][1]["deps"].page.route, "mice_page")
+        self.assertIsNotNone(fake.calls[0][1]["deps"].session)
         usage = UsageEvent.objects.get(event_type=UsageEvent.AI_PROMPT)
         self.assertEqual(usage.user, self.user)
         self.assertEqual(usage.username, self.user.username)
@@ -105,7 +123,42 @@ class ChatEndpointTests(TestCase):
         self.assertEqual(usage.target_type, "assistant")
         self.assertEqual(usage.object_count, 1)
         self.assertEqual(usage.reference, "")
-        self.assertEqual(usage.get_event_type_display(), "AI prompt sent")
+        self.assertEqual(usage.get_event_type_display(), "AI assistant used")
+
+    def test_usage_events_are_limited_per_user_and_day(self):
+        self.grant_access()
+        fake = FakeAgent()
+        today = timezone.localdate()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            with patch("lab.usage.timezone.localdate", return_value=today):
+                for _ in range(2):
+                    response = self.post_stream()
+                    b"".join(response.streaming_content)
+
+                other = get_user_model().objects.create_user(username="other-ai-user")
+                other.groups.add(self.ai_group)
+                self.client.force_login(other)
+                response = self.post_stream()
+                b"".join(response.streaming_content)
+
+            self.client.force_login(self.user)
+            with patch(
+                "lab.usage.timezone.localdate", return_value=today + timedelta(days=1)
+            ):
+                response = self.post_stream()
+                b"".join(response.streaming_content)
+
+        events = UsageEvent.objects.filter(event_type=UsageEvent.AI_PROMPT)
+        self.assertEqual(events.count(), 3)
+        self.assertEqual(
+            events.filter(user=self.user, usage_date=today).count(),
+            1,
+        )
+        self.assertEqual(
+            events.filter(user=self.user, usage_date=today + timedelta(days=1)).count(),
+            1,
+        )
+        self.assertEqual(events.filter(user=other, usage_date=today).count(), 1)
 
     def test_provider_failure_still_counts_the_user_attempt(self):
         self.grant_access()
@@ -179,6 +232,223 @@ class ChatEndpointTests(TestCase):
         self.assertContains(response, "Ask Lab Helper")
         self.assertContains(response, "Message Lab Helper")
         self.assertNotContains(response, "Marcott-E")
+
+    # -- Request-scoped file attachments ---------------------------------
+    def post_multipart(self, *, name="data.csv", content=b"a,b,c\n1,2,3", content_type="text/csv", **overrides):
+        data = {
+            "conversation_id": str(uuid4()),
+            "message": "What is this?",
+            "page_path": "/mice/",
+            "attachment": SimpleUploadedFile(name, content, content_type=content_type),
+        }
+        data.update(overrides)
+        return self.client.post(reverse("flare_ai:chat_stream"), data=data)
+
+    def test_multipart_prompt_accepts_all_supported_extensions(self):
+        self.grant_access()
+        fake = FakeAgent()
+        cases = [
+            ("table.csv", "text/csv"),
+            ("book.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            ("notes.txt", "text/plain"),
+            ("readme.md", "text/markdown"),
+        ]
+        for name, content_type in cases:
+            with patch("flare_ai.views.get_agent", return_value=fake):
+                response = self.post_multipart(name=name, content_type=content_type)
+                self.assertEqual(response.status_code, 200, name)
+                body = b"".join(response.streaming_content).decode()
+            events = [json.loads(line) for line in body.splitlines()]
+            self.assertEqual(events[0]["type"], "start", name)
+            attachment = fake.calls[-1][1]["deps"].attachment
+            self.assertIsNotNone(attachment, name)
+            self.assertEqual(attachment.name, name)
+            self.assertEqual(attachment.suffix, Path(name).suffix.lower())
+            self.assertIsInstance(attachment.upload, UploadedFile)
+
+    def test_attachment_metadata_reaches_agent_context(self):
+        self.grant_access()
+        fake = FakeAgent()
+        content = b"a,b,c\n1,2,3\n4,5,6"
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_multipart(content=content)
+            b"".join(response.streaming_content)
+        attachment = fake.calls[0][1]["deps"].attachment
+        self.assertEqual(attachment.name, "data.csv")
+        self.assertEqual(attachment.size, len(content))
+        self.assertEqual(attachment.suffix, ".csv")
+        self.assertEqual(attachment.content_type, "text/csv")
+        self.assertEqual(attachment.identifier, "file-1")
+
+    def test_json_prompt_has_no_attachment_in_context(self):
+        self.grant_access()
+        fake = FakeAgent()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_stream()
+            b"".join(response.streaming_content)
+        self.assertIsNone(fake.calls[0][1]["deps"].attachment)
+
+    def test_unsupported_extension_is_rejected_without_agent_or_usage(self):
+        self.grant_access()
+        fake = FakeAgent()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_multipart(name="file.pdf", content_type="application/pdf")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        self.assertEqual(fake.calls, [])
+        self.assertFalse(UsageEvent.objects.exists())
+
+    def test_empty_file_is_rejected_without_agent_or_usage(self):
+        self.grant_access()
+        fake = FakeAgent()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_multipart(content=b"")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(fake.calls, [])
+        self.assertFalse(UsageEvent.objects.exists())
+
+    @override_settings(DATA_UPLOAD_MAX_MEMORY_SIZE=64 * 1024 * 1024)
+    def test_oversized_file_is_rejected_without_agent_or_usage(self):
+        self.grant_access()
+        fake = FakeAgent()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_multipart(content=b"0" * (MAX_ATTACHMENT_BYTES + 1))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(fake.calls, [])
+        self.assertFalse(UsageEvent.objects.exists())
+
+    def test_multiple_files_are_rejected(self):
+        self.grant_access()
+        fake = FakeAgent()
+        boundary = "flare-test-boundary"
+        parts = [
+            "conversation_id", "11111111-1111-1111-1111-111111111111",
+            "message", "What is this?",
+            "page_path", "/mice/",
+            "attachment", "one.csv", "text/csv", "a,b",
+            "attachment", "two.csv", "text/csv", "c,d",
+        ]
+        body = b""
+        i = 0
+        while i < len(parts):
+            if parts[i] in {"attachment"}:
+                field, filename, ctype, content = parts[i:i + 4]
+                i += 4
+                body += (
+                    f"--{boundary}\r\n"
+                    f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+                    f"Content-Type: {ctype}\r\n\r\n"
+                ).encode() + content.encode() + b"\r\n"
+            else:
+                field, value = parts[i], parts[i + 1]
+                i += 2
+                body += (
+                    f"--{boundary}\r\n"
+                    f'Content-Disposition: form-data; name="{field}"\r\n\r\n'
+                ).encode() + value.encode() + b"\r\n"
+        body += f"--{boundary}--\r\n".encode()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.client.post(
+                reverse("flare_ai:chat_stream"),
+                data=body,
+                content_type=f"multipart/form-data; boundary={boundary}",
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(fake.calls, [])
+        self.assertFalse(UsageEvent.objects.exists())
+
+    def test_greeting_cannot_carry_an_attachment(self):
+        self.grant_access()
+        fake_attachment = SimpleNamespace(close=lambda: None)
+        with patch("flare_ai.views.attachment_from_files", return_value=fake_attachment):
+            response = self.post_stream(greeting=True)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("greeting", response.json()["error"].lower())
+
+    def test_upload_is_closed_after_successful_stream(self):
+        self.grant_access()
+        fake = FakeAgent()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_multipart()
+            b"".join(response.streaming_content)
+        attachment = fake.calls[0][1]["deps"].attachment
+        self.assertTrue(attachment.upload.file.closed)
+
+    def test_upload_is_closed_after_provider_failure(self):
+        self.grant_access()
+        failing = FailingAgent()
+        with patch("flare_ai.views.get_agent", return_value=failing):
+            response = self.post_multipart()
+            body = b"".join(response.streaming_content).decode()
+        events = [json.loads(line) for line in body.splitlines()]
+        self.assertEqual(events[-1]["type"], "error")
+        attachment = failing.calls[0][1]["deps"].attachment
+        self.assertTrue(attachment.upload.file.closed)
+
+    def test_upload_is_closed_when_stream_is_interrupted(self):
+        self.grant_access()
+        fake = FakeAgent()
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_multipart()
+            events = [next(response.streaming_content) for _ in range(3)]
+            # Simulate a client disconnect: close the response, aborting the stream.
+            response.close()
+        self.assertEqual([json.loads(event)["type"] for event in events], ["start", "delta", "delta"])
+        attachment = fake.calls[0][1]["deps"].attachment
+        self.assertTrue(attachment.upload.file.closed)
+
+
+class AttachmentValidationTests(SimpleTestCase):
+    def files_with(self, *uploads):
+        files = MultiValueDict()
+        if uploads:
+            files.setlist("attachment", list(uploads))
+        return files
+
+    def make_upload(self, name="data.csv", content=b"a,b,c\n1,2,3", content_type="text/csv"):
+        return SimpleUploadedFile(name, content, content_type=content_type)
+
+    def test_no_files_returns_none(self):
+        self.assertIsNone(attachment_from_files(self.files_with()))
+
+    def test_valid_file_is_wrapped(self):
+        upload = self.make_upload()
+        attachment = attachment_from_files(self.files_with(upload))
+        self.assertIsInstance(attachment, RequestAttachment)
+        self.assertEqual(attachment.name, "data.csv")
+        self.assertEqual(attachment.suffix, ".csv")
+        self.assertEqual(attachment.size, len(b"a,b,c\n1,2,3"))
+        self.assertEqual(attachment.content_type, "text/csv")
+        self.assertEqual(attachment.identifier, "file-1")
+        self.assertIs(attachment.upload, upload)
+
+    def test_unsupported_extension_is_rejected(self):
+        upload = self.make_upload(name="file.pdf", content_type="application/pdf")
+        with self.assertRaises(ValidationError):
+            attachment_from_files(self.files_with(upload))
+
+    def test_extension_only_is_not_enough_for_unsupported_file(self):
+        upload = self.make_upload(name="archive.bin", content_type="application/octet-stream")
+        with self.assertRaises(ValidationError):
+            attachment_from_files(self.files_with(upload))
+
+    def test_empty_file_is_rejected(self):
+        upload = self.make_upload(content=b"")
+        with self.assertRaises(ValidationError):
+            attachment_from_files(self.files_with(upload))
+
+    def test_oversized_file_is_rejected(self):
+        upload = self.make_upload(content=b"0" * (MAX_ATTACHMENT_BYTES + 1))
+        with self.assertRaises(ValidationError):
+            attachment_from_files(self.files_with(upload))
+
+    def test_multiple_files_are_rejected(self):
+        uploads = [
+            self.make_upload(name="one.csv", content_type="text/csv"),
+            self.make_upload(name="two.txt", content_type="text/plain"),
+        ]
+        with self.assertRaises(ValidationError):
+            attachment_from_files(self.files_with(*uploads))
 
 
 @override_settings(ROOT_URLCONF="flare_ai.tests.urls")

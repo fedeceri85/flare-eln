@@ -60,10 +60,11 @@ have separate saves; cancelling the main form does not undo those operations.
 
 Detailed topics: animal_ids, add_animals, edit_animals, genetics, parentage,
 procedures, projects, recordings, files_and_images, spreadsheet_import, reports,
-sharing and settings. The assistant explains these workflows; its current tools
-cannot click buttons, submit forms or change records. Use search_mice for its
-supported live animal searches. This manual cannot establish which laboratory
-records or files actually exist.
+sharing and settings. The assistant explains these workflows and can prepare a
+temporary Add animals draft from a conversation. The returned link opens the
+normal populated form for review; the assistant cannot click Save, submit the
+form or create records. Use search_mice for its supported live animal searches.
+This manual cannot establish which laboratory records or files actually exist.
 
 Sources: lab/navigation.py; lab/ui.py; lab/templates/lab/base.html;
 lab/templates/lab/components/filter_form.html; lab/templates/lab/components/table.html;
@@ -585,6 +586,31 @@ LLMs thorugh its settings by using the OpenAI API.
 Only members of the administrator-configured AI Django group can see or use the
 assistant, including staff and superusers. Opening an empty chat or resetting it
 warms the model with a hidden greeting, then displays starter questions. FLARE's
-usage events record one metadata-only count for each explicit user prompt; they
-do not store prompt text, responses, page context or conversation IDs, and the
-hidden greeting is not counted.
+usage events record at most one metadata-only AI usage entry per user per day,
+regardless of how many explicit prompts they send. They do not store prompt
+text, responses, page context or conversation IDs, and the hidden greeting is
+not counted.
+
+The assistant can prepare a temporary, session-owned Add animals draft after it
+has an unambiguous protocol, active crossing and Animal ID definition. It lists
+missing required information separately from optional unknowns. The review link
+expires after one hour and opens the existing Add animals form. No animal is
+created until the user reviews the values and presses **Save**. Unsaved form
+changes are not sent back to the assistant.
+
+### Attach a file to a question
+Next to the message box there is an **Attach** button. Use it to add one file to
+your question. FLARE-AI accepts CSV, XLSX, TXT and Markdown files of up to
+10 MB. After you choose a file, a chip shows its name and size, and a **Remove**
+button clears it.
+
+The file lives only in your open browser tab. It is sent together with the next
+question you send, and it is automatically resent with follow-up questions while
+the drawer stays open, so you do not need to attach it again. Closing the
+drawer, choosing **Remove**, navigating to another page, or reloading the page
+discards the file; reopening the drawer requires you to select it again.
+
+FLARE-AI does not store the file and does not write it to the server. In this
+release the assistant only receives the file's name, size, type and extension.
+It cannot yet read the file's contents, so ask it to explain what it can do
+with the attached file before relying on a specific answer.

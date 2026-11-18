@@ -4,17 +4,17 @@ from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 from pydantic_ai.usage import UsageLimits
 
-from lab.models import UsageEvent
-from lab.usage import record_usage
+from lab.usage import record_daily_ai_usage
 
 from .access import user_can_use_ai
 from .agent import get_agent
+from .attachments import attachment_from_files
 from .context import AIRequestContext, resolve_page_context
 
 
@@ -36,15 +36,17 @@ def _event(kind, **payload):
 
 
 def _payload(request):
-    if request.content_type != "application/json":
-        raise ValueError("Expected a JSON request.")
-    try:
-        value = json.loads(request.body)
-    except (TypeError, ValueError, UnicodeDecodeError) as exc:
-        raise ValueError("Invalid JSON request.") from exc
-    if not isinstance(value, dict):
-        raise ValueError("Expected a JSON object.")
-    return value
+    if request.content_type == "application/json":
+        try:
+            value = json.loads(request.body)
+        except (TypeError, ValueError, UnicodeDecodeError) as exc:
+            raise ValueError("Invalid JSON request.") from exc
+        if not isinstance(value, dict):
+            raise ValueError("Expected a JSON object.")
+        return value
+    if request.content_type == "multipart/form-data":
+        return request.POST.dict()
+    raise ValueError("Expected a JSON or multipart request.")
 
 
 def _conversation_id(value):
@@ -76,6 +78,7 @@ def _history(turns):
 @require_POST
 def chat_stream(request):
     _require_access(request)
+    attachment = None
     try:
         payload = _payload(request)
         conversation_id = _conversation_id(payload.get("conversation_id"))
@@ -89,7 +92,28 @@ def chat_stream(request):
             raise ValueError(f"Messages are limited to {MAX_MESSAGE_LENGTH} characters.")
         if not isinstance(page_path, str) or len(page_path) > 2048:
             raise ValueError("Invalid page path.")
+        attachment = attachment_from_files(request.FILES)
+        if greeting and attachment is not None:
+            raise ValueError("Files cannot be attached to the hidden greeting.")
+    except (ValueError, ValidationError) as exc:
+        if attachment is not None:
+            attachment.close()
+        message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
+        return JsonResponse({"error": message}, status=400)
+
+    if request.FILES and attachment is None:
+        return JsonResponse({"error": "Use the attachment field for chat files."}, status=400)
+
+    if attachment is not None and greeting:
+        attachment.close()
+        attachment = None
+        return JsonResponse({"error": "Files cannot be attached to the hidden greeting."}, status=400)
+
+    try:
+        conversation_id = _conversation_id(conversation_id)
     except ValueError as exc:
+        if attachment is not None:
+            attachment.close()
         return JsonResponse({"error": str(exc)}, status=400)
 
     conversations = request.session.get(SESSION_KEY, {})
@@ -104,57 +128,57 @@ def chat_stream(request):
     deps = AIRequestContext(
         user=request.user,
         page=resolve_page_context(page_path),
+        session=request.session,
+        attachment=attachment,
     )
 
     def stream():
-        yield _event("start", conversation_id=conversation_id)
         try:
-            if not greeting:
-                record_usage(
-                    UsageEvent.AI_PROMPT,
-                    request.user,
-                    source="ai",
-                    target_type="assistant",
-                    object_count=1,
-                )
-            with get_agent().run_stream_sync(
-                message,
-                message_history=history,
-                conversation_id=conversation_id,
-                deps=deps,
-                usage_limits=UsageLimits(request_limit=8),
-                timeout=300,
-            ) as result:
-                for delta in result.stream_text(delta=True):
-                    if delta:
-                        yield _event("delta", text=delta)
-                turn = result.new_messages_json().decode("utf-8")
+            yield _event("start", conversation_id=conversation_id)
+            try:
+                if not greeting:
+                    record_daily_ai_usage(request.user)
+                with get_agent().run_stream_sync(
+                    message,
+                    message_history=history,
+                    conversation_id=conversation_id,
+                    deps=deps,
+                    usage_limits=UsageLimits(request_limit=8),
+                    timeout=300,
+                ) as result:
+                    for delta in result.stream_text(delta=True):
+                        if delta:
+                            yield _event("delta", text=delta)
+                    turn = result.new_messages_json().decode("utf-8")
 
-            stored = request.session.get(SESSION_KEY, {})
-            if not isinstance(stored, dict):
-                stored = {}
-            stored.pop(conversation_id, None)
-            stored[conversation_id] = [*turns, turn][-MAX_TURNS:]
-            while len(stored) > MAX_CONVERSATIONS:
-                stored.pop(next(iter(stored)))
-            request.session[SESSION_KEY] = stored
-            request.session.modified = True
-            # Session middleware has already returned the streaming response.
-            request.session.save()
-            yield _event(
-                "done",
-                conversation_id=conversation_id,
-                suggestions=STARTER_QUESTIONS if greeting else [],
-            )
-        except GeneratorExit:
-            raise
-        except Exception:
-            logger.exception("FLARE AI request failed without logging prompt content.")
-            yield _event(
-                "error",
-                code="assistant_unavailable",
-                message="The assistant could not complete this request. Please try again.",
-            )
+                stored = request.session.get(SESSION_KEY, {})
+                if not isinstance(stored, dict):
+                    stored = {}
+                stored.pop(conversation_id, None)
+                stored[conversation_id] = [*turns, turn][-MAX_TURNS:]
+                while len(stored) > MAX_CONVERSATIONS:
+                    stored.pop(next(iter(stored)))
+                request.session[SESSION_KEY] = stored
+                request.session.modified = True
+                # Session middleware has already returned the streaming response.
+                request.session.save()
+                yield _event(
+                    "done",
+                    conversation_id=conversation_id,
+                    suggestions=STARTER_QUESTIONS if greeting else [],
+                )
+            except GeneratorExit:
+                raise
+            except Exception:
+                logger.exception("FLARE AI request failed without logging prompt content.")
+                yield _event(
+                    "error",
+                    code="assistant_unavailable",
+                    message="The assistant could not complete this request. Please try again.",
+                )
+        finally:
+            if attachment is not None:
+                attachment.close()
 
     response = StreamingHttpResponse(stream(), content_type="application/x-ndjson")
     response["Cache-Control"] = "private, no-store"

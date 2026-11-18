@@ -16,6 +16,11 @@
     const statusElement = root.querySelector("[data-ai-status]");
     const form = root.querySelector("[data-ai-form]");
     const input = root.querySelector("[data-ai-input]");
+    const attachButton = root.querySelector("[data-ai-attach]");
+    const attachmentRow = root.querySelector("[data-ai-attachment]");
+    const attachmentChip = root.querySelector("[data-ai-attachment-chip]");
+    const removeAttachmentButton = root.querySelector("[data-ai-remove-attachment]");
+    const fileInput = root.querySelector("[data-ai-file-input]");
     const csrfToken = form.querySelector("[name=csrfmiddlewaretoken]").value;
     let controller = null;
     let activeRequestKind = null;
@@ -54,6 +59,38 @@
     const save = () => {
         state.messages = state.messages.slice(-20);
         sessionStorage.setItem(storageKey, JSON.stringify(state));
+    };
+
+    // The selected file is held only in this variable while the drawer is open.
+    // Browser File objects cannot be persisted to sessionStorage, so closing,
+    // navigating or refreshing always discards the attachment.
+    let attachmentFile = null;
+
+    const formatBytes = (bytes) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    const renderAttachment = () => {
+        if (attachmentFile) {
+            attachmentChip.textContent = `${attachmentFile.name} · ${formatBytes(attachmentFile.size)}`;
+            attachmentRow.hidden = false;
+        } else {
+            attachmentChip.textContent = "";
+            attachmentRow.hidden = true;
+        }
+    };
+
+    const setAttachmentFile = (file) => {
+        attachmentFile = file || null;
+        renderAttachment();
+    };
+
+    const clearAttachment = () => {
+        attachmentFile = null;
+        fileInput.value = "";
+        renderAttachment();
     };
 
     const appendInlineMarkdown = (container, text) => {
@@ -213,6 +250,12 @@
                 renderMarkdown(content, text);
             } else {
                 content.textContent = text;
+                if (message.attachmentName) {
+                    const attached = document.createElement("div");
+                    attached.className = "flare-ai-message-attachment";
+                    attached.textContent = `Attached: ${message.attachmentName}`;
+                    content.append(attached);
+                }
             }
             item.append(label, content);
             messagesElement.append(item);
@@ -247,6 +290,7 @@
 
     const setOpen = (open) => {
         state.open = open;
+        if (!open) clearAttachment();
         save();
         render();
         if (open) {
@@ -283,7 +327,14 @@
 
         input.value = "";
         state.suggestions = [];
-        if (!greeting) state.messages.push({role: "user", text, state: "complete"});
+        if (!greeting) {
+            state.messages.push({
+                role: "user",
+                text,
+                state: "complete",
+                attachmentName: attachmentFile ? attachmentFile.name : null,
+            });
+        }
         state.messages.push({
             role: "assistant",
             text: "",
@@ -297,26 +348,37 @@
         const requestController = controller;
 
         try {
-            const requestBody = {
-                conversation_id: state.conversationId,
-                page_path: window.location.pathname,
-            };
-            if (greeting) {
-                requestBody.greeting = true;
-            } else {
-                requestBody.message = text;
-            }
-            const response = await fetch(root.dataset.streamUrl, {
+            const requestConfig = {
                 method: "POST",
                 credentials: "same-origin",
                 signal: requestController.signal,
                 headers: {
                     "Accept": "application/x-ndjson",
-                    "Content-Type": "application/json",
                     "X-CSRFToken": csrfToken,
                 },
-                body: JSON.stringify(requestBody),
-            });
+            };
+            if (!greeting && attachmentFile) {
+                // Let the browser set the multipart Content-Type boundary.
+                const body = new FormData();
+                body.append("conversation_id", state.conversationId);
+                body.append("page_path", window.location.pathname);
+                body.append("message", text);
+                body.append("attachment", attachmentFile);
+                requestConfig.body = body;
+            } else {
+                requestConfig.headers["Content-Type"] = "application/json";
+                const requestBody = {
+                    conversation_id: state.conversationId,
+                    page_path: window.location.pathname,
+                };
+                if (greeting) {
+                    requestBody.greeting = true;
+                } else {
+                    requestBody.message = text;
+                }
+                requestConfig.body = JSON.stringify(requestBody);
+            }
+            const response = await fetch(root.dataset.streamUrl, requestConfig);
             if (!response.ok || !response.body) {
                 let detail = "The assistant request failed.";
                 try {
@@ -390,6 +452,16 @@
     launcher.addEventListener("click", () => setOpen(!state.open));
     closeButton.addEventListener("click", () => setOpen(false));
     stopButton.addEventListener("click", () => controller?.abort());
+    attachButton.addEventListener("click", () => {
+        // Reset so the same file can be re-selected, then open the picker.
+        fileInput.value = "";
+        fileInput.click();
+    });
+    fileInput.addEventListener("change", () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (file) setAttachmentFile(file);
+    });
+    removeAttachmentButton.addEventListener("click", () => clearAttachment());
     form.addEventListener("submit", (event) => {
         event.preventDefault();
         send();
@@ -420,6 +492,7 @@
         const oldId = state.conversationId;
         state = blankState();
         state.open = true;
+        clearAttachment();
         save();
         render();
         setBusy(true, "greeting");

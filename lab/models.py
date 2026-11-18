@@ -1122,12 +1122,13 @@ class UsageEvent(models.Model):
         (CODE_REUSED, "Code reused"),
         (CODE_ENTERED, "Code entered"),
         (REPORT_EXPORTED, "Report exported"),
-        (AI_PROMPT, "AI prompt sent"),
+        (AI_PROMPT, "AI assistant used"),
     ]
     event_type = models.CharField(max_length=24, choices=EVENT_CHOICES)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     username = models.CharField(max_length=150, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    usage_date = models.DateField(null=True, blank=True, editable=False)
     target_type = models.CharField(max_length=16, choices=[("animals", "Animals"), ("recording", "Recording"), ("experiment", "Experiment"), ("assistant", "AI assistant")])
     reference = models.CharField(max_length=64, blank=True, help_text="Share code or experiment ID.")
     object_count = models.PositiveIntegerField(default=0, help_text="Number of animals or recordings.")
@@ -1139,6 +1140,13 @@ class UsageEvent(models.Model):
         indexes = [
             models.Index(fields=["event_type", "-created_at"], name="usage_type_created_idx"),
             models.Index(fields=["user", "-created_at"], name="usage_user_created_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event_type", "user", "usage_date"],
+                condition=models.Q(event_type="ai_prompt"),
+                name="usage_ai_user_day_uniq",
+            ),
         ]
 
     def __str__(self):

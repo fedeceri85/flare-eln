@@ -23,6 +23,11 @@ from .parentage import configure_parent_controls, clean_parent_controls
 from .procedures import BulkProcedureCreateForm, validate_procedure_drafts
 
 
+ANIMAL_FORM_DRAFT_SESSION_KEY = "animal_form_drafts"
+ANIMAL_FORM_DRAFT_MAX_AGE = 60 * 60
+ANIMAL_FORM_DRAFT_LIMIT = 5
+
+
 class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
     ID_FIELDS = ["no_id_available", "mouse_id_prefix", "mouse_numbers"]
     MOUSE_FIELDS = [

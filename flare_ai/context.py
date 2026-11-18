@@ -3,6 +3,7 @@ from urllib.parse import urlsplit
 
 from django.urls import Resolver404, resolve
 
+from flare_ai.attachments import RequestAttachment
 from lab.models import Experiment, Mouse, Project, Protocol, Recording
 
 
@@ -27,6 +28,8 @@ class PageContext:
 class AIRequestContext:
     user: object
     page: PageContext
+    session: object | None = None
+    attachment: RequestAttachment | None = None
 
 
 def resolve_page_context(page_path: str) -> PageContext:

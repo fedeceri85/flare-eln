@@ -1,3 +1,8 @@
+16/11/2026
+- First version of FLARE-AI assistant. 
+- Added a conversational, review-only Add animals form draft; the existing Save action remains the only record-creation path.
+- Four tools are available: search animals, search recordings, the app guide and preparation of animal form drafts.
+
 29/10/2026
 - Added shareable link creation, allowing sharing group of animals or individual recordings. 
 - Shortened automatic animal ids. 

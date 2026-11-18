@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 
 SearchText = Annotated[str, Field(min_length=1, max_length=1000)]
+ShortText = Annotated[str, Field(max_length=500)]
 MissingMouseField = Literal[
     "date_of_birth", "date_added", "protocol_start_date", "cull_date",
     "added_by", "mother", "father", "mother_external_id", "father_external_id",
@@ -33,6 +34,59 @@ class MouseGenotypeFilter(BaseModel):
         if all(value is None for value in (self.line, self.category, self.uncertain)):
             raise ValueError("Provide a genotype line, category or uncertainty flag.")
         return self
+
+
+class AnimalDraftRow(BaseModel):
+    """Values that can differ between animals in one prepared litter."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    number: Annotated[str, Field(max_length=100)] = ""
+    local_identifier: Annotated[str, Field(max_length=100)] = ""
+    sex: Literal["M", "F", "unknown"] | None = None
+    genotypes: dict[ShortText, ShortText] = Field(default_factory=dict, max_length=20)
+    uncertain_genotypes: list[ShortText] = Field(default_factory=list, max_length=20)
+
+
+class AnimalFormDraftInput(BaseModel):
+    """A review-only draft for the existing Add animals form.
+
+    Use either protocol_id or protocol_number (plus licence_reference when the
+    number is ambiguous). Use crossing_id after the tool returns candidates, or
+    crossing for an exact/partial catalogue search. For a single arbitrary
+    Animal ID, put the complete ID in mouse_id_prefix and leave mouse_numbers
+    blank. For a litter, use a shared prefix and the form's number/range syntax.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    protocol_id: int | None = Field(default=None, gt=0)
+    protocol_number: int | None = None
+    licence_reference: ShortText | None = None
+    protocol_query: ShortText | None = None
+    crossing_id: int | None = Field(default=None, gt=0)
+    crossing: ShortText | None = None
+
+    generate_ids: bool = False
+    mouse_id_prefix: Annotated[str, Field(max_length=100)] = ""
+    mouse_numbers: Annotated[str, Field(max_length=5000)] = ""
+    date_of_birth: date | None = None
+    breeding_pair: Annotated[str, Field(max_length=100)] = ""
+    colour: Annotated[str, Field(max_length=100)] = ""
+    status: Literal["Alive", "Culled"] = "Alive"
+    severity: Literal["Non-recovery", "Mild", "Moderate", "Severe"] | None = None
+    protocol_start_date: date | None = None
+    cull_date: date | None = None
+    notes: Annotated[str, Field(max_length=4000)] = ""
+
+    shared_genotypes: dict[ShortText, ShortText] = Field(default_factory=dict, max_length=20)
+    shared_uncertain_genotypes: list[ShortText] = Field(default_factory=list, max_length=20)
+    animals: list[AnimalDraftRow] = Field(default_factory=list, max_length=100)
+
+    mother_id: Annotated[str, Field(max_length=255)] | None = None
+    father_id: Annotated[str, Field(max_length=255)] | None = None
+    keep_unlinked_mother: bool = False
+    keep_unlinked_father: bool = False
 
 
 class MouseSearchInput(BaseModel):
