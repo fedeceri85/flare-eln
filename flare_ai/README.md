@@ -64,12 +64,16 @@ file, and refuses to pair an attachment with the hidden greeting. All validation
 happens before the agent runs, so a rejected upload never calls the model and
 never records usage.
 
-The upload is request-scoped. `flare_ai.attachments` exposes only safe
+The upload is request-scoped. A streaming upload handler enforces the 10 MB
+limit while Django parses the request, before a larger file can be written in
+full. `flare_ai.attachments` exposes only safe
 metadata (identifier, name, lower-cased suffix, size, MIME type and the Django
 uploaded file) through `AIRequestContext.attachment`; it never reads or copies
 the file content. The server closes the underlying file in a `finally` block, so
-it is released on success, provider failure and interrupted streaming. Nothing is
-written to disk and no database row is created for the file.
+it is released on success, provider failure and interrupted streaming. Django
+may use temporary disk storage while handling larger accepted files; that
+temporary file is closed at the end of the request. No database row or
+permanent application file is created.
 
 In this release the assistant cannot inspect the attached content. It receives
 the metadata only and must say so explicitly rather than inventing an analysis.

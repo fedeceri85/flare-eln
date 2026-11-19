@@ -8,13 +8,22 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from django.core.files.uploadhandler import StopUpload
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from django.urls import reverse
 from django.utils.datastructures import MultiValueDict
 from django.utils import timezone
 
-from flare_ai.attachments import MAX_ATTACHMENT_BYTES, RequestAttachment, attachment_from_files
+from flare_ai.attachments import (
+    MAX_ATTACHMENT_BYTES,
+    MAX_MULTIPART_REQUEST_BYTES,
+    AttachmentSizeUploadHandler,
+    RequestAttachment,
+    attachment_from_files,
+    attachment_upload_was_too_large,
+)
 from flare_ai.context import resolve_page_context
 from flare_ai.views import SESSION_KEY, STARTER_QUESTIONS
 from lab.models import Experiment, Project, UsageEvent
@@ -317,6 +326,31 @@ class ChatEndpointTests(TestCase):
         self.assertEqual(fake.calls, [])
         self.assertFalse(UsageEvent.objects.exists())
 
+    def test_oversized_request_is_rejected_before_multipart_parsing(self):
+        self.grant_access()
+        body = encode_multipart(BOUNDARY, {
+            "conversation_id": str(uuid4()),
+            "message": "What is this?",
+            "page_path": "/mice/",
+            "attachment": SimpleUploadedFile("data.csv", b"a,b\n1,2", content_type="text/csv"),
+        })
+        with (
+            patch("flare_ai.views.get_agent") as get_agent,
+            patch("flare_ai.views.attachment_from_files") as parse_attachment,
+        ):
+            response = self.client.generic(
+                "POST",
+                reverse("flare_ai:chat_stream"),
+                data=body,
+                content_type=MULTIPART_CONTENT,
+                CONTENT_LENGTH=str(MAX_MULTIPART_REQUEST_BYTES + 1),
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("10 MB", response.json()["error"])
+        get_agent.assert_not_called()
+        parse_attachment.assert_not_called()
+        self.assertFalse(UsageEvent.objects.exists())
+
     def test_multiple_files_are_rejected(self):
         self.grant_access()
         fake = FakeAgent()
@@ -391,8 +425,10 @@ class ChatEndpointTests(TestCase):
         with patch("flare_ai.views.get_agent", return_value=fake):
             response = self.post_multipart()
             events = [next(response.streaming_content) for _ in range(3)]
-            # Simulate a client disconnect: close the response, aborting the stream.
-            response.close()
+            # Simulate a client disconnect by closing the streaming generator.
+            # response.close() also emits request_finished, which would close the
+            # shared database connection used by Django's TestCase transaction.
+            response._iterator.close()
         self.assertEqual([json.loads(event)["type"] for event in events], ["start", "delta", "delta"])
         attachment = fake.calls[0][1]["deps"].attachment
         self.assertTrue(attachment.upload.file.closed)
@@ -449,6 +485,21 @@ class AttachmentValidationTests(SimpleTestCase):
         ]
         with self.assertRaises(ValidationError):
             attachment_from_files(self.files_with(*uploads))
+
+    def test_streaming_handler_stops_before_file_exceeds_limit(self):
+        request = SimpleNamespace()
+        handler = AttachmentSizeUploadHandler(request)
+        final_chunk = b"x" * 2
+        with self.assertRaises(StopUpload):
+            handler.receive_data_chunk(final_chunk, MAX_ATTACHMENT_BYTES - 1)
+        self.assertTrue(attachment_upload_was_too_large(request))
+
+    def test_streaming_handler_passes_chunks_within_limit(self):
+        request = SimpleNamespace()
+        handler = AttachmentSizeUploadHandler(request)
+        chunk = b"safe"
+        self.assertIs(handler.receive_data_chunk(chunk, MAX_ATTACHMENT_BYTES - len(chunk)), chunk)
+        self.assertFalse(attachment_upload_was_too_large(request))
 
 
 @override_settings(ROOT_URLCONF="flare_ai.tests.urls")

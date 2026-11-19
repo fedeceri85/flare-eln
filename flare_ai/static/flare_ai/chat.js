@@ -280,11 +280,6 @@
         const last = state.messages.at(-1);
         const canRetry = last && ["interrupted", "error"].includes(last.state);
         retryButton.hidden = !canRetry;
-        if (canRetry) {
-            retryButton.textContent = last.kind === "greeting"
-                ? `Retry loading ${assistantName}`
-                : "Retry message";
-        }
         messagesElement.scrollTop = messagesElement.scrollHeight;
     };
 

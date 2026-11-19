@@ -6,69 +6,51 @@
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    border: 0;
+    border: 1px solid #45416f;
     border-radius: 999px;
-    padding: 13px 20px;
-    background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 45%, var(--blue, #215d91) 100%);
+    padding: 8px 16px 8px 9px;
+    background: #555080;
     color: #fff;
-    box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33;
+    box-shadow: 0 4px 12px #2925442e;
     cursor: pointer;
     font: inherit;
     font-weight: 700;
-    letter-spacing: .01em;
-    transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
-    animation: flare-ai-launcher-pulse 3.2s ease-out infinite;
+    transition: background-color .15s ease, box-shadow .15s ease;
 }
 
 .flare-ai-launcher:hover {
-    transform: translateY(-2px) scale(1.03);
-    filter: brightness(1.07);
-    animation: none;
-    box-shadow: 0 14px 32px #4c1d9566, 0 4px 10px #17395c33;
+    background: #49456f;
+    border-color: #39365d;
+    box-shadow: 0 6px 16px #29254438;
 }
 
 .flare-ai-launcher:focus-visible {
-    outline: 3px solid #7c3aed;
+    outline: 3px solid #aaa4d1;
     outline-offset: 3px;
 }
 
 .flare-ai-launcher:active {
-    transform: translateY(0) scale(.98);
-    filter: brightness(.97);
+    background: #3f3b62;
 }
 
-.flare-ai-launcher-emoji {
-    display: inline-block;
-    font-size: 1.25em;
-    line-height: 1;
-    animation: flare-ai-launcher-wiggle 4.5s ease-in-out infinite;
+.flare-ai-launcher-icon {
+    display: inline-grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border: 1px solid #ffffff38;
+    border-radius: 50%;
+    background: #ffffff14;
 }
 
-@keyframes flare-ai-launcher-pulse {
-    0% {
-        box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33, 0 0 0 0 rgba(124, 58, 237, .35);
-    }
-    70% {
-        box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33, 0 0 0 14px rgba(124, 58, 237, 0);
-    }
-    100% {
-        box-shadow: 0 8px 24px #4c1d954d, 0 2px 6px #17395c33, 0 0 0 0 rgba(124, 58, 237, 0);
-    }
-}
-
-@keyframes flare-ai-launcher-wiggle {
-    0%, 88%, 100% { transform: rotate(0deg) scale(1); }
-    90% { transform: rotate(16deg) scale(1.12); }
-    93% { transform: rotate(-10deg) scale(1.05); }
-    96% { transform: rotate(6deg) scale(1.08); }
-    98% { transform: rotate(-3deg) scale(1.02); }
+.flare-ai-launcher-icon svg {
+    width: 17px;
+    height: 17px;
+    fill: currentColor;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .flare-ai-launcher,
-    .flare-ai-launcher-emoji { animation: none; }
     .flare-ai-launcher { transition: none; }
-    .flare-ai-launcher:hover { transform: none; }
 }
 
 .flare-ai-drawer {
@@ -76,7 +58,7 @@
     inset: var(--header-height, 56px) 0 0 auto;
     z-index: 65;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
     width: min(720px, 100vw);
     background: var(--surface, #fff);
     border-left: 1px solid var(--border, #d9e1e8);
@@ -229,8 +211,6 @@
     font-size: .88rem;
 }
 
-.flare-ai-retry { margin: 0 16px 10px; justify-self: start; }
-
 .flare-ai-form {
     padding: 12px 16px 16px;
     border-top: 1px solid var(--border, #d9e1e8);
@@ -251,6 +231,8 @@
     margin-top: 8px;
 }
 
+.flare-ai-form-actions [hidden] { display: none; }
+
 .flare-ai-attachment-row {
     display: flex;
     align-items: center;
@@ -260,6 +242,8 @@
 }
 
 .flare-ai-attach { white-space: nowrap; }
+
+.flare-ai-attach-icon { flex: 0 0 auto; }
 
 .flare-ai-attachment {
     display: inline-flex;

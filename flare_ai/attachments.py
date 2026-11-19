@@ -4,12 +4,48 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
+from django.core.files.uploadhandler import FileUploadHandler, StopUpload
 from django.core.files.uploadedfile import UploadedFile
 from django.http import QueryDict
 
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024
+MAX_MULTIPART_REQUEST_BYTES = MAX_ATTACHMENT_BYTES + MAX_MULTIPART_OVERHEAD_BYTES
 ALLOWED_ATTACHMENT_SUFFIXES = {".csv", ".xlsx", ".txt", ".md"}
+ATTACHMENT_TOO_LARGE_ATTRIBUTE = "_flare_ai_attachment_too_large"
+
+
+class AttachmentSizeUploadHandler(FileUploadHandler):
+    """Stop multipart parsing before an uploaded file can exceed our limit."""
+
+    def receive_data_chunk(self, raw_data, start):
+        if start + len(raw_data) > MAX_ATTACHMENT_BYTES:
+            setattr(self.request, ATTACHMENT_TOO_LARGE_ATTRIBUTE, True)
+            # Consume the remaining request without passing it to disk-backed
+            # handlers, allowing the view to return a normal JSON response.
+            raise StopUpload(connection_reset=False)
+        return raw_data
+
+    def file_complete(self, file_size):
+        return None
+
+
+def install_attachment_upload_limit(request) -> None:
+    """Install the streaming limit before request.POST or request.FILES is read."""
+    raw_length = request.META.get("CONTENT_LENGTH")
+    try:
+        content_length = int(raw_length) if raw_length else None
+    except (TypeError, ValueError):
+        content_length = None
+    if content_length is not None and content_length > MAX_MULTIPART_REQUEST_BYTES:
+        raise ValidationError("Attach a file no larger than 10 MB.")
+    request.upload_handlers.insert(0, AttachmentSizeUploadHandler(request))
+
+
+def attachment_upload_was_too_large(request) -> bool:
+    """Return whether the streaming handler stopped an oversized upload."""
+    return bool(getattr(request, ATTACHMENT_TOO_LARGE_ATTRIBUTE, False))
 
 
 @dataclass(frozen=True)

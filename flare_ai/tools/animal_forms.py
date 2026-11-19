@@ -196,9 +196,9 @@ def prepare_animal_form(
     parent is not found, call again with keep_unlinked_mother/father=true only
     after the user explicitly confirms it should be kept as external text.
     The returned URL must be shown exactly as supplied.
-    If the crossing is not found, search the crossing using partial matching 
+    If the crossing is not found, search the crossing using partial matching
     of the provided text before addressing the user again.
-    If the user does not have an ID for the animals, do not ask the user for a prefix, 
+    If the user does not have an ID for the animals, do not ask the user for a prefix,
     just generate one using the pre-determined rules.
     """
 

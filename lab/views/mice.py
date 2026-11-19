@@ -446,6 +446,7 @@ def mice_page(request):
             ),
             "edit_selected_url": edit_selected_mice_all_url(),
             "add_litter_url": reverse("lab:add_litter_all"),
+            "has_active_filters": any(filter_values.values()),
         },
     )
 
@@ -644,8 +645,17 @@ def _edit_selected_mice(request, selected_protocol=None):
     )
     recording_return_url = url_with_query_params(bulk_return_url, mouse_editor_tab="services")
     selecting_recording = request.method == "POST" and "select_recording_destination" in request.POST
+    recording_destination_initial = None
+    if not selecting_recording:
+        recording_destination_initial = {
+            "recording_type": request.GET.get("recording_recording_type", ""),
+            "project": request.GET.get("recording_project", ""),
+            "experiment": request.GET.get("recording_experiment", ""),
+        }
     recording_destination_form = RecordingDestinationForm(
-        request.POST if selecting_recording else None, prefix="recording",
+        request.POST if selecting_recording else None,
+        initial=recording_destination_initial,
+        prefix="recording",
     )
     if selecting_recording and recording_destination_form.is_valid():
         experiment = recording_destination_form.cleaned_data["experiment"]
@@ -731,6 +741,7 @@ def _edit_selected_mice(request, selected_protocol=None):
             "animal_recording_sections": build_animal_recording_sections(selected_mice),
             "recording_destination_form": recording_destination_form,
             "recording_destination_options": recording_destination_form.destination_options,
+            "recording_project_options": recording_destination_form.project_options,
             "service_recording_actions": service_recording_actions_for_mice(
                 selected_mice,
                 recording_return_url,

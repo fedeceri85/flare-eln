@@ -610,7 +610,9 @@ the drawer stays open, so you do not need to attach it again. Closing the
 drawer, choosing **Remove**, navigating to another page, or reloading the page
 discards the file; reopening the drawer requires you to select it again.
 
-FLARE-AI does not store the file and does not write it to the server. In this
-release the assistant only receives the file's name, size, type and extension.
-It cannot yet read the file's contents, so ask it to explain what it can do
-with the attached file before relying on a specific answer.
+FLARE-AI does not retain the file after the request or create a database record
+for it. While the request is being handled, Django may hold the upload in memory
+or in a temporary server file; that temporary data is released when the request
+ends. In this release the assistant only receives the file's name, size, type
+and extension. It cannot yet read the file's contents, so ask it to explain what
+it can do with the attached file before relying on a specific answer.

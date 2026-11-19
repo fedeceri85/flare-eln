@@ -14,7 +14,11 @@ from lab.usage import record_daily_ai_usage
 
 from .access import user_can_use_ai
 from .agent import get_agent
-from .attachments import attachment_from_files
+from .attachments import (
+    attachment_from_files,
+    attachment_upload_was_too_large,
+    install_attachment_upload_limit,
+)
 from .context import AIRequestContext, resolve_page_context
 
 
@@ -45,7 +49,10 @@ def _payload(request):
             raise ValueError("Expected a JSON object.")
         return value
     if request.content_type == "multipart/form-data":
-        return request.POST.dict()
+        value = request.POST.dict()
+        if attachment_upload_was_too_large(request):
+            raise ValidationError("Attach a file no larger than 10 MB.")
+        return value
     raise ValueError("Expected a JSON or multipart request.")
 
 
@@ -80,6 +87,8 @@ def chat_stream(request):
     _require_access(request)
     attachment = None
     try:
+        if request.content_type == "multipart/form-data":
+            install_attachment_upload_limit(request)
         payload = _payload(request)
         conversation_id = _conversation_id(payload.get("conversation_id"))
         greeting = payload.get("greeting") is True

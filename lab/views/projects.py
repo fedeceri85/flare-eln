@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from ..forms import ExperimentForm, ProjectForm
-from ..models import Experiment, Project
+from ..models import Experiment, Project, RecordingType
 from ..ui import (
     EXPERIMENT_FILTER_SPECS,
     PROJECT_FILTER_SPECS,
@@ -27,6 +27,7 @@ from .common import (
     experiments_page_url,
     projects_page_url,
     safe_return_url,
+    url_with_query_params,
 )
 
 
@@ -293,6 +294,14 @@ def add_experiment(request, project_pk):
         experiments_page_url(project),
     )
 
+    recording_type_id = request.GET.get("recording_type", "")
+    recording_type = (
+        RecordingType.objects.filter(pk=recording_type_id, active=True).first()
+        if recording_type_id.isdigit()
+        else None
+    )
+    resume_recording = request.GET.get("resume_recording") == "1"
+
     if request.method == "POST":
         form = ExperimentForm(request.POST)
 
@@ -304,9 +313,19 @@ def add_experiment(request, project_pk):
                 request,
                 f"Experiment {experiment.name} was created successfully.",
             )
+            if resume_recording:
+                return_url = url_with_query_params(
+                    return_url,
+                    mouse_editor_tab="services",
+                    recording_recording_type=experiment.recording_type_id,
+                    recording_project=project.pk,
+                    recording_experiment=experiment.pk,
+                )
             return redirect(return_url)
     else:
-        form = ExperimentForm()
+        form = ExperimentForm(initial={
+            "recording_type_query": recording_type.name,
+        } if recording_type else None)
 
     return render(
         request,

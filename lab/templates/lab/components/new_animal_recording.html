@@ -8,7 +8,10 @@
                 {% include "lab/components/form_field.html" with field=recording_destination_form.experiment %}
             </div>
         </div>
-        <p class="bulk-help" role="status" aria-live="polite" data-recording-destination-status></p>
+        <div class="recording-experiment-guidance" data-recording-experiment-guidance hidden>
+            <p class="warning-message recording-experiment-warning" role="status" aria-live="polite" data-recording-destination-status></p>
+            <a href="" data-add-compatible-experiment>Add a new experiment of this type in this project</a>
+        </div>
     </td>
     <td class="action-cell">
         <button type="submit" class="table-row-action" data-recording-continue aria-label="Add recording for the selected animals">Add record</button>

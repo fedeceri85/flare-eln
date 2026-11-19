@@ -1,3 +1,7 @@
+18/11/2026
+- Added file attachment to AI assistant.
+- Added "add animals" functionality to AI assistant.
+
 16/11/2026
 - First version of FLARE-AI assistant. 
 - Added a conversational, review-only Add animals form draft; the existing Save action remains the only record-creation path.

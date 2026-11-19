@@ -57,6 +57,7 @@
         </form>
         <noscript><p>Enable JavaScript to select a project and compatible experiment.</p></noscript>
         {{ recording_destination_options|json_script:"animal-recording-destinations" }}
+        {{ recording_project_options|json_script:"animal-recording-projects" }}
         {% endif %}
     </section>
 {% endif %}

@@ -6,6 +6,7 @@ from datetime import date
 
 from django import forms
 from django.db.models import Q
+from django.urls import reverse
 
 from ..models import (
     Experiment,
@@ -65,6 +66,11 @@ class RecordingDestinationForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        projects = list(
+            Project.objects.filter(active=True, is_service=False).order_by(
+                "name", "pk",
+            )
+        )
         experiments = list(
             Experiment.objects.select_related("project")
             .filter(
@@ -83,6 +89,16 @@ class RecordingDestinationForm(forms.Form):
             }
             for experiment in experiments
         ]
+        self.project_options = [
+            {
+                "project": str(project.pk),
+                "project_name": project.name,
+                "add_experiment_url": reverse(
+                    "lab:add_experiment", args=[project.pk],
+                ),
+            }
+            for project in projects
+        ]
         recording_type_id = str(self["recording_type"].value() or "")
         project_id = str(self["project"].value() or "")
         compatible = [
@@ -90,8 +106,8 @@ class RecordingDestinationForm(forms.Form):
             if str(experiment.recording_type_id) == recording_type_id
         ]
         self.fields["project"].queryset = Project.objects.filter(
-            pk__in={experiment.project_id for experiment in compatible},
-        )
+            pk__in=[project.pk for project in projects],
+        ).order_by("name", "pk")
         self.fields["experiment"].queryset = Experiment.objects.filter(
             pk__in=[
                 experiment.pk for experiment in compatible

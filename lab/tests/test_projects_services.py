@@ -1,4 +1,5 @@
 from datetime import date
+from urllib.parse import parse_qs, urlencode, urlsplit
 from django.test import override_settings
 from django.urls import reverse
 from ..models import Experiment, Project, RecordingType
@@ -378,6 +379,47 @@ class ExperimentsPageTests(AuthenticatedTestCase):
         self.assertEqual(experiment.start_date, date(2026, 4, 1))
         self.assertEqual(experiment.end_date, date(2026, 9, 1))
         self.assertFalse(experiment.archived)
+
+    def test_add_experiment_from_animal_picker_preselects_type_and_restores_destination(self):
+        editor_url = reverse("lab:edit_selected_mice_all") + "?" + urlencode({
+            "selected_mouse": "Mouse 1",
+            "mouse_editor_tab": "services",
+            "return_url": reverse("lab:mice_page"),
+        })
+        workflow_url = self.add_experiment_url + "?" + urlencode({
+            "recording_type": self.imaging_type.pk,
+            "resume_recording": "1",
+            "return_url": editor_url,
+        })
+        response = self.client.get(workflow_url)
+        self.assertEqual(
+            response.context["form"]["recording_type_query"].value(),
+            self.imaging_type.name,
+        )
+
+        response = self.client.post(workflow_url, {
+            "return_url": editor_url,
+            "name": "Picker-created experiment",
+            "recording_type_query": self.imaging_type.name,
+        })
+        experiment = Experiment.objects.get(name="Picker-created experiment")
+        self.assertEqual(response.status_code, 302)
+        destination = urlsplit(response["Location"])
+        self.assertEqual(destination.path, reverse("lab:edit_selected_mice_all"))
+        query = parse_qs(destination.query)
+        self.assertEqual(query["selected_mouse"], ["Mouse 1"])
+        self.assertEqual(query["mouse_editor_tab"], ["services"])
+        self.assertEqual(query["recording_recording_type"], [str(self.imaging_type.pk)])
+        self.assertEqual(query["recording_project"], [str(self.project.pk)])
+        self.assertEqual(query["recording_experiment"], [str(experiment.pk)])
+
+    def test_invalid_preselected_recording_type_is_ignored(self):
+        response = self.client.get(
+            self.add_experiment_url,
+            {"recording_type": "not-an-id", "resume_recording": "1"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["form"]["recording_type_query"].value())
 
     def test_edit_experiment_updates_fields(self):
         response = self.client.post(

@@ -75,6 +75,38 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
         types = response.context["recording_destination_form"].fields["recording_type"].queryset
         self.assertNotIn(inactive_type, types)
 
+    def test_project_choices_include_active_projects_without_compatible_experiments(self):
+        empty_project = Project.objects.create(name="Empty recording project")
+        inactive_project = Project.objects.create(name="Old recording project", active=False)
+        response = self.client.get(self.url, {"selected_mouse": self.mice[0].pk})
+        form = response.context["recording_destination_form"]
+        self.assertIn(empty_project, form.fields["project"].queryset)
+        self.assertNotIn(inactive_project, form.fields["project"].queryset)
+        project_options = response.context["recording_project_options"]
+        empty_option = next(
+            option for option in project_options
+            if option["project"] == str(empty_project.pk)
+        )
+        self.assertEqual(
+            empty_option["add_experiment_url"],
+            reverse("lab:add_experiment", args=[empty_project.pk]),
+        )
+        self.assertContains(response, "Add a new experiment of this type in this project")
+
+    def test_destination_state_from_experiment_creation_is_restored(self):
+        response = self.client.get(self.url, {
+            "selected_mouse": self.mice[0].pk,
+            "mouse_editor_tab": "services",
+            "recording_recording_type": self.recording_type.pk,
+            "recording_project": self.project.pk,
+            "recording_experiment": self.experiment.pk,
+        })
+        form = response.context["recording_destination_form"]
+        self.assertEqual(str(form["recording_type"].value()), str(self.recording_type.pk))
+        self.assertEqual(str(form["project"].value()), str(self.project.pk))
+        self.assertEqual(str(form["experiment"].value()), str(self.experiment.pk))
+        self.assertIn(self.experiment, form.fields["experiment"].queryset)
+
     def test_service_projects_are_excluded_and_cannot_be_submitted_as_recording_destinations(self):
         service_experiment = Experiment.objects.get(project__is_service=True, name="Genotyping")
         response = self.client.get(self.url, {"selected_mouse": self.mice[0].pk})

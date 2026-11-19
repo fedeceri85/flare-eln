@@ -13,7 +13,12 @@
         aria-controls="flare-ai-drawer"
         aria-expanded="false"
     >
-        <span class="flare-ai-launcher-emoji" aria-hidden="true">✨</span>
+        <span class="flare-ai-launcher-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 2.75c.35 4.8 2.45 6.9 7.25 7.25-4.8.35-6.9 2.45-7.25 7.25-.35-4.8-2.45-6.9-7.25-7.25 4.8-.35 6.9-2.45 7.25-7.25Z" />
+                <path d="M19 15.75c.14 1.92.98 2.76 2.9 2.9-1.92.14-2.76.98-2.9 2.9-.14-1.92-.98-2.76-2.9-2.9 1.92-.14 2.76-.98 2.9-2.9Z" />
+            </svg>
+        </span>
         Ask {{ flare_ai_assistant_name }}
     </button>
     <aside
@@ -36,11 +41,27 @@
         <ol class="flare-ai-messages" data-ai-messages aria-live="polite"></ol>
         <div class="flare-ai-suggestions" data-ai-suggestions hidden></div>
         <div class="flare-ai-status" data-ai-status role="status"></div>
-        <button type="button" class="button flare-ai-retry" data-ai-retry hidden>Retry interrupted message</button>
         <form class="flare-ai-form" data-ai-form>
             {% csrf_token %}
             <div class="flare-ai-attachment-row">
-                <button type="button" class="button flare-ai-attach" data-ai-attach>Attach</button>
+                <button type="button" class="button flare-ai-attach" data-ai-attach>
+                    <svg
+                        class="flare-ai-attach-icon"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    Attach
+                </button>
                 <div class="flare-ai-attachment" data-ai-attachment hidden>
                     <span class="flare-ai-attachment-chip" data-ai-attachment-chip></span>
                     <button
@@ -61,8 +82,9 @@
                 required
             ></textarea>
             <div class="flare-ai-form-actions">
-                <button type="button" class="button" data-ai-stop hidden>Stop</button>
                 <button type="submit" class="button button-primary" data-ai-send>Send</button>
+                <button type="button" class="button" data-ai-stop hidden>Stop</button>
+                <button type="button" class="button flare-ai-retry" data-ai-retry hidden>Retry</button>
             </div>
             <p class="flare-ai-attachment-help" data-ai-attachment-help>Attach a CSV, XLSX, TXT or MD file (up to 10 MB).</p>
             <input
