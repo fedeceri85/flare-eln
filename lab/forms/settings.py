@@ -19,12 +19,12 @@ class GenotypeCategoryForm(forms.ModelForm):
 class RecordingTypeForm(forms.ModelForm):
     class Meta:
         model = RecordingType
-        fields = ["name", "plural_name", "slug", "description", "active", "hide_data_paths_in_table", "hide_notes_in_table"]
+        fields = ["name", "plural_name", "slug", "description", "active", "show_animal_age", "hide_data_paths_in_table", "hide_notes_in_table"]
         widgets = {"description": forms.Textarea(attrs={"rows": 3})}
 
     @property
     def visible_field_sections(self):
-        return [{"fields": [self[name] for name in ("name", "plural_name", "slug", "description", "active")]}]
+        return [{"fields": [self[name] for name in ("name", "plural_name", "slug", "description", "active", "show_animal_age")]}]
 
     @property
     def inherited_recording_fields(self):

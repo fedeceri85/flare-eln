@@ -105,6 +105,15 @@ class RecordingModelTests(AuthenticatedTestCase):
             response, selected_recording_url, response.wsgi_request.get_full_path(),
         )
 
+    def test_mouse_age_on_uses_postnatal_days_and_rejects_invalid_context(self):
+        self.mouse.date_of_birth = date(2024, 2, 29)
+        self.assertEqual(self.mouse.age_on(date(2024, 2, 29)), 0)
+        self.assertEqual(self.mouse.age_on(date(2024, 3, 1)), 1)
+        self.assertIsNone(self.mouse.age_on(date(2024, 2, 28)))
+        self.assertIsNone(self.mouse.age_on(None))
+        self.mouse.date_of_birth = None
+        self.assertIsNone(self.mouse.age_on(date(2024, 3, 1)))
+
     def test_recording_string_handles_missing_mouse(self):
         recording = create_recording(
             experiment=self.experiment,

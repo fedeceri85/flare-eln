@@ -139,3 +139,13 @@ class BulkProcedureCreationTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn("procedure_drafts", response.context["form"].errors)
         self.assertEqual(Procedure.objects.count(), 2)
+
+    def test_notes_are_captured_on_the_pending_editor_and_persisted(self):
+        for url in self.urls:
+            response = self.client.get(url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
+            html = Markup(response.content.decode())
+            self.assertTrue(html.find("textarea", name="new_procedure-notes"))
+            self.assertContains(response, "<th>Notes</th>")
+        response = self.client.post(self.url, self.payload([self.draft(notes="Handled gently")]))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(set(Procedure.objects.values_list("notes", flat=True)), {"Handled gently"})

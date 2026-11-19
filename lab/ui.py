@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
 
-from .models import Mouse, RecordingImage
+from .models import Mouse, RecordingImage, format_postnatal_age
 
 
 EMPTY_VALUE = format_html("&mdash;")
@@ -300,6 +300,18 @@ RECORDING_FILTER_SPECS = [
         "name": "date_to",
         "label": "End date",
         "type": "date",
+    },
+    {
+        "name": "age_from",
+        "label": "Min age (days)",
+        "type": "number",
+        "placeholder": "Postnatal day, e.g. 30",
+    },
+    {
+        "name": "age_to",
+        "label": "Max age (days)",
+        "type": "number",
+        "placeholder": "Postnatal day, e.g. 90",
     },
     {
         "name": "mouse",
@@ -1376,13 +1388,16 @@ def format_recording_mice_links(recording):
     if not mice:
         return EMPTY_VALUE
 
+    show_age = recording.recording_type.show_animal_age
     links = format_html_join(
         "",
-        '<a class="mouse-link" href="{}">{}</a>',
+        '<a class="mouse-link" href="{}"><span>{}</span>{}</a>',
         (
             (
                 reverse("lab:animal_summary", args=[mouse.pk]),
                 mouse.mouse_id,
+                recording_animal_age_badge(mouse, recording.recording_date)
+                if show_age else "",
             )
             for mouse in mice
         ),
@@ -1390,13 +1405,49 @@ def format_recording_mice_links(recording):
     animal_links = format_html('<div class="recording-animal-links">{}</div>', links)
 
     if len(mice) > 1:
+        age_summary = (
+            recording_animal_age_summary(mice, recording.recording_date)
+            if show_age else ""
+        )
         return format_html(
-            '<details class="recording-animals"><summary>{} animals</summary>{}</details>',
-            len(mice),
+            '<details class="recording-animals"><summary>{} animals{}</summary>{}</details>',
+            len(mice), age_summary,
             animal_links,
         )
 
     return animal_links
+
+
+def recording_animal_age_badge(mouse, recording_date):
+    age_days = mouse.age_on(recording_date)
+    display = format_postnatal_age(age_days)
+    if display is None:
+        return format_html(
+            '<span class="animal-age animal-age-unknown">Age unknown</span>'
+        )
+    return format_html(
+        '<span class="animal-age" title="Postnatal day {}" aria-label="Postnatal day {}">{}</span>',
+        age_days, age_days, display,
+    )
+
+
+def recording_animal_age_summary(mice, recording_date):
+    known = sorted(
+        age for age in (mouse.age_on(recording_date) for mouse in mice)
+        if age is not None
+    )
+    unknown_count = len(mice) - len(known)
+    if not known:
+        label = "Age unknown"
+    elif known[0] == known[-1]:
+        label = format_postnatal_age(known[0])
+    else:
+        label = f"{format_postnatal_age(known[0])}–{format_postnatal_age(known[-1])}"
+    if unknown_count and known:
+        label = f"{label} · {unknown_count} unknown"
+    return format_html(
+        ' <span class="animal-age animal-age-summary">{}</span>', label,
+    )
 
 
 def format_crossing_type_summary(mouse):

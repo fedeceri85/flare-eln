@@ -23,3 +23,20 @@ class RecordingBuiltinMigrationTests(TransactionTestCase):
         recording = apps.get_model('lab', 'Recording').objects.get(pk=recording.pk)
         self.assertFalse(kind.hide_data_paths_in_table); self.assertFalse(kind.hide_notes_in_table)
         self.assertEqual(recording.data_paths, ['/keep/data']); self.assertEqual(recording.notes, 'Keep notes')
+
+    def test_existing_recording_types_enable_animal_age(self):
+        executor = MigrationExecutor(connection)
+        latest = executor.loader.graph.leaf_nodes()
+        self.addCleanup(lambda: MigrationExecutor(connection).migrate(latest))
+        previous = [("lab", "0070_daily_ai_usage_events")]
+        target = [("lab", "0071_recordingtype_show_animal_age")]
+        executor.migrate(previous)
+        apps = executor.loader.project_state(previous).apps
+        kind = apps.get_model("lab", "RecordingType").objects.create(
+            name="Age migration", slug="age-migration"
+        )
+        executor = MigrationExecutor(connection)
+        executor.migrate(target)
+        apps = executor.loader.project_state(target).apps
+        kind = apps.get_model("lab", "RecordingType").objects.get(pk=kind.pk)
+        self.assertTrue(kind.show_animal_age)

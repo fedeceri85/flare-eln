@@ -31,7 +31,10 @@ class RecordingReportTests(AuthenticatedTestCase):
         ) for day, owner in ((1, self.user), (2, other_user))]
         self.foreign = Recording.objects.create(experiment=other_experiment, recording_type=self.kind, owner=self.user, recording_date=date(2026, 10, 3))
         protocol = Protocol.objects.create(protocol_number=142, licence_reference="EXPORT", name="Export")
-        mouse = Mouse.objects.create(mouse_id="Animal / 007", protocol=protocol)
+        mouse = Mouse.objects.create(
+            mouse_id="Animal / 007", protocol=protocol,
+            date_of_birth=date(2026, 8, 6),
+        )
         self.recordings[0].mice.add(mouse)
         self.url = reverse("lab:recording_report", args=[self.project.pk, self.experiment.pk])
         self.table_url = reverse("lab:recordings_page", args=[self.project.pk, self.experiment.pk])
@@ -60,12 +63,14 @@ class RecordingReportTests(AuthenticatedTestCase):
         self.assertEqual(sheet.max_row, 5)
         headings = [cell.value for cell in sheet[3]]
         self.assertEqual(headings[:2], ["Date", "Animals"])
+        self.assertEqual(headings[2], "Age at recording")
         self.assertIn("Hidden", headings)
         self.assertIn("Retired", headings)
         self.assertNotIn("Actions", headings)
         self.assertEqual(sheet["A4"].value, datetime(2026, 10, 1))
         self.assertEqual(sheet["A5"].value, datetime(2026, 10, 2))
         self.assertEqual(sheet["B4"].value, "Animal / 007")
+        self.assertEqual(sheet["C4"].value, "P56")
         values = dict(zip(headings, [cell.value for cell in sheet[4]]))
         self.assertEqual(values["Count"], 1)
         self.assertIs(values["Passed"], False)
@@ -123,6 +128,13 @@ class RecordingReportTests(AuthenticatedTestCase):
         self.assertEqual(sheet["A2"].data_type, "s")
         self.assertIn(self.project.name, sheet["A2"].value)
         self.assertEqual(sheet.cell(5, headings.index("Count") + 1).value, 0)
+
+    def test_age_export_column_can_be_disabled_per_recording_type(self):
+        self.kind.show_animal_age = False
+        self.kind.save(update_fields=["show_animal_age"])
+        sheet = load_workbook(BytesIO(self.download().content)).active
+        headings = [cell.value for cell in sheet[3]]
+        self.assertNotIn("Age at recording", headings)
 
     def test_pdf_and_long_notes_wide_schemas(self):
         response = self.download(format="pdf")

@@ -166,6 +166,8 @@ class ExistingProcedureBulkTests(TestCase):
         self.assertLess(html.index('>Delete selected</button>'), html.index('id="primary-form"'))
         self.assertGreater(html.index('data-existing-procedure-editor'), html.index('</form>', html.index('id="primary-form"')))
         self.assertIn('name="existing_procedures-update_date"', html)
+        self.assertIn("<th>Notes</th>", html)
+        self.assertIn('<td class="animal-summary-value">Keep notes</td>', html)
         rows = response.context["existing_procedure_rows"]
         self.assertEqual([row["record"].pk for row in rows], [self.records[1].pk, self.records[0].pk, self.records[2].pk])
         self.assertEqual(self.client.post(self.url, self.data()).status_code, 400)

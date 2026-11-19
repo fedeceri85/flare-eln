@@ -191,7 +191,7 @@ def edit_mouse_procedure(request, mouse_pk, procedure_pk):
     )
     return_url = safe_return_url(request, fallback_url)
     edit_mouse_url = reverse("lab:edit_mouse", args=[mouse.pk])
-    cancel_url = f"{edit_mouse_url}?{urlencode({'return_url': return_url})}"
+    cancel_url = f"{edit_mouse_url}?{urlencode({'return_url': return_url, 'mouse_editor_tab': 'procedures'})}"
 
     if request.method == "POST":
         form = ProcedureEditForm(request.POST, instance=procedure)
@@ -246,5 +246,5 @@ def delete_mouse_procedure(request, mouse_pk, procedure_pk):
     )
     edit_url = reverse("lab:edit_mouse", args=[mouse.pk])
     return redirect(
-        f"{edit_url}?{urlencode({'return_url': return_url})}"
+        f"{edit_url}?{urlencode({'return_url': return_url, 'mouse_editor_tab': 'procedures'})}"
     )

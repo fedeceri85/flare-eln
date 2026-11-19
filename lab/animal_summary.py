@@ -6,7 +6,7 @@ from django.db.models import F
 from django.urls import reverse
 
 from .forms import BulkMouseUpdateForm
-from .models import Procedure, Recording, genotype_category_labels
+from .models import Procedure, Recording, format_postnatal_age, genotype_category_labels
 from .ui import build_recording_type_table, format_value, recording_attachment_counts
 
 
@@ -128,6 +128,14 @@ def build_animal_summary(mice):
             "legacy_genotype": legacy,
         })
 
+    procedures = list(
+        Procedure.objects.filter(mouse__in=mice)
+        .select_related("procedure_type", "mouse")
+        .order_by("mouse_id", F("date").desc(nulls_last=True), "-procedure_id")
+    )
+    for procedure in procedures:
+        procedure.age_display = format_postnatal_age(procedure.mouse.age_on(procedure.date))
+
     return {
         "summary_groups": groups,
         "summary_crossing": summary_field(
@@ -140,7 +148,5 @@ def build_animal_summary(mice):
         "individual_rows": individual_rows,
         "single_mouse_mode": len(mice) == 1,
         "animal_recording_sections": build_animal_recording_sections(mice),
-        "procedures": Procedure.objects.filter(mouse__in=mice).select_related("procedure_type").order_by(
-            "mouse_id", F("date").desc(nulls_last=True), "-procedure_id",
-        ),
+        "procedures": procedures,
     }

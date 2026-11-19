@@ -14,6 +14,7 @@ class BaseProcedureForm(forms.ModelForm):
             "date",
             "lab_member",
             "lab_book_page",
+            "notes",
         ]
         labels = {
             "procedure_type": "Procedure type",
@@ -95,13 +96,13 @@ def validate_procedure_drafts(drafts):
     for index, draft in enumerate(drafts, 1):
         if (not isinstance(draft, dict)
                 or any(not isinstance(draft.get(name, ""), str)
-                       for name in ("date", "lab_member", "lab_book_page"))
+                       for name in ("date", "lab_member", "lab_book_page", "notes"))
                 or not isinstance(draft.get("procedure_type", ""), (str, int))
                 or isinstance(draft.get("procedure_type"), bool)):
             raise forms.ValidationError(f"Procedure {index}: invalid procedure details.")
         procedure_form = BulkProcedureCreateForm({
             f"new_procedure-{name}": draft.get(name, "")
-            for name in ("procedure_type", "date", "lab_member", "lab_book_page")
+            for name in ("procedure_type", "date", "lab_member", "lab_book_page", "notes")
         })
         if not procedure_form.is_valid():
             errors = "; ".join(

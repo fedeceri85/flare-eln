@@ -65,6 +65,12 @@ SEVERITY_RANK = {
             "Severe": 3,
         }
 
+
+def format_postnatal_age(age_days):
+    """Format a validated age without making the stored data mouse-specific."""
+    return f"P{age_days}" if age_days is not None and age_days >= 0 else None
+
+
 class Protocol(models.Model):
     protocol_id = models.AutoField(primary_key=True)
     protocol_number = models.IntegerField()
@@ -358,6 +364,17 @@ class Mouse(models.Model):
 
     def __str__(self):
             return self.mouse_id
+
+    def age_on(self, reference_date):
+        """Return completed postnatal days on a date, or None when unknown."""
+        if (
+            self.date_of_birth is None
+            or reference_date is None
+            or reference_date < self.date_of_birth
+        ):
+            return None
+
+        return (reference_date - self.date_of_birth).days
 
     def clean(self):
         super().clean()
@@ -798,6 +815,13 @@ class RecordingType(models.Model):
 
     hide_data_paths_in_table = models.BooleanField(default=False)
     hide_notes_in_table = models.BooleanField(default=False)
+    show_animal_age = models.BooleanField(
+        default=True,
+        verbose_name="Show animal age",
+        help_text=(
+            "Show postnatal age in recording tables and experiment exports."
+        ),
+    )
 
     class Meta:
         ordering = ["name"]

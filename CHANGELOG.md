@@ -1,3 +1,8 @@
+19/11/2026
+- Improvements to "Add recording" interface
+- General bug fixes
+- Added ages to experiments (age of animal at the time of experiment.)
+
 18/11/2026
 - Added file attachment to AI assistant.
 - Added "add animals" functionality to AI assistant.

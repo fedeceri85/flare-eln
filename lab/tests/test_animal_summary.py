@@ -61,6 +61,17 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertContains(response, 'name="colour"')
         self.assertContains(response, 'value="Black and white"')
 
+    def test_cull_date_is_visible_with_animal_status_properties(self):
+        self.mice[0].cull_date = date(2026, 3, 1)
+        self.mice[0].status = "Culled"
+        self.mice[0].save(update_fields=["cull_date", "status"])
+        response = self.client.get(
+            reverse("lab:animal_summary", args=[self.mice[0].pk])
+        )
+        self.assertContains(response, "Animal status")
+        self.assertContains(response, "Cull date")
+        self.assertContains(response, "01/03/2026")
+
     def test_summary_uses_familiar_tabs_and_has_no_editable_fields(self):
         response, markup = self.summary()
         self.assertEqual([node.attrs["data-mouse-tab"] for node in markup.find("button", role="tab")],
@@ -542,3 +553,40 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         summary = self.client.get(result.url)
         self.assertEqual(summary.status_code, 200)
         self.assertContains(summary, "New protocol")
+
+    def test_procedure_table_renders_age_column(self):
+        response, markup = self.summary()
+        headings = [
+            node.text.strip()
+            for node in markup.find("th", scope="col")
+            if node.within("section", **{"data-mouse-tab-panel": "procedures"})
+        ]
+        self.assertEqual(
+            ["Animal ID", "Procedure type", "Date", "Age", "Lab member", "Lab-book page", "Notes", "Actions"],
+            headings,
+        )
+        self.assertContains(response, "P32")
+
+    def test_procedure_age_display_computed_for_each_procedure(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([procedure.age_display for procedure in response.context["procedures"]], ["P32"])
+
+    def test_procedure_age_display_unknown_when_birth_date_missing(self):
+        self.mice[0].date_of_birth = None
+        self.mice[0].save(update_fields=["date_of_birth"])
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([procedure.age_display for procedure in response.context["procedures"]], [None])
+
+    def test_edit_page_existing_procedure_table_has_no_age_column(self):
+        response = self.client.get(self.edit_url, {"selected_mouse": [mouse.pk for mouse in self.mice]})
+        self.assertEqual(response.status_code, 200)
+        markup = Markup(response.content.decode())
+        headings = [
+            node.text.strip()
+            for node in markup.find("th")
+            if node.within("section", id="mouse-panel-existing-procedures")
+        ]
+        self.assertIn("Procedure type", headings)
+        self.assertNotIn("Age", headings)

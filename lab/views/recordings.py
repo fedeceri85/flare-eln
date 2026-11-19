@@ -1,5 +1,6 @@
 'Recordings views and helpers.'
 
+from datetime import timedelta
 from uuid import uuid4
 
 from django.contrib import messages
@@ -139,6 +140,15 @@ def positive_int_or_none(value):
         return None
 
     return parsed if parsed > 0 else None
+
+
+def nonnegative_int_or_none(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return parsed if parsed >= 0 else None
 
 
 class NullableJSONTextTransform(KeyTextTransform):
@@ -381,6 +391,30 @@ def recordings_page(request, project_pk, experiment_pk):
         recordings = recordings.filter(
             recording_date__lte=filter_values["date_to"],
         )
+
+    age_from = nonnegative_int_or_none(filter_values.get("age_from"))
+    age_to = nonnegative_int_or_none(filter_values.get("age_to"))
+
+    if age_from is not None or age_to is not None:
+        # Match recordings where any mouse is within [age_from, age_to]
+        # postnatal days on the recording date:
+        #   age_from <= (recording_date - date_of_birth) <= age_to
+        # is equivalent to the date bounds
+        #   recording_date - age_to <= date_of_birth <= recording_date - age_from
+        # Expressed with F('recording_date') - timedelta so the SQL compiles
+        # on every backend; mice with an unknown birth date never match.
+        age_lookup = {}
+
+        if age_from is not None:
+            age_lookup["mice__date_of_birth__lte"] = (
+                F("recording_date") - timedelta(days=age_from)
+            )
+        if age_to is not None:
+            age_lookup["mice__date_of_birth__gte"] = (
+                F("recording_date") - timedelta(days=age_to)
+            )
+
+        recordings = recordings.filter(**age_lookup)
 
     recordings, sort, direction = order_recordings(
         recordings.distinct(), experiment.recording_type,

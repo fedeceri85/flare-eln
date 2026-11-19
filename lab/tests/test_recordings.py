@@ -199,6 +199,43 @@ class RecordingsPageTests(AuthenticatedTestCase):
         for page_size in (25, 50, 100, 150, 200):
             self.assertContains(response, f'value="{page_size}"')
 
+    def test_recording_animal_ages_show_inline_and_as_a_collapsed_range(self):
+        self.mouse_1.date_of_birth = date(2026, 5, 30)
+        self.mouse_1.save(update_fields=["date_of_birth"])
+        self.mouse_2.date_of_birth = date(2026, 5, 20)
+        self.mouse_2.save(update_fields=["date_of_birth"])
+        self.newer_recording.mice.add(self.mouse_2)
+
+        response = self.client.get(self.recordings_url)
+        markup = Markup(response.content.decode())
+        newer_row = markup.find("tr", id=f"recording-{self.newer_recording.pk}")[0]
+        self.assertIn("2 animals", newer_row.text)
+        self.assertIn("P56–P66", newer_row.text)
+        self.assertIn("P56", newer_row.text)
+        self.assertIn("P66", newer_row.text)
+        badges = [
+            node for node in markup.find("span")
+            if "animal-age" in node.attrs.get("class", "") and node.within("tr", id=f"recording-{self.newer_recording.pk}")
+        ]
+        self.assertTrue(badges)
+        self.assertTrue(any(node.attrs.get("aria-label") == "Postnatal day 56" for node in badges))
+
+        self.imaging_type.show_animal_age = False
+        self.imaging_type.save(update_fields=["show_animal_age"])
+        response = self.client.get(self.recordings_url)
+        row = Markup(response.content.decode()).find("tr", id=f"recording-{self.newer_recording.pk}")[0]
+        self.assertNotIn("P56", row.text)
+        self.assertNotIn("P66", row.text)
+
+    def test_recording_animal_age_summary_reports_unknown_ages(self):
+        self.mouse_1.date_of_birth = date(2026, 5, 30)
+        self.mouse_1.save(update_fields=["date_of_birth"])
+        self.newer_recording.mice.add(self.mouse_2)
+        response = self.client.get(self.recordings_url)
+        row = Markup(response.content.decode()).find("tr", id=f"recording-{self.newer_recording.pk}")[0]
+        self.assertIn("P56 · 1 unknown", row.text)
+        self.assertIn("Age unknown", row.text)
+
     def test_recordings_page_honours_page_size(self):
         for index in range(30):
             create_recording(

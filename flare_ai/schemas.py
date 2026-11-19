@@ -225,6 +225,21 @@ class RecordingSearchInput(BaseModel):
 
     mouse_id: SearchText | None = Field(default=None, description="Exact Animal ID, ignoring case.")
     mouse_id_contains: SearchText | None = Field(default=None, description="Part of an Animal ID.")
+    animal_age_days: int | None = Field(
+        default=None,
+        ge=0,
+        description="Exact animal age in postnatal days on the recording date.",
+    )
+    animal_age_days_from: int | None = Field(
+        default=None,
+        ge=0,
+        description="Minimum animal age in postnatal days on the recording date, inclusive.",
+    )
+    animal_age_days_to: int | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum animal age in postnatal days on the recording date, inclusive.",
+    )
 
     recording_type: SearchText | None = Field(
         default=None, description="Partial recording type name, such as ephys or behaviour."
@@ -262,4 +277,23 @@ class RecordingSearchInput(BaseModel):
             )
         ):
             raise ValueError("recording_date must be within the requested range.")
+        if (
+            self.animal_age_days_from is not None
+            and self.animal_age_days_to is not None
+            and self.animal_age_days_from > self.animal_age_days_to
+        ):
+            raise ValueError(
+                "animal_age_days_from must be on or before animal_age_days_to."
+            )
+        if self.animal_age_days is not None and (
+            (
+                self.animal_age_days_from is not None
+                and self.animal_age_days < self.animal_age_days_from
+            )
+            or (
+                self.animal_age_days_to is not None
+                and self.animal_age_days > self.animal_age_days_to
+            )
+        ):
+            raise ValueError("animal_age_days must be within its requested range.")
         return self

@@ -1,5 +1,5 @@
 :root {
-    zoom: 90%;
+    zoom: 85%;
     --ink: #192d40;
     --muted: #5a6b7c;
     --blue: #205eaa;
@@ -1209,7 +1209,7 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .procedure-editor .bulk-input label { margin-bottom: 6px; }
 .procedure-editor .bulk-input :is(input, select, textarea):disabled { background: #f3f5f7; color: #748393; border-color: #e0e5eb; opacity: 1; }
 .procedure-editor > .procedure-after-save { margin: 14px 0 0; }
-.animal-recording-creator { position: relative; z-index: 2; }
+.animal-recording-creator { position: relative; z-index: 10; }
 .animal-recording-creator .table-card, .animal-recording-creator .table-scroll { overflow: visible; }
 .animal-recording-row > td { vertical-align: top; }
 .animal-recording-row .form-field { position: relative; margin: 0; min-width: 0; max-width: 360px; }
@@ -1239,12 +1239,15 @@ input[type="checkbox"] { accent-color: var(--blue); }
 }
 
 .procedure-create-with-action { grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)) auto; }
-.procedure-add-button { align-self: end; min-height: 34px; }
+.procedure-create-with-action .bulk-field:has(textarea) { grid-column: 1 / -1; }
+.procedure-add-button { grid-row: 1; grid-column: 5; align-self: end; min-height: 34px; }
 @media (max-width: 1100px) {
     .procedure-create-with-action { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .procedure-add-button { grid-column: 1 / -1; grid-row: auto; justify-self: end; }
 }
 @media (max-width: 600px) {
     .procedure-create-with-action { grid-template-columns: minmax(0, 1fr); }
+    .procedure-add-button { grid-column: 1 / -1; grid-row: auto; justify-self: start; }
 }
 
 .individual-mouse-table { table-layout: fixed; min-width: 880px; white-space: normal; }
@@ -1416,7 +1419,10 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .recording-animals > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
 .recording-animals[open] > summary { margin-bottom: 6px; }
 .recording-animal-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 260px; max-width: 100%; min-width: 0; }
-.recording-animal-links .mouse-link { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.recording-animal-links .mouse-link { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.animal-age { color: var(--muted); font-size: 0.88em; font-weight: 500; white-space: nowrap; }
+.animal-age-summary { margin-left: 4px; }
+.animal-age-unknown { font-weight: 400; }
 .recording-images-section { margin-top: 24px; padding: 20px; }
 .media-uploader { margin-top: 20px; min-width: 0; }
 .media-uploader [hidden] { display: none; }

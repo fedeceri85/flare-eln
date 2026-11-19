@@ -7,18 +7,28 @@ from xml.sax.saxutils import escape
 
 from django.utils import timezone
 
+from .models import format_postnatal_age
 from .ui import recording_field_label
 
 
 def recording_report_data(experiment, recordings):
     kind = experiment.recording_type
     fields = list(kind.fields.all()) if kind else []
-    headings = ["Date", "Animals", *[recording_field_label(field) for field in fields]]
-    widths = [16, 28, *[24 for _ in fields]]
+    show_animal_age = bool(kind and kind.show_animal_age)
+    headings = ["Date", "Animals"]
+    widths = [16, 28]
+    if show_animal_age:
+        headings.append("Age at recording")
+        widths.append(20)
+    headings.extend(recording_field_label(field) for field in fields)
+    widths.extend(24 for _ in fields)
     headings.extend(["Recording Paths", "Notes"])
     widths.extend([40, 44])
     rows = []
     for recording in recordings:
+        mice = sorted(
+            recording.mice.all(), key=lambda mouse: mouse.mouse_id.lower()
+        )
         values = []
         for field in fields:
             value = recording.values.get(field.key)
@@ -28,7 +38,16 @@ def recording_report_data(experiment, recordings):
                 except ValueError:
                     pass
             values.append(value)
-        row = [recording.recording_date, "\n".join(mouse.pk for mouse in recording.mice.all()), *values]
+        row = [
+            recording.recording_date,
+            "\n".join(mouse.pk for mouse in mice),
+        ]
+        if show_animal_age:
+            row.append("\n".join(
+                format_postnatal_age(mouse.age_on(recording.recording_date)) or "—"
+                for mouse in mice
+            ))
+        row.extend(values)
         row.extend(["\n".join(recording.data_paths), recording.notes])
         rows.append(row)
     return {"headings": headings, "widths": widths, "rows": rows}

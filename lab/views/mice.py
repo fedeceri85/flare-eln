@@ -727,7 +727,14 @@ def _edit_selected_mice(request, selected_protocol=None):
         request,
         "lab/edit_selected_mice.html",
         {
-            **editor_context(request, selected_mice, selected_protocol, return_url=bulk_return_url),
+            # Pass the original destination (e.g. the animal summary) -- not the
+            # self-referential ``bulk_return_url`` (the edit page itself). Using
+            # the edit page URL here makes the edit page's own ``return_url``
+            # nested inside itself, so after saving a procedure the first
+            # "Save changes" bounces back to this page on the shared tab instead
+            # of going to the summary. The individual procedure edit links and the
+            # bulk editor's re-render both return to the original destination.
+            **editor_context(request, selected_mice, selected_protocol, return_url=return_url),
             "litter_procedure_form": BulkProcedureCreateForm(),
             "procedure_fields_enabled": can_add_bulk_procedure,
             "form": form,
