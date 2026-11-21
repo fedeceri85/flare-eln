@@ -146,3 +146,45 @@ class RecordingSearchTests(TestCase):
         self.assertFalse(filter_recordings(
             RecordingSearchInput(animal_age_days_from=0)
         ).exists())
+
+    def test_pins_to_project_and_experiment(self):
+        other_project = Project.objects.create(name="Other AI project")
+        other_experiment = Experiment.objects.create(
+            project=other_project, name="Other responses", recording_type=self.kind,
+        )
+        other_recording = Recording.objects.create(
+            owner=self.user,
+            experiment=other_experiment,
+            recording_type=self.kind,
+            recording_date=date(2026, 11, 5),
+            data_paths=[],
+            values={},
+        )
+        other_recording.mice.add(self.mouse)
+
+        by_project = filter_recordings(
+            RecordingSearchInput(project_id=self.project.project_id)
+        )
+        self.assertEqual(list(by_project), [self.recording])
+        by_experiment = filter_recordings(
+            RecordingSearchInput(experiment_id=self.experiment.experiment_id)
+        )
+        self.assertEqual(list(by_experiment), [self.recording])
+        both = filter_recordings(
+            RecordingSearchInput(
+                project_id=self.project.project_id,
+                experiment_id=self.experiment.experiment_id,
+            )
+        )
+        self.assertEqual(list(both), [self.recording])
+        self.assertNotIn(
+            self.recording,
+            list(
+                filter_recordings(
+                    RecordingSearchInput(
+                        project_id=other_project.project_id,
+                        experiment_id=self.experiment.experiment_id,
+                    )
+                )
+            ),
+        )

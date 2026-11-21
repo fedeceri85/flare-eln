@@ -100,7 +100,7 @@ engine.
 Run the suite with:
 
 ```bash
-python3 scripts/test_auto_update_synology_release.py
+python3 tests/test_auto_update_synology_release.py
 ```
 
 References:

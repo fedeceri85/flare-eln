@@ -11,17 +11,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .models import ImageStorageLocation, ImageStorageSettings, RecordingImage, SpreadsheetImportImage
+from .models import ImageStorageLocation, RecordingImage, SpreadsheetImportImage
 
 logger = logging.getLogger(__name__)
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
 MAX_BATCH_IMAGES = 10
-
-
-def configured_directory():
-    configuration = ImageStorageSettings.objects.select_related("active_location").filter(pk=1).first()
-    return Path(configuration.active_location.directory) if configuration else Path(settings.RECORDING_MEDIA_ROOT)
 
 
 def validate_directory(value):
@@ -44,27 +39,16 @@ def validate_directory(value):
         raise ValidationError("The application cannot write to this folder.") from exc
 
 
-def activate_directory(directory):
-    directory = validate_directory(directory)
-    with transaction.atomic():
-        location, _ = ImageStorageLocation.objects.get_or_create(directory=directory)
-        ImageStorageSettings.objects.update_or_create(pk=1, defaults={"active_location": location})
-    return location
-
-
 def upload_location():
-    configuration = ImageStorageSettings.objects.select_related("active_location").filter(pk=1).first()
-    directory = Path(configuration.active_location.directory) if configuration else Path(settings.RECORDING_MEDIA_ROOT)
-    # Bootstrap only the deployment default. User-selected folders must already exist.
-    if configuration is None:
-        try:
-            directory.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise ValidationError("Image storage is unavailable. Ask an administrator to check Image storage settings.") from exc
+    directory = Path(settings.RECORDING_MEDIA_ROOT)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ValidationError("Image storage is unavailable. Ask an administrator to check the deployment media folder.") from exc
     try:
         directory = validate_directory(str(directory))
     except ValidationError as exc:
-        raise ValidationError("Image storage is unavailable. Ask an administrator to check Image storage settings.") from exc
+        raise ValidationError("Image storage is unavailable. Ask an administrator to check the deployment media folder.") from exc
     return ImageStorageLocation.objects.get_or_create(directory=directory)[0]
 
 

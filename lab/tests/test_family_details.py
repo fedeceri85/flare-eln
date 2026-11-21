@@ -10,7 +10,7 @@ from ..family import build_family_sections, build_parent_groups
 from ..forms import BulkMouseUpdateForm, individual_mouse_field_prefix
 from ..models import Mouse, Protocol
 from ..parentage import apply_parentage
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..views.mice import apply_bulk_mouse_updates
 
 
@@ -63,7 +63,7 @@ class FamilyDetailsTests(TestCase):
         self.assertTrue(markup.find('h2', id='family-offspring-title')[0].within('section', id='mouse-panel-family'))
         self.assertContains(response, 'Recorded IDs differ')
         edit = markup.find('a', **{'data-mouse-summary-edit': None})[0].attrs['href']
-        self.assertEqual(parse_qs(urlsplit(edit).query)['mouse_editor_tab'], ['individual'])
+        self.assertEqual(parse_qs(urlsplit(edit).query)['mouse_editor_tab'], ['family'])
 
     def test_view_all_offspring_is_a_link_next_to_its_count(self):
         response = self.client.get(reverse('lab:animal_summary', args=[self.mum.pk]), {'mouse_editor_tab': 'family'})

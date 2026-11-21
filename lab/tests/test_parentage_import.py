@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from ..models import Mouse, MouseLine, Species, Protocol, Project, Experiment, RecordingType, SpreadsheetImportDraft, Recording
 from ..parentage import apply_parentage, graph_state, validate_parentage
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..spreadsheet_import.engine import animal_groups, build_review, commit_import, draft_table, initial_resolution
 from ..spreadsheet_import.forms import AnimalsForm
 from ..spreadsheet_import.mapping import new_definition

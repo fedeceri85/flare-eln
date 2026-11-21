@@ -8,4 +8,5 @@ app_name = "flare_ai"
 urlpatterns = [
     path("chat/stream/", views.chat_stream, name="chat_stream"),
     path("chat/reset/", views.reset_chat, name="reset_chat"),
+    path("settings/", views.ai_settings, name="ai_settings"),
 ]

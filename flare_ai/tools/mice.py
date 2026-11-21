@@ -154,9 +154,11 @@ def search_mice(filters: MouseSearchInput) -> dict:
     not semantically or with spelling correction. Each genotypes entry matches
     one recorded line/category/uncertainty call; multiple entries can require
     different lines. Dates and their bounds are inclusive. Returns at most 20
-    mice and has_more, not a complete count. Each compact result includes the
-    Animal ID, birth date, crossing, genotype summary and record URL. Other
-    properties can be filtered but are not included in this compact response.
+    mice and has_more, not a complete count. Each result includes the Animal
+    ID, birth date, crossing, procedures, genotype summary, protocol, pedigree
+    (mother and father Animal IDs and their external IDs), breeding pair, sex,
+    status, severity and whether it exceeds the protocol maximum, local
+    identifier, marking type, colour, notes and the record URL.
     When search_mice returns a summary_url, offer it as a Markdown link named
     "View animal summary". Use the exact returned URL without modifying it.
     This tool never changes records.
@@ -222,6 +224,19 @@ def search_mice(filters: MouseSearchInput) -> dict:
                 if mouse.protocol
                 else None
             ),
+            "mother_id": mouse.mother.mouse_id if mouse.mother else None,
+            "father_id": mouse.father.mouse_id if mouse.father else None,
+            "mother_external_id": mouse.mother_external_id,
+            "father_external_id": mouse.father_external_id,
+            "breeding_pair": mouse.breeding_pair,
+            "sex": mouse.sex,
+            "status": mouse.status,
+            "severity": mouse.severity,
+            "severity_exceeded": mouse.severity_exceeded,
+            "local_identifier": mouse.tattoo,
+            "marking_type": mouse.marking_type,
+            "colour": mouse.colour,
+            "notes": mouse.notes,
         })
 
     return {

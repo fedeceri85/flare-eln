@@ -1,20 +1,5 @@
 from django import forms
 
-from ..recording_images import configured_directory, validate_directory
-
-
-class ImageStorageForm(forms.Form):
-    directory = forms.CharField(max_length=1024, label="Folder for new images",
-        help_text="Use an existing folder writable by the application. Existing images stay in their original folders.")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["directory"].initial = str(configured_directory())
-
-    def clean_directory(self):
-        return validate_directory(self.cleaned_data["directory"])
-
-
 class MultipleImageInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 

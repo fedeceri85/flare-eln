@@ -1,9 +1,11 @@
 from datetime import date
+from urllib.parse import parse_qs, urlsplit
+
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from ..models import Mouse, Procedure, ProcedureType, Protocol
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ._support import AuthenticatedTestCase, create_test_crossing, crossing_post_data
 
 
@@ -537,7 +539,15 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], return_url)
+        destination = urlsplit(response["Location"])
+        self.assertEqual(destination.path, reverse("lab:view_selected_mice_all"))
+        self.assertEqual(
+            parse_qs(destination.query),
+            {
+                "selected_mouse": ["MOUSE-SCOPED-ADD"],
+                "return_url": [return_url],
+            },
+        )
 
         mouse = Mouse.objects.get(pk="MOUSE-SCOPED-ADD")
         self.assertEqual(mouse.protocol, self.protocol_a1)

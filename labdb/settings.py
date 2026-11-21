@@ -88,11 +88,7 @@ SESSION_SAVE_EVERY_REQUEST = False
 # static collection when present, while exposing no UI or routes unless enabled.
 FLARE_AI_AVAILABLE = importlib.util.find_spec("flare_ai") is not None
 FLARE_AI_ENABLED = FLARE_AI_AVAILABLE and env_bool("FLARE_AI_ENABLED", False)
-FLARE_AI_BASE_URL = env_first("FLARE_AI_BASE_URL", default="")
-FLARE_AI_API_KEY = env_first("FLARE_AI_API_KEY", default="")
-FLARE_AI_MODEL = env_first("FLARE_AI_MODEL", default="")
 FLARE_AI_GROUP_NAME = env_first("FLARE_AI_GROUP_NAME", default="FLARE AI users")
-FLARE_AI_ASSISTANT_NAME = env_first("FLARE_AI_ASSISTANT_NAME", default="Marcott-E")
 
 # Uploaded viewing copies are private and served by authenticated application views.
 RECORDING_MEDIA_ROOT = Path(env_first("FLARE_MEDIA_ROOT", default=str(BASE_DIR / "media")))

@@ -12,8 +12,8 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
-from ..models import Experiment, ImageStorageSettings, Project, Recording, RecordingImage, RecordingType
-from ..recording_images import activate_directory, compress_image, image_path, save_images
+from ..models import Experiment, Project, Recording, RecordingImage, RecordingType
+from ..recording_images import compress_image, image_path, save_images
 
 
 def upload(name="sample.png", size=(400, 200), mode="RGB", **save_options):
@@ -42,7 +42,6 @@ class RecordingImageTests(TestCase):
         self.recording = Recording.objects.create(owner=self.owner, experiment=self.experiment, recording_type=self.kind, recording_date="2026-10-25")
         self.url = reverse("lab:recording_images", args=[self.project.pk, self.experiment.pk, self.recording.pk])
         self.list_url = reverse("lab:recordings_page", args=[self.project.pk, self.experiment.pk])
-        self.settings_url = reverse("lab:image_storage_settings")
         self.client.force_login(self.owner)
 
     def add_image(self, **kwargs):
@@ -126,31 +125,6 @@ class RecordingImageTests(TestCase):
         with Image.open(BytesIO(data)) as saved:
             self.assertFalse(saved.getexif())
 
-    def test_storage_settings_are_admin_only_and_shared_between_requests(self):
-        self.assertEqual(self.client.get(self.settings_url).status_code, 403)
-        self.assertEqual(self.client.post(self.settings_url, {"directory": str(self.root)}).status_code, 403)
-        self.assertNotContains(self.client.get(reverse("lab:settings_page")), self.settings_url)
-        self.client.force_login(self.admin)
-        self.assertContains(self.client.get(reverse("lab:settings_page")), self.settings_url)
-        response = self.client.post(self.settings_url, {"directory": str(self.root)})
-        self.assertRedirects(response, self.settings_url)
-        self.assertEqual(ImageStorageSettings.objects.get(pk=1).active_location.directory, str(self.root))
-        other_client = Client()
-        other_client.force_login(self.owner)
-        self.assertEqual(other_client.post(self.url, {"action": "upload", "images": upload()}).status_code, 302)
-        self.assertEqual(self.recording.images.get().storage_location.directory, str(self.root))
-
-    def test_folder_change_keeps_old_images_accessible_and_changes_new_uploads_only(self):
-        old = self.add_image()
-        new_directory = self.root / "new-location"
-        new_directory.mkdir()
-        activate_directory(str(new_directory))
-        new = self.add_image(name="second.png")
-        self.assertNotEqual(old.storage_location_id, new.storage_location_id)
-        self.assertEqual(Path(new.storage_location.directory), new_directory)
-        self.assertEqual(len(self.gallery().json()["images"]), 2)
-        self.assertEqual(self.client.get(reverse("lab:recording_image_file", args=[old.pk])).status_code, 200)
-
     def test_missing_image_is_omitted_then_reappears_without_reupload(self):
         image = self.add_image()
         path = image_path(image)
@@ -194,35 +168,38 @@ class RecordingImageTests(TestCase):
         self.assertEqual(self.recording.images.count(), 1)
         self.assertEqual(len(response.json()["images"]), 1)
 
-    def test_invalid_or_unwritable_folder_does_not_replace_active_location(self):
-        activate_directory(str(self.root))
-        self.client.force_login(self.admin)
-        for directory in ("relative", str(self.root / "missing")):
-            response = self.client.post(self.settings_url, {"directory": directory})
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(response.context["form"].errors)
-        with patch("lab.recording_images.tempfile.TemporaryFile", side_effect=PermissionError):
-            response = self.client.post(self.settings_url, {"directory": str(self.root)})
-            self.assertTrue(response.context["form"].errors)
-        self.assertEqual(ImageStorageSettings.objects.get(pk=1).active_location.directory, str(self.root))
-
-    def test_docker_setting_cannot_escape_persistent_media_mount(self):
+    def test_deployment_media_root_cannot_escape_persistent_media_mount(self):
         mounted = self.root / "media"
         mounted.mkdir()
-        with override_settings(RECORDING_MEDIA_BOUNDARY=str(mounted)):
+        with override_settings(
+            RECORDING_MEDIA_ROOT=self.root,
+            RECORDING_MEDIA_BOUNDARY=str(mounted),
+        ):
             with self.assertRaises(ValidationError):
-                activate_directory(str(self.root))
+                save_images(self.recording, [upload()])
             link = mounted / "outside"
             link.symlink_to(self.root, target_is_directory=True)
+        with override_settings(
+            RECORDING_MEDIA_ROOT=link,
+            RECORDING_MEDIA_BOUNDARY=str(mounted),
+        ):
             with self.assertRaises(ValidationError):
-                activate_directory(str(link))
-            activate_directory(str(mounted))
+                save_images(self.recording, [upload()])
+        with override_settings(
+            RECORDING_MEDIA_ROOT=mounted,
+            RECORDING_MEDIA_BOUNDARY=str(mounted),
+        ):
+            save_images(self.recording, [upload()])
+        self.assertEqual(
+            Path(self.recording.images.get().storage_location.directory),
+            mounted,
+        )
 
     def test_private_viewing_and_owner_staff_modification_permissions(self):
         image = self.add_image()
         file_url = reverse("lab:recording_image_file", args=[image.pk])
         self.client.logout()
-        for url in (file_url, self.url, self.settings_url):
+        for url in (file_url, self.url):
             self.assertEqual(self.client.get(url).status_code, 302)
         self.client.force_login(self.viewer)
         self.assertEqual(self.client.get(file_url).status_code, 200)

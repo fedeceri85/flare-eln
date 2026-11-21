@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 
 from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingField, RecordingType
 from ..recording_reports import render_recording_pdf
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ._support import AuthenticatedTestCase
 
 

@@ -5,7 +5,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from ..models import GenotypeCategory, Experiment, Project, Recording, RecordingField, RecordingType
-from ..test_navigation import Markup
+from .test_navigation import Markup
 
 
 @override_settings(ALLOWED_HOSTS=["testserver"])

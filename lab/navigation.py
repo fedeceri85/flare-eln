@@ -26,11 +26,12 @@ PAGE_TITLES = {
     "add_recording": "Add recording", "edit_recording": "Edit recording",
     "import_recordings": "Import from spreadsheet", "import_recordings_draft": "Import from spreadsheet",
     "maintenance": "Maintenance", "settings_page": "Settings", "import_templates": "Import templates",
-    "image_storage_settings": "Image storage", "recording_images": "Recording images",
+    "recording_images": "Recording images",
     "rename_import_template": "Rename import template", "delete_import_template": "Delete import template",
     "genotype_categories": "Genotype categories", "add_genotype_category": "Add genotype category", "edit_genotype_category": "Edit genotype category",
     "recording_types": "Recording types", "add_recording_type": "Add recording type", "edit_recording_type": "Edit recording type",
     "delete_recording_type": "Delete recording type", "add_recording_field": "Add recording field", "edit_recording_field": "Edit recording field",
+    "ai_settings": "AI Assistant",
     "delete_recording": "Delete recording", "delete_selected_recordings": "Delete selected recordings", "select_recording_mouse": "Select animals",
     "edit_mouse": "Edit animal", "rename_mouse": "Rename animal",
     "delete_mouse": "Delete animal", "edit_mouse_procedure": "Edit procedure",
@@ -123,9 +124,9 @@ def build_navigation(context):
         section = "home"
     elif name in {
         "maintenance", "settings_page", "import_templates", "rename_import_template", "delete_import_template",
-        "image_storage_settings",
         "genotype_categories", "add_genotype_category", "edit_genotype_category",
         "recording_types", "add_recording_type", "edit_recording_type", "delete_recording_type", "add_recording_field", "edit_recording_field",
+        "ai_settings",
     }:
         section = "settings"
     elif name == "lines_crossings_page":
@@ -168,8 +169,10 @@ def build_navigation(context):
                 crumb(kind.name, reverse("lab:edit_recording_type", args=[kind.pk]))
             if name != "recording_types":
                 crumb(title)
-        elif name in {"image_storage_settings", "maintenance"}:
+        elif name == "maintenance":
             crumb(title)
+        elif name == "ai_settings":
+            crumb("AI Assistant")
         elif name != "settings_page":
             crumb("Import templates", reverse("lab:import_templates"))
         if name in {"rename_import_template", "delete_import_template"}:

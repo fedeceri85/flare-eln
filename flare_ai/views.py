@@ -3,11 +3,13 @@ import logging
 from uuid import UUID
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import JsonResponse, StreamingHttpResponse
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
-from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.messages import ImageUrl, ModelMessagesTypeAdapter
 from pydantic_ai.usage import UsageLimits
 
 from lab.usage import record_daily_ai_usage
@@ -20,6 +22,8 @@ from .attachments import (
     install_attachment_upload_limit,
 )
 from .context import AIRequestContext, resolve_page_context
+from .forms import AIProviderSettingsForm
+from .models import AIProviderSettings
 
 
 logger = logging.getLogger(__name__)
@@ -141,6 +145,17 @@ def chat_stream(request):
         attachment=attachment,
     )
 
+    # Build the user prompt: text-only or multi-modal (text + image(s)).
+    user_prompt = message
+    if attachment is not None:
+        try:
+            image_urls = attachment.image_data_urls()
+        except ValidationError as exc:
+            attachment.close()
+            return JsonResponse({"error": exc.messages[0]}, status=400)
+        if image_urls:
+            user_prompt = [message, *[ImageUrl(url=u) for u in image_urls]]
+
     def stream():
         try:
             yield _event("start", conversation_id=conversation_id)
@@ -148,7 +163,7 @@ def chat_stream(request):
                 if not greeting:
                     record_daily_ai_usage(request.user)
                 with get_agent().run_stream_sync(
-                    message,
+                    user_prompt,
                     message_history=history,
                     conversation_id=conversation_id,
                     deps=deps,
@@ -210,3 +225,25 @@ def reset_chat(request):
         request.session[SESSION_KEY] = conversations
         request.session.modified = True
     return JsonResponse({"reset": True})
+
+
+@login_required(login_url="lab:login")
+def ai_settings(request):
+    """Staff-only page to configure the AI assistant provider connection."""
+    if not request.user.is_staff:
+        raise PermissionDenied
+    instance = AIProviderSettings.singleton()
+    if request.method == "POST":
+        form = AIProviderSettingsForm(request.POST, instance=instance)
+        if form.is_valid():
+            form.save()
+            get_agent.cache_clear()
+            messages.success(request, "AI assistant settings saved.")
+            return redirect("flare_ai:ai_settings")
+    else:
+        form = AIProviderSettingsForm(instance=instance)
+    key_status = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" if instance.has_api_key else "not set"
+    return render(request, "flare_ai/ai_settings.html", {
+        "form": form,
+        "key_status": key_status,
+    })

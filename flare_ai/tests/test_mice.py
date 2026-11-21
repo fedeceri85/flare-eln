@@ -223,13 +223,18 @@ class MouseSearchTests(TestCase):
         self.assertEqual(row["url"], reverse("lab:animal_summary", args=[self.unknown.pk]))
         json.dumps(row)
 
-    def test_results_are_compact_and_use_current_genotype_labels(self):
+    def test_results_fields_and_use_current_genotype_labels(self):
         Mouse.objects.filter(pk=self.alpha.pk).update(notes="x" * 600)
         GenotypeCategory.objects.filter(code="het").update(label="Heterozygous")
         row = search_mice(MouseSearchInput(mouse_id=self.alpha.pk))["mice"][0]
         self.assertEqual(
             set(row),
-            {"mouse_id", "date_of_birth", "crossing", "procedures", "genotype", "url", "protocol"},
+            {
+                "mouse_id", "date_of_birth", "crossing", "procedures", "genotype",
+                "url", "protocol", "mother_id", "father_id", "mother_external_id",
+                "father_external_id", "breeding_pair", "sex", "status", "severity",
+                "severity_exceeded", "local_identifier", "marking_type", "colour", "notes",
+            },
         )
         self.assertIn(f"{self.lines[0].name}: Heterozygous", row["genotype"])
         self.assertIn(f"{self.lines[1].name}: Hom", row["genotype"])

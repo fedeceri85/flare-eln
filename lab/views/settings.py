@@ -1,6 +1,7 @@
 """Shared application settings and spreadsheet template metadata management."""
 from functools import wraps
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
@@ -31,10 +32,15 @@ def settings_page(request):
     cards.append({"title": "Maintenance", "description": "Find matching animal records and link recorded parent IDs across the workspace.", "url": reverse("lab:maintenance")})
     if request.user.is_staff:
         cards.extend([
-          #  {"title": "Image storage", "description": "Choose the folder for new recording images.", "url": reverse("lab:image_storage_settings")},
             {"title": "Genotype categories", "description": "Manage genotype labels, ordering and availability.", "url": reverse("lab:genotype_categories")},
             {"title": "Recording types", "description": "Manage experiment types and their recording fields.", "url": reverse("lab:recording_types")},
         ])
+        if getattr(settings, "FLARE_AI_ENABLED", False):
+            cards.append({
+                "title": "AI Assistant",
+                "description": "Configure the AI assistant connection.",
+                "url": reverse("flare_ai:ai_settings"),
+            })
     return render(request, "lab/settings.html", {"cards": cards})
 
 

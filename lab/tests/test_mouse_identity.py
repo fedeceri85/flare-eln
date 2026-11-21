@@ -3,7 +3,7 @@ from datetime import date
 from urllib.parse import parse_qs, urlsplit
 from django.test import override_settings
 from django.urls import reverse
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..models import Experiment, Mouse, Procedure, ProcedureType, Project, Protocol, RecordingType
 from ._support import AuthenticatedTestCase, create_recording
 

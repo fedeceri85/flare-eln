@@ -11,6 +11,9 @@ from lab.ui import selected_recording_url
 RECORDING_FILTER_LOOKUPS = {
     "owner": "owner__username__icontains",
     "experiment_contains": "experiment__name__icontains",
+    "project_contains": "experiment__project__name__icontains",
+    "project_id": "experiment__project_id",
+    "experiment_id": "experiment_id",
     "recording_type": "recording_type__name__icontains",
     "recording_date": "recording_date",
     "recording_date_from": "recording_date__gte",

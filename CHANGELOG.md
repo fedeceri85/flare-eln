@@ -1,3 +1,10 @@
+21/11/2026
+- Added vision attachment support: upload images (PNG, JPG, WEBP) and PDFs (up to 15 pages) for AI transcription of handwritten lab notes.
+- Added search_procedures and search_projects tools to the AI assistant.
+- Added list_crossings tool so the assistant can reference the genetic crossing catalogue when disambiguating transcriptions.
+- Added read_attachment tool for reading CSV and XLSX files in chat; presents structured data with sheet selection support.
+
+
 19/11/2026
 - Improvements to "Add recording" interface
 - General bug fixes

@@ -15,11 +15,11 @@ from django.utils import timezone
 from PIL import Image
 
 from ..models import Experiment, Mouse, Project, Protocol, RecordingImage, RecordingType, SpreadsheetImportDraft
-from ..recording_images import activate_directory, image_path, save_import_images
+from ..recording_images import image_path, save_import_images
 from ..spreadsheet_import.engine import animal_groups, build_review, commit_import, initial_resolution
 from ..spreadsheet_import.mapping import new_definition
 from ..spreadsheet_import.source import read_upload, table_from_sheet
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ._support import create_test_crossing
 
 
@@ -248,20 +248,6 @@ class ImportSharedImageTests(TestCase):
         draft.refresh_from_db()
         self.assertNotIn("review_fingerprint", draft.state)
         self.assertFalse(path.exists())
-
-    def test_storage_folder_change_does_not_move_existing_staged_images(self):
-        draft = self.draft()
-        self.stage(draft)
-        first = draft.shared_images.select_related("storage_location").get()
-        other = self.root / "new"
-        other.mkdir()
-        activate_directory(str(other))
-        self.stage(draft, image_upload("second.png"))
-        self.review(draft)
-        commit_import(draft.pk, self.user, self.experiment, [])
-        locations = set(RecordingImage.objects.values_list("storage_location__directory", flat=True))
-        self.assertEqual(locations, {str(self.root), str(other)})
-        self.assertTrue(image_path(first).exists())
 
     def test_ajax_upload_returns_preview_and_fresh_revision_without_overwriting_settings(self):
         draft = self.draft()

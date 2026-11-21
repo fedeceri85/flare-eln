@@ -10,22 +10,21 @@ The app is present in the standard image but disabled by default. Configure:
 
 ```text
 FLARE_AI_ENABLED=1
-FLARE_AI_BASE_URL=http://model-server:1234/v1
-FLARE_AI_API_KEY=provider-key
-FLARE_AI_MODEL=model-identifier
 FLARE_AI_GROUP_NAME=FLARE AI users
-FLARE_AI_ASSISTANT_NAME=Marcott-E
 ```
+
+The provider connection (Base URL, API key, Model, Assistant name) is
+configured through **Settings → AI Assistant** in the application UI
+(staff-only). These values are stored in the database, not in `.env`.
 
 Run the project migrations, create the configured group in Django Admin, and add
 approved users to it. Group membership is strict: staff and superusers must also
 belong to the group. Disabled users and non-members do not receive the drawer
 and cannot call its endpoints.
 
-Provider configuration is deployment-owned in this release. Secrets must stay
-in the deployment `.env`, never in source or browser-visible settings.
-`FLARE_AI_ASSISTANT_NAME` controls both the displayed chat name and the identity
-given to the model; restart the web process after changing it.
+The API key is stored in plain text in the database and must never be rendered
+in any template or response body. The Settings page shows a masked status
+(`set (…)`) and never pre-fills the key field.
 
 ## Chat behavior
 

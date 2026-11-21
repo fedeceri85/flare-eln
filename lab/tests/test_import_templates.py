@@ -12,7 +12,7 @@ from ..spreadsheet_import.forms import MappingForm
 from ..spreadsheet_import.mapping import new_definition
 from ..spreadsheet_import.source import resolve_binding, table_from_sheet
 from ..spreadsheet_import.templates import capture_mapping, match_mapping
-from ..test_navigation import Markup
+from .test_navigation import Markup
 
 
 @override_settings(ALLOWED_HOSTS=["testserver"])

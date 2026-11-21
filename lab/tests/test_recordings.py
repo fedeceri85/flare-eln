@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.urls import reverse
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingField, RecordingType
 from ._support import AuthenticatedTestCase, create_recording, create_test_crossing, crossing_post_data
 

@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from ..forms import individual_mouse_field_prefix
 from ..models import Experiment, GenotypeCategory, ImageStorageLocation, Mouse, MouseGenotype, Procedure, ProcedureType, Project, Protocol, RecordingImage, RecordingType
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..views.common import url_with_query_params
 from ._support import AuthenticatedTestCase, create_recording, create_test_crossing
 

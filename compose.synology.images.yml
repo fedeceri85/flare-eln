@@ -43,11 +43,7 @@ services:
       FLARE_MEDIA_ROOT: /media
       FLARE_MEDIA_BOUNDARY: /media
       FLARE_AI_ENABLED: "${FLARE_AI_ENABLED:-0}"
-      FLARE_AI_BASE_URL: "${FLARE_AI_BASE_URL:-}"
-      FLARE_AI_API_KEY: "${FLARE_AI_API_KEY:-}"
-      FLARE_AI_MODEL: "${FLARE_AI_MODEL:-}"
       FLARE_AI_GROUP_NAME: "${FLARE_AI_GROUP_NAME:-FLARE AI users}"
-      FLARE_AI_ASSISTANT_NAME: "${FLARE_AI_ASSISTANT_NAME:-Marcott-E}"
     volumes:
       - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/external-imports:/external-imports:ro"
       - "${LABDB_SYNOLOGY_ROOT:-/volume1/docker/flare-eln}/media:/media"

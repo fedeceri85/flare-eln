@@ -1,35 +1,15 @@
 """Authenticated image management and a JSON-backed gallery with an HTML fallback."""
-from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_safe
 
-from ..forms.recording_images import ImageStorageForm, RecordingImageUploadForm
+from ..forms.recording_images import RecordingImageUploadForm
 from ..models import RecordingImage
-from ..recording_images import activate_directory, available_images, read_image, save_images
+from ..recording_images import available_images, read_image, save_images
 from .common import experiment_for_project_or_404, experiment_recordings_url, safe_return_url
 from .recordings import recording_for_experiment_or_404, require_recording_modify_permission
-from .settings import administrator_required
-
-
-@administrator_required
-@require_http_methods(["GET", "HEAD", "POST"])
-def image_storage_settings(request):
-    form = ImageStorageForm(request.POST if request.method == "POST" else None)
-    if request.method == "POST" and form.is_valid():
-        try:
-            activate_directory(form.cleaned_data["directory"])
-        except ValidationError as exc:
-            form.add_error("directory", exc)
-        else:
-            messages.success(request, "Image storage updated. New uploads will use this folder.")
-            return redirect("lab:image_storage_settings")
-    return render(request, "lab/settings_form.html", {
-        "form": form, "title": "Image storage", "parent_url": reverse("lab:settings_page"),
-        "help_note": "Changes apply to new uploads only. In Docker, choose a folder within the mounted media folder. Images are not included in application backups.",
-    })
 
 
 def gallery_payload(recording, user):

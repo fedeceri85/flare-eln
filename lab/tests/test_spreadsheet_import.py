@@ -16,7 +16,7 @@ from ..models import (
     Crossing, CrossingLine, Experiment, GenotypeCategory, Mouse, MouseGenotype, MouseLine, Project, Protocol,
     Procedure, ProcedureType, Recording, RecordingField, RecordingType, Species, SpreadsheetImportDraft, resolve_crossing,
 )
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..spreadsheet_import.engine import animal_groups, build_review, commit_import, draft_table, initial_resolution
 from ..spreadsheet_import.forms import AnimalsForm, GeneticsForm, MappingForm, SetupForm
 from ..spreadsheet_import.mapping import crossing_candidates, crossing_suggestion, new_definition, parse_date, validate_definition
@@ -92,8 +92,11 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(len(table["rows"]), 9)
         self.assertEqual(table["rows"][0]["flag"], "Possible metadata row")
         self.assertEqual(table["columns"][1]["heading"], "Pedigree #")
+        self.assertEqual(table["columns"][1]["occurrence"], 2)
+        self.assertEqual(table["columns"][9]["heading"], "gria2")
         self.assertEqual(table["columns"][9]["occurrence"], 1)
-        self.assertEqual(table["columns"][11]["occurrence"], 3)
+        self.assertEqual(table["columns"][11]["heading"], "GCamp6")
+        self.assertEqual(table["columns"][11]["occurrence"], 1)
         self.assertEqual(table["rows"][1]["values"][4], "2026-10-02")
         self.assertEqual(sum(not r["flag"] for r in table["rows"]), 8)
 

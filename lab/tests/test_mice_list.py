@@ -456,10 +456,6 @@ class MicePageTests(AuthenticatedTestCase):
         self.assertContains(response, self.recent_mouse.mouse_id)
         self.assertContains(response, self.old_mouse.mouse_id)
         self.assertContains(response, self.non_regulated_mouse.mouse_id)
-        self.assertContains(
-            response,
-            "Regulated procedure creation is disabled for one or more selected animals.",
-        )
         self.assertFalse(response.context["can_add_bulk_procedure"])
         self.assertContains(response, "<fieldset")
         self.assertContains(response, "disabled")

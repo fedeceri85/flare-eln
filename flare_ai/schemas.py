@@ -210,6 +210,50 @@ class MouseSearchInput(BaseModel):
         return self
 
 
+class ProjectSearchInput(BaseModel):
+    """Read-only project filters combined with AND; omit unwanted conditions.
+
+    Text is matched as a case-insensitive substring. Dates and date bounds are
+    inclusive. Lab-wide service projects are excluded unless is_service is true.
+    """
+
+    # Reject invented fields and trim whitespace around names.
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: SearchText | None = Field(default=None, description="Partial project name, ignoring case.")
+    lab_member: SearchText | None = Field(default=None, description="Partial lab member name.")
+    description: SearchText | None = Field(default=None, description="Literal text in the project description.")
+    active: bool | None = Field(default=None, description="Whether the project is active.")
+    is_service: bool | None = Field(default=None, description="Set true to find the lab-wide service project.")
+    start_date_from: date | None = Field(default=None, description="Earliest start date, inclusive.")
+    start_date_to: date | None = Field(default=None, description="Latest start date, inclusive.")
+    end_date_from: date | None = Field(default=None, description="Earliest end date, inclusive.")
+    end_date_to: date | None = Field(default=None, description="Latest end date, inclusive.")
+
+
+class ExperimentSearchInput(BaseModel):
+    """Read-only experiment filters combined with AND; omit unwanted conditions.
+
+    Text is matched as a case-insensitive substring. Dates and date bounds are
+    inclusive. Use project for a partial project name, or project_id to pin one
+    project returned by search_projects. Lab-wide service experiments are
+    excluded unless is_service is true.
+    """
+
+    # Reject invented fields and trim whitespace around names.
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: SearchText | None = Field(default=None, description="Partial experiment name, ignoring case.")
+    description: SearchText | None = Field(default=None, description="Literal text in the experiment description.")
+    project: SearchText | None = Field(default=None, description="Partial name of the parent project.")
+    project_id: int | None = Field(default=None, gt=0, description="Exact project ID (from search_projects).")
+    recording_type: SearchText | None = Field(default=None, description="Partial experiment type name.")
+    archived: bool | None = Field(default=None, description="Whether the experiment is archived.")
+    is_service: bool | None = Field(default=None, description="Set true to find lab-wide service experiments.")
+    start_date_from: date | None = Field(default=None, description="Earliest start date, inclusive.")
+    start_date_to: date | None = Field(default=None, description="Latest start date, inclusive.")
+
+
 class RecordingSearchInput(BaseModel):
     """Read-only recording filters combined with AND."""
 
@@ -254,6 +298,15 @@ class RecordingSearchInput(BaseModel):
     notes_contains: SearchText | None = Field(
         default=None, description="Literal text contained in recording notes."
     )
+    project_contains: SearchText | None = Field(
+        default=None, description="Partial project name, ignoring case."
+    )
+    project_id: int | None = Field(
+        default=None, gt=0, description="Exact project ID (from search_projects) to pin results to one project."
+    )
+    experiment_id: int | None = Field(
+        default=None, gt=0, description="Exact experiment ID (from search_experiments) to pin results to one experiment."
+    )
 
     @model_validator(mode="after")
     def check_filter_combination(self) -> Self:
@@ -296,4 +349,73 @@ class RecordingSearchInput(BaseModel):
             )
         ):
             raise ValueError("animal_age_days must be within its requested range.")
+        return self
+
+
+
+class ProcedureSearchInput(BaseModel):
+    """Read-only procedure filters combined with AND."""
+
+    # Reject invented fields and trim whitespace around names.
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    mouse_id: SearchText | None = Field(default=None, description="Exact Animal ID, ignoring case.")
+    mouse_id_contains: SearchText | None = Field(default=None, description="Part of an Animal ID.")
+    animal_age_days: int | None = Field(
+        default=None,
+        ge=0,
+        description="Exact animal age in postnatal days on the recording date.",
+    )
+    animal_age_days_from: int | None = Field(
+        default=None,
+        ge=0,
+        description="Minimum animal age in postnatal days on the recording date, inclusive.",
+    )
+    animal_age_days_to: int | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum animal age in postnatal days on the recording date, inclusive.",
+    )
+    
+    
+    procedure_type: SearchText | None = Field(
+        default=None, description="Partial procedure type name, ignoring case."
+    )
+    procedure_date: date | None = Field(default=None, description="Exact procedure date.")
+    procedure_date_from: date | None = Field(
+        default=None, description="Earliest procedure date, inclusive."
+    )
+    procedure_date_to: date | None = Field(
+        default=None, description="Latest procedure date, inclusive."
+    )
+
+    notes_contains: SearchText | None = Field(
+        default=None, description="Literal text contained in procedure notes."
+    )
+    lab_member: SearchText | None = Field(
+        default=None, description="Partial username of the lab member who performed the procedure."
+    )
+
+    @model_validator(mode="after")
+    def check_filter_combination(self) -> Self:
+        values = self.model_dump(exclude_none=True, exclude_defaults=True)
+        if not values:
+            raise ValueError("Provide at least one search filter.")
+        if (
+            self.procedure_date_from is not None
+            and self.procedure_date_to is not None
+            and self.procedure_date_from > self.procedure_date_to
+        ):
+            raise ValueError("procedure_date_from must be on or before procedure_date_to.")
+        if self.procedure_date is not None and (
+            (
+                self.procedure_date_from is not None
+                and self.procedure_date < self.procedure_date_from
+            )
+            or (
+                self.procedure_date_to is not None
+                and self.procedure_date > self.procedure_date_to
+            )
+        ):
+            raise ValueError("procedure_date must be within the requested range.")
         return self

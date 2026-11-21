@@ -233,9 +233,12 @@ class ChatEndpointTests(TestCase):
         self.assertContains(response, "data-flare-ai-chat")
         self.assertContains(response, reverse("flare_ai:chat_stream"))
 
-    @override_settings(FLARE_AI_ASSISTANT_NAME="Lab Helper")
     def test_configured_assistant_name_is_rendered(self):
         self.grant_access()
+        from flare_ai.models import AIProviderSettings
+        cfg = AIProviderSettings.singleton()
+        cfg.assistant_name = "Lab Helper"
+        cfg.save()
         response = self.client.get(reverse("lab:home"))
         self.assertContains(response, 'data-assistant-name="Lab Helper"')
         self.assertContains(response, "Ask Lab Helper")
@@ -459,7 +462,7 @@ class AttachmentValidationTests(SimpleTestCase):
         self.assertIs(attachment.upload, upload)
 
     def test_unsupported_extension_is_rejected(self):
-        upload = self.make_upload(name="file.pdf", content_type="application/pdf")
+        upload = self.make_upload(name="archive.zip", content_type="application/zip")
         with self.assertRaises(ValidationError):
             attachment_from_files(self.files_with(upload))
 
@@ -500,6 +503,36 @@ class AttachmentValidationTests(SimpleTestCase):
         chunk = b"safe"
         self.assertIs(handler.receive_data_chunk(chunk, MAX_ATTACHMENT_BYTES - len(chunk)), chunk)
         self.assertFalse(attachment_upload_was_too_large(request))
+
+    def test_install_limit_skips_when_upload_handlers_locked(self):
+        """Simulates CsrfViewMiddleware having already read request.POST.
+
+        When upload_handlers are locked, insert() raises AttributeError.
+        install_attachment_upload_limit must not propagate that error.
+        """
+        from flare_ai.attachments import install_attachment_upload_limit
+
+        class LockedHandlers:
+            def insert(self, index, value):
+                raise AttributeError("You cannot alter upload handlers after the upload has been processed.")
+
+        request = SimpleNamespace(
+            META={"CONTENT_LENGTH": str(1024)},  # well under limit
+            upload_handlers=LockedHandlers(),
+        )
+        # Should not raise
+        install_attachment_upload_limit(request)
+
+    def test_install_limit_rejects_oversized_content_length(self):
+        """The CONTENT_LENGTH check fires before any handler insertion."""
+        from flare_ai.attachments import install_attachment_upload_limit
+
+        request = SimpleNamespace(
+            META={"CONTENT_LENGTH": str(MAX_MULTIPART_REQUEST_BYTES + 1)},
+            upload_handlers=[],
+        )
+        with self.assertRaises(ValidationError):
+            install_attachment_upload_limit(request)
 
 
 @override_settings(ROOT_URLCONF="flare_ai.tests.urls")

@@ -1063,12 +1063,6 @@ class ImageStorageLocation(models.Model):
         return self.directory
 
 
-class ImageStorageSettings(models.Model):
-    # A single database-backed setting is shared by every application worker.
-    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
-    active_location = models.ForeignKey(ImageStorageLocation, on_delete=models.PROTECT)
-
-
 class RecordingImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="images")

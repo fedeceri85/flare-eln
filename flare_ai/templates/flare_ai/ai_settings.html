@@ -1,0 +1,18 @@
+{% extends 'lab/settings_base.html' %}
+{% block main_class %}container container-narrow{% endblock %}
+{% block title %}AI Assistant{% endblock %}
+{% block page_title %}AI Assistant{% endblock %}
+{% block page_subtitle %}<p>Configure the AI assistant connection.</p>{% endblock %}
+{% block settings_content %}
+    {% if key_status %}
+    <p class="settings-help">API key: {{ key_status }}</p>
+    {% endif %}
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        {% include 'lab/components/form_fields.html' %}
+        <div class="actions">
+            <button class="button button-primary" type="submit">Save changes</button>
+            <a class="button" href="{% url 'lab:settings_page' %}">Cancel</a>
+        </div>
+    </form>
+{% endblock %}

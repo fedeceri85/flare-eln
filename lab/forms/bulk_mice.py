@@ -544,7 +544,7 @@ class BulkMouseUpdateForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         cleaned_data["mouse_id_renames"] = self.clean_mouse_ids(cleaned_data)
-        clean_parent_controls(self)
+        parentage_requested = clean_parent_controls(self)
         if not self.single_mouse_mode and self.selected_crossing and any(
             uses_shared_genotype(self, line) and cleaned_data.get(genotype_field_name(line))
             for line in self.selected_crossing.ordered_lines()
@@ -642,6 +642,23 @@ class BulkMouseUpdateForm(forms.Form):
                 protocol = individual.get("protocol", cleaned_data.get("protocol") if cleaned_data.get("update_protocol") else mouse.protocol)
                 if protocol is not None and not protocol.allows_regulated_procedures:
                     self.add_error("procedure_drafts", f"{mouse.pk}: this animal’s protocol does not allow the pending procedures.")
+
+        has_updates = any(
+            cleaned_data.get(update_field)
+            for update_field, _ in self.MOUSE_UPDATE_FIELDS
+        ) or any((
+            cleaned_data.get("update_genotype"),
+            cleaned_data.get("notes_action") in {"append", "replace"},
+            bool(cleaned_data.get("procedure_drafts")),
+            bool(cleaned_data.get("mouse_id_renames")),
+            bool(cleaned_data.get("individual_updates")),
+            parentage_requested,
+        ))
+        # Reject no-op saves, but only outside the explicit bulk-edit "Save
+        # changes" flow (which submits apply_bulk_edit) where finishing with an
+        # empty queue is a legitimate action.
+        if not has_updates and not self.errors and "apply_bulk_edit" not in self.data:
+            raise forms.ValidationError("Select at least one change before saving.")
 
         self.validate_local_identifiers(cleaned_data)
         return cleaned_data

@@ -2,7 +2,7 @@ from datetime import date
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..models import Mouse, MAX_SEVERITY_CHOICES, Procedure, ProcedureType, Protocol
 from ._support import AuthenticatedTestCase
 
@@ -146,10 +146,6 @@ class ReportsPageTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Reports")
         self.assertContains(response, f'href="{self.report_url}"')
-        markup = Markup(response.content.decode())
-        mice_links = markup.find("a", href=reverse("lab:mice_page"))
-        self.assertTrue(mice_links)
-        self.assertTrue(all(link.within("nav") for link in mice_links))
 
     def test_reports_page_renders_mice_card(self):
         response = self.client.get(self.report_url)

@@ -168,7 +168,7 @@ class AnimalFormDraftTests(TestCase):
         form = response.context["form"]
         self.assertTrue(form.is_valid(), form.errors)
         self.assertTrue(form["mouse_id_prefix"].value().startswith("261112_"))
-        self.assertEqual(form["pup_03_sex"].value(), "")
+        self.assertIsNone(form["pup_03_sex"].value())
         self.assertEqual(form[f"pup_03_{genotype_field_name(self.line)}"].value(), "unknown")
 
         for index in range(ANIMAL_FORM_DRAFT_LIMIT + 1):

@@ -70,7 +70,8 @@ class AuthenticationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Admin Console")
-        self.assertNotContains(response, "Lines &amp; Crossings")
+        self.assertContains(response, "Lines &amp; Crossings")
+        self.assertContains(response, 'href="/lines-crossings/"')
 
 
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost"])

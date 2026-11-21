@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..models import MouseLine, Recording, Species, resolve_crossing
 
 

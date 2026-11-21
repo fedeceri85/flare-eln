@@ -4,7 +4,7 @@ from django.test import override_settings
 from django.urls import reverse
 
 from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingType
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ._support import AuthenticatedTestCase
 
 

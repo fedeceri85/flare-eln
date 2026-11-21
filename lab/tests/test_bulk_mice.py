@@ -3,7 +3,7 @@ from datetime import date
 from urllib.parse import parse_qs, urlencode, urlsplit
 from django.test import override_settings
 from django.urls import reverse
-from ..test_navigation import Markup
+from .test_navigation import Markup
 from ..forms import individual_mouse_field_prefix, sync_mouse_structured_genetics
 from ..models import Experiment, Mouse, MouseGenotype, Procedure, ProcedureType, Project, Protocol
 from ._support import AuthenticatedTestCase, create_test_crossing, crossing_post_data
