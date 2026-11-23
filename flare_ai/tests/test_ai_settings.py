@@ -155,6 +155,61 @@ class AIProviderSettingsTests(TestCase):
 
         self.assertIsNone(crossing_vocabulary())
 
+    def test_procedure_recording_vocabulary_lists_both_type_lists(self):
+        from flare_ai.agent import procedure_and_recording_types
+        from lab.models import ProcedureType, RecordingType
+
+        RecordingType.objects.create(
+            name="AI Test Genotyping", slug="ai-test-genotyping"
+        )
+        RecordingType.objects.create(name="Electrocochleography", slug="ecog")
+        ProcedureType.objects.create(name="AI Test Genotyping")
+
+        instruction = procedure_and_recording_types()
+        self.assertIn("AI Test Genotyping", instruction)
+        self.assertIn("Electrocochleography", instruction)
+        self.assertIn("Recording types in this lab", instruction)
+        self.assertIn("Procedure types in this lab", instruction)
+
+    def test_procedure_recording_vocabulary_excludes_inactive_recording_types(self):
+        from flare_ai.agent import procedure_and_recording_types
+        from lab.models import RecordingType
+
+        RecordingType.objects.create(name="AI Active Type", slug="ai-active-type")
+        RecordingType.objects.create(
+            name="AI Deprecated Type", slug="ai-deprecated-type", active=False
+        )
+
+        instruction = procedure_and_recording_types()
+        self.assertIn("AI Active Type", instruction)
+        self.assertNotIn("AI Deprecated Type", instruction)
+
+    def test_procedure_recording_vocabulary_teaches_disambiguation(self):
+        from flare_ai.agent import procedure_and_recording_types
+        from lab.models import ProcedureType, RecordingType
+
+        RecordingType.objects.create(
+            name="AI Shared Type", slug="ai-shared-type"
+        )
+        ProcedureType.objects.create(name="AI Shared Type")
+
+        instruction = procedure_and_recording_types()
+        self.assertIn("search_recordings", instruction)
+        self.assertIn("search_procedures", instruction)
+        self.assertIn("ambiguous", instruction)
+
+    def test_procedure_recording_vocabulary_is_empty_when_lab_has_neither(self):
+        from flare_ai.agent import procedure_and_recording_types
+        from lab.models import Experiment, ProcedureType, RecordingType
+
+        # Data migrations create default types. Detach the seeded service
+        # experiment so this test can represent a genuinely empty catalogue.
+        Experiment.objects.update(recording_type=None)
+        RecordingType.objects.all().delete()
+        ProcedureType.objects.all().delete()
+
+        self.assertIsNone(procedure_and_recording_types())
+
     def test_assistant_name_with_line_break_is_rejected(self):
         self.client.force_login(self.staff)
         response = self.client.post(reverse("flare_ai:ai_settings"), {
