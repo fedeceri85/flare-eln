@@ -15,6 +15,14 @@ from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from django.urls import reverse
 from django.utils.datastructures import MultiValueDict
 from django.utils import timezone
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
 
 from flare_ai.attachments import (
     MAX_ATTACHMENT_BYTES,
@@ -30,6 +38,18 @@ from lab.models import Experiment, Project, UsageEvent
 
 
 class FakeStreamResult:
+    def __init__(self, messages=None, history=None):
+        if messages is None:
+            messages = [
+                ModelResponse(parts=[
+                    ToolCallPart(tool_name="search_mice"),
+                    ToolCallPart(tool_name="search_mice"),
+                ]),
+                ModelResponse(parts=[ToolCallPart(tool_name="user_guide")]),
+            ]
+        self._new_messages = messages
+        self._history = history or []
+
     def __enter__(self):
         return self
 
@@ -43,14 +63,22 @@ class FakeStreamResult:
     def new_messages_json(self):
         return b"[]"
 
+    def new_messages(self):
+        return self._new_messages
+
+    def all_messages(self):
+        return [*self._history, *self._new_messages]
+
 
 class FakeAgent:
-    def __init__(self):
+    def __init__(self, messages=None, history=None):
+        self.messages = messages
+        self.history = history
         self.calls = []
 
     def run_stream_sync(self, message, **kwargs):
         self.calls.append((message, kwargs))
-        return FakeStreamResult()
+        return FakeStreamResult(self.messages, self.history)
 
 
 class FailingAgent:
@@ -133,6 +161,47 @@ class ChatEndpointTests(TestCase):
         self.assertEqual(usage.object_count, 1)
         self.assertEqual(usage.reference, "")
         self.assertEqual(usage.get_event_type_display(), "AI assistant used")
+
+    def test_done_event_reports_only_tools_used_in_current_reply(self):
+        self.grant_access()
+        history = [
+            ModelRequest(parts=[UserPromptPart("previous question")]),
+            ModelResponse(parts=[ToolCallPart(tool_name="search_mice"), ToolCallPart(tool_name="user_guide")]),
+            ModelRequest(parts=[
+                ToolReturnPart(tool_name="search_mice", content="ok"),
+                ToolReturnPart(tool_name="user_guide", content="ok"),
+            ]),
+            ModelResponse(parts=[TextPart("previous answer")]),
+        ]
+        with patch("flare_ai.views.get_agent", return_value=FakeAgent(history=history)):
+            response = self.post_stream()
+            events = [
+                json.loads(line)
+                for line in b"".join(response.streaming_content).decode().splitlines()
+            ]
+
+        # Tool calls from the previous turn must not accumulate into this reply.
+        self.assertEqual(
+            events[-1]["tools"],
+            [
+                {"name": "search_mice", "count": 2},
+                {"name": "user_guide", "count": 1},
+            ],
+        )
+
+    def test_tool_returns_are_not_reported_as_tool_calls(self):
+        self.grant_access()
+        fake = FakeAgent(
+            messages=[ModelRequest(parts=[ToolReturnPart(tool_name="search_mice", content="ok")])]
+        )
+        with patch("flare_ai.views.get_agent", return_value=fake):
+            response = self.post_stream()
+            events = [
+                json.loads(line)
+                for line in b"".join(response.streaming_content).decode().splitlines()
+            ]
+
+        self.assertEqual(events[-1]["tools"], [])
 
     def test_usage_events_are_limited_per_user_and_day(self):
         self.grant_access()

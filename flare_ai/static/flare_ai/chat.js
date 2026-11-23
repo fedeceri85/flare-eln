@@ -258,6 +258,33 @@
                 }
             }
             item.append(label, content);
+            if (message.role === "assistant" && Array.isArray(message.tools) && message.tools.length) {
+                const toolsBox = document.createElement("div");
+                toolsBox.className = "flare-ai-tools";
+                const total = message.tools.reduce((sum, tool) => sum + tool.count, 0);
+                const toggle = document.createElement("button");
+                toggle.type = "button";
+                toggle.className = "flare-ai-tools-toggle";
+                toggle.setAttribute("aria-expanded", String(Boolean(message.toolsExpanded)));
+                toggle.textContent = `${total} ${total === 1 ? "tool" : "tools"} used`;
+                toggle.addEventListener("click", () => {
+                    message.toolsExpanded = !message.toolsExpanded;
+                    save();
+                    render();
+                });
+                toolsBox.append(toggle);
+                if (message.toolsExpanded) {
+                    const list = document.createElement("ul");
+                    list.className = "flare-ai-tools-list";
+                    for (const tool of message.tools) {
+                        const entry = document.createElement("li");
+                        entry.textContent = tool.count > 1 ? `${tool.name} (×${tool.count})` : tool.name;
+                        list.append(entry);
+                    }
+                    toolsBox.append(list);
+                }
+                item.append(toolsBox);
+            }
             messagesElement.append(item);
         }
 
@@ -403,6 +430,14 @@
                         render();
                     } else if (event.type === "done") {
                         assistant.state = "complete";
+                        if (Array.isArray(event.tools)) {
+                            assistant.tools = event.tools
+                                .filter((tool) => tool && typeof tool.name === "string")
+                                .map((tool) => ({
+                                    name: tool.name,
+                                    count: Number.isInteger(tool.count) && tool.count > 0 ? tool.count : 1,
+                                }));
+                        }
                         if (Array.isArray(event.suggestions)) {
                             state.suggestions = event.suggestions.filter((value) => typeof value === "string");
                         }

@@ -1,7 +1,27 @@
 """Form for configuring the AI assistant provider connection."""
+import re
+
 from django import forms
 
 from .models import AIProviderSettings
+
+# The assistant name is a display label, not prompt material. Keep it name-like
+# so it cannot smuggle line breaks or arbitrary text into the system prompt.
+_ASSISTANT_NAME_RE = re.compile(r"^[\w .'\-()]+$")
+
+
+def validate_assistant_name(value: str) -> None:
+    """Reject assistant names that are not short, single-line labels."""
+    value = (value or "").strip()
+    if not value:
+        return
+    if any(ch.isspace() and ch != " " for ch in value):
+        raise forms.ValidationError("The assistant name must not contain line breaks.")
+    if not _ASSISTANT_NAME_RE.match(value):
+        raise forms.ValidationError(
+            "Use letters, numbers, spaces, hyphens, apostrophes and dots only "
+            "(e.g. Marcott-E). The name must not contain instructions or sentences."
+        )
 
 
 class AIProviderSettingsForm(forms.Form):
@@ -24,7 +44,10 @@ class AIProviderSettingsForm(forms.Form):
     assistant_name = forms.CharField(
         label="Assistant name",
         required=False,
+        max_length=100,
         widget=forms.TextInput(attrs={"placeholder": "Marcott-E"}),
+        help_text="Short display label only — it is shown to users, never read as instructions.",
+        validators=[validate_assistant_name],
     )
 
     def __init__(self, *args, **kwargs):

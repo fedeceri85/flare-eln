@@ -9,7 +9,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
-from pydantic_ai.messages import ImageUrl, ModelMessagesTypeAdapter
+from pydantic_ai.messages import BaseToolCallPart, ImageUrl, ModelMessagesTypeAdapter
 from pydantic_ai.usage import UsageLimits
 
 from lab.usage import record_daily_ai_usage
@@ -83,6 +83,20 @@ def _history(turns):
             logger.warning("Discarded invalid FLARE AI session history.")
             return []
     return messages
+
+
+def _tools_used(result):
+    """Raw tool names the model called in this reply, in first-use order with repeat counts.
+
+    Only this run's messages are inspected, so tool calls from earlier turns
+    (replayed via message history) are not accumulated.
+    """
+    counts = {}
+    for message in result.new_messages():
+        for part in getattr(message, "parts", ()):
+            if isinstance(part, BaseToolCallPart) and part.tool_name:
+                counts[part.tool_name] = counts.get(part.tool_name, 0) + 1
+    return [{"name": name, "count": count} for name, count in counts.items()]
 
 
 @login_required(login_url="lab:login")
@@ -174,6 +188,11 @@ def chat_stream(request):
                         if delta:
                             yield _event("delta", text=delta)
                     turn = result.new_messages_json().decode("utf-8")
+                    try:
+                        tools = _tools_used(result)
+                    except Exception:
+                        logger.exception("FLARE AI tool extraction failed; continuing without tool details.")
+                        tools = []
 
                 stored = request.session.get(SESSION_KEY, {})
                 if not isinstance(stored, dict):
@@ -190,6 +209,7 @@ def chat_stream(request):
                     "done",
                     conversation_id=conversation_id,
                     suggestions=STARTER_QUESTIONS if greeting else [],
+                    tools=tools,
                 )
             except GeneratorExit:
                 raise

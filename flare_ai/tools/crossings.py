@@ -9,8 +9,10 @@ def list_crossings():
     Returns every active crossing with its display name, species and
     constituent mouse lines (in gene order). Use this as a vocabulary
     reference when transcribing handwritten notes that contain crossing
-    notations, or when the user asks what crossings are available.
-    This tool never changes records.
+    notations, when the user asks what crossings are available, or when
+    the user mentions a mouse by a short code (e.g. a gene symbol such as
+    TMC1) that must be matched against a crossing or line name before
+    searching. This tool never changes records.
     """
     crossings = active_crossings_queryset()
 

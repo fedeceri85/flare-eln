@@ -70,7 +70,7 @@ function streamResponse(events = [
 
 const FORM_DATA_MARKER = '__flareFormData';
 
-function fixture() {
+function fixture(options = {}) {
     const parts = {};
     const selectorMap = {
         '[data-ai-launcher]': 'launcher',
@@ -107,7 +107,7 @@ function fixture() {
     };
     const fetchMock = (url, config) => {
         requests.push({url, config});
-        return Promise.resolve(streamResponse());
+        return Promise.resolve(streamResponse(options.events));
     };
     const sessionStorage = {
         _store: {},
@@ -243,4 +243,59 @@ test('resetting the conversation clears the attachment', async () => {
     await ui.settle();
     assert.equal(ui.parts.attachment.hidden, true);
     assert.equal(ui.parts.chip.textContent, '');
+});
+
+const TOOLS_EVENTS = [
+    {type: 'start', conversation_id: 'uuid-1234-5678'},
+    {type: 'delta', text: 'Found 3 mice.'},
+    {
+        type: 'done',
+        conversation_id: 'uuid-1234-5678',
+        suggestions: [],
+        tools: [
+            {name: 'search_mice', count: 2},
+            {name: 'user_guide', count: 1},
+        ],
+    },
+];
+
+const toolsBoxOf = (ui, index) => {
+    const item = ui.parts.messages.children[index];
+    return item.children.find((child) => child.className === 'flare-ai-tools');
+};
+
+test('a done event with tools renders a collapsed tools toggle', async () => {
+    const ui = fixture({events: TOOLS_EVENTS});
+    ui.submit('What mice are there?');
+    await ui.settle();
+    const toolsBox = toolsBoxOf(ui, ui.parts.messages.children.length - 1);
+    assert.ok(toolsBox, 'tools section rendered under the assistant message');
+    const toggle = toolsBox.children[0];
+    assert.equal(toggle.className, 'flare-ai-tools-toggle');
+    assert.match(toggle.textContent, /3 tools used/);
+    assert.equal(toggle.attrs['aria-expanded'], 'false');
+    assert.equal(toolsBox.children.length, 1, 'list stays hidden while collapsed');
+});
+
+test('the tools toggle expands the raw tool names and keeps its state across re-renders', async () => {
+    const ui = fixture({events: TOOLS_EVENTS});
+    ui.submit('What mice are there?');
+    await ui.settle();
+    toolsBoxOf(ui, 1).children[0].click();
+    await ui.settle();
+
+    const expanded = toolsBoxOf(ui, 1);
+    assert.equal(expanded.children[0].attrs['aria-expanded'], 'true');
+    const list = expanded.children[1];
+    assert.equal(list.className, 'flare-ai-tools-list');
+    assert.deepEqual(list.children.map((li) => li.textContent), ['search_mice (×2)', 'user_guide']);
+
+    // A follow-up message re-renders the whole list; the expanded state must survive.
+    ui.submit('Tell me more');
+    await ui.settle();
+    assert.equal(toolsBoxOf(ui, 1).children[0].attrs['aria-expanded'], 'true');
+    assert.deepEqual(
+        toolsBoxOf(ui, 1).children[1].children.map((li) => li.textContent),
+        ['search_mice (×2)', 'user_guide'],
+    );
 });

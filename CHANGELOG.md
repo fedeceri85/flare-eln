@@ -1,3 +1,9 @@
+22/11/2026
+- AI assistant now sees the lab's active crossings in its vocabulary up front (e.g. TMC1), so short animal codes are recognised without an extra tool call; inactive crossings are excluded and the list is capped with a pointer to list_crossings.
+- AI assistant now recognises short animal codes such as gene symbols (e.g. TMC1) as crossings or constituent lines and routes them to the crossing search before giving up.
+- Hardened the AI assistant settings: the assistant name is now validated as a short single-line label and is presented to the model as an explicitly untrusted display name, so it can no longer be used to inject instructions into the system prompt.
+- AI chat now shows which tools the assistant used for each answer as a small collapsed line that expands to the raw tool names with repeat counts.
+
 21/11/2026
 - Added vision attachment support: upload images (PNG, JPG, WEBP) and PDFs (up to 15 pages) for AI transcription of handwritten lab notes.
 - Added search_procedures and search_projects tools to the AI assistant.

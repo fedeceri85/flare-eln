@@ -299,6 +299,49 @@
     overflow-wrap: anywhere;
 }
 
+.flare-ai-tools { margin-top: 8px; }
+
+.flare-ai-tools-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    padding: 2px 4px;
+    background: none;
+    color: #526474;
+    cursor: pointer;
+    font: inherit;
+    font-size: .78rem;
+}
+
+.flare-ai-tools-toggle:hover,
+.flare-ai-tools-toggle:focus-visible { color: var(--blue, #215d91); }
+
+.flare-ai-tools-toggle::before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    transition: transform .15s ease;
+}
+
+.flare-ai-tools-toggle[aria-expanded="true"]::before { transform: rotate(180deg); }
+
+.flare-ai-tools-list {
+    margin: 4px 0 0;
+    padding-left: 1.4em;
+    color: #526474;
+    font-size: .78rem;
+}
+
+.flare-ai-tools-list li + li { margin-top: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .flare-ai-tools-toggle::before { transition: none; }
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
