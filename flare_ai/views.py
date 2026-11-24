@@ -181,7 +181,7 @@ def chat_stream(request):
                     message_history=history,
                     conversation_id=conversation_id,
                     deps=deps,
-                    usage_limits=UsageLimits(request_limit=8),
+                    usage_limits=UsageLimits(request_limit=24),
                     timeout=300,
                 ) as result:
                     for delta in result.stream_text(delta=True):

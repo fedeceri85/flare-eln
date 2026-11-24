@@ -1,11 +1,11 @@
 """Read-only recording searches using explicit Django lookups."""
 from datetime import timedelta
 
-from django.db.models import DateField, ExpressionWrapper, F, Q
+from django.db.models import Count, DateField, ExpressionWrapper, F, Q
 from django.urls import reverse
 
 from flare_ai.schemas import RecordingSearchInput
-from lab.models import Recording, format_postnatal_age
+from lab.models import Crossing, Recording, format_postnatal_age
 from lab.ui import selected_recording_url
 
 RECORDING_FILTER_LOOKUPS = {
@@ -70,8 +70,14 @@ def filter_recordings(filters: RecordingSearchInput):
         if value is not None:
             recordings = recordings.filter(**{lookup: value})
 
-    # Keep all animal constraints in one filter call so Animal ID and age must
-    # describe the same member of a multi-animal recording.
+    # Independent presence checks: every listed ID must be in the recording,
+    # but they need not share properties with the same-mouse block below.
+    if filters.mouse_ids is not None:
+        for mid in filters.mouse_ids:
+            recordings = recordings.filter(mice__mouse_id__iexact=mid)
+
+    # Keep all animal constraints in one filter call so Animal ID, age and
+    # property filters must describe the same member of a multi-animal recording.
     animal_conditions = Q()
     if filters.mouse_id is not None:
         animal_conditions &= Q(mice__mouse_id__iexact=filters.mouse_id)
@@ -93,6 +99,60 @@ def filter_recordings(filters: RecordingSearchInput):
                 filters.animal_age_days_to
             )
         )
+
+    # --- mouse property filters (same-mouse) ---
+    if filters.crossing is not None:
+        text = filters.crossing
+        animal_conditions &= (
+            Q(mice__crossing_definition__display_name__icontains=text)
+            | Q(mice__crossing_definition__lines__name__icontains=text)
+            | Q(mice__crossing_definition__lines__aliases__icontains=text)
+            | Q(mice__crossing_definition__isnull=True, mice__crossing__icontains=text)
+        )
+
+    if filters.crossing_type is not None:
+        crossings = Crossing.objects.annotate(
+            mutant_lines=Count("lines", filter=Q(lines__is_wild_type=False))
+        )
+        if filters.crossing_type == "WT":
+            crossings = crossings.filter(mutant_lines=0)
+        elif filters.crossing_type == "Single":
+            crossings = crossings.filter(mutant_lines=1)
+        else:
+            crossings = crossings.filter(mutant_lines__gte=2)
+        legacy_types = [filters.crossing_type]
+        if filters.crossing_type == "Multiple":
+            legacy_types.append("Double_triple")
+        animal_conditions &= (
+            Q(mice__crossing_definition_id__in=crossings.values("pk"))
+            | Q(mice__crossing_definition__isnull=True, mice__crossing_type__in=legacy_types)
+        )
+
+    if filters.sex is not None:
+        value = "" if filters.sex == "unknown" else filters.sex
+        animal_conditions &= Q(mice__sex=value)
+
+    if filters.colour is not None:
+        animal_conditions &= Q(mice__colour__icontains=filters.colour)
+
+    if filters.genotype is not None:
+        animal_conditions &= Q(mice__genotype__icontains=filters.genotype)
+
+    if filters.species is not None:
+        animal_conditions &= Q(
+            mice__crossing_definition__species__name__icontains=filters.species
+        )
+
+    if filters.breeding_pair is not None:
+        animal_conditions &= Q(mice__breeding_pair__icontains=filters.breeding_pair)
+
+    if filters.status is not None:
+        animal_conditions &= Q(mice__status=filters.status)
+
+    if filters.severity is not None:
+        value = "" if filters.severity == "unknown" else filters.severity
+        animal_conditions &= Q(mice__severity=value)
+
     if animal_conditions:
         recordings = recordings.filter(animal_conditions)
 
@@ -100,12 +160,15 @@ def filter_recordings(filters: RecordingSearchInput):
 
 
 def search_recordings(filters: RecordingSearchInput):
-    """Find recording by any combination of the supported properties.
+    """Find recordings by any combination of the supported properties.
     All filters combine with AND. Text is matched non-semantically, including notes.
     Dates and age bounds are inclusive. Animal age means postnatal days on the
     recording date; convert weeks to days before calling this tool. A recording
-    matches an age filter when at least one linked animal matches, and Animal ID
-    and age filters always refer to the same linked animal.
+    matches an age filter when at least one linked animal matches, and Animal ID,
+    age and mouse property filters (crossing, sex, genotype, species, colour,
+    breeding pair, status, severity, crossing type) always refer to the same
+    linked animal. Use mouse_ids to require that several specific animals are
+    all present in the recording; it is independent of the property filters.
     Return at most 20 recordings and advise if it has more. 
     When returning the recordings, get the animal IDs and call the search_mice tool to obtain 
     a url of the summary of all the animals that you can provide to the user. 

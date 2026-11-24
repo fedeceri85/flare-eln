@@ -285,6 +285,46 @@ class RecordingSearchInput(BaseModel):
         description="Maximum animal age in postnatal days on the recording date, inclusive.",
     )
 
+    # --- multi-mouse presence (independent of the same-mouse property block) ---
+    mouse_ids: list[SearchText] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=20,
+        description="Exact Animal IDs that must ALL be present in the recording. Independent of the same-mouse property filters below.",
+    )
+
+    # --- same-mouse property filters (all refer to one linked mouse) ---
+    crossing: SearchText | None = Field(
+        default=None,
+        description="Partial crossing name, constituent line name/alias, or legacy crossing text.",
+    )
+    crossing_type: Literal["WT", "Single", "Multiple"] | None = Field(
+        default=None,
+        description="Crossing type (WT, Single Mutation, or Multiple).",
+    )
+    sex: Literal["M", "F", "unknown"] | None = Field(
+        default=None, description="Mouse sex."
+    )
+    colour: SearchText | None = Field(
+        default=None, description="Mouse coat colour."
+    )
+    genotype: SearchText | None = Field(
+        default=None,
+        description="Literal text in the saved genotype summary, including legacy records.",
+    )
+    species: SearchText | None = Field(
+        default=None, description="Species name from the linked crossing."
+    )
+    breeding_pair: SearchText | None = Field(
+        default=None, description="Breeding pair identifier."
+    )
+    status: Literal["Alive", "Culled"] | None = Field(
+        default=None, description="Mouse status."
+    )
+    severity: Literal["Non-recovery", "Mild", "Moderate", "Severe", "unknown"] | None = Field(
+        default=None, description="Severity level."
+    )
+
     recording_type: SearchText | None = Field(
         default=None, description="Partial recording type name, such as ephys or behaviour."
     )
@@ -313,6 +353,8 @@ class RecordingSearchInput(BaseModel):
         values = self.model_dump(exclude_none=True, exclude_defaults=True)
         if not values:
             raise ValueError("Provide at least one search filter.")
+        if self.mouse_id is not None and self.mouse_ids is not None:
+            raise ValueError("Use mouse_id OR mouse_ids, not both.")
         if (
             self.recording_date_from is not None
             and self.recording_date_to is not None

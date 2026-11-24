@@ -6,7 +6,15 @@ from pydantic import ValidationError
 
 from flare_ai.schemas import RecordingSearchInput
 from flare_ai.tools.recordings import filter_recordings, search_recordings
-from lab.models import Experiment, Mouse, Project, Protocol, Recording, RecordingType
+from lab.models import (
+    Experiment,
+    Mouse,
+    Project,
+    Protocol,
+    Recording,
+    RecordingType,
+)
+from lab.tests._support import create_test_crossing
 
 
 class RecordingSearchInputTests(SimpleTestCase):
@@ -32,6 +40,45 @@ class RecordingSearchInputTests(SimpleTestCase):
                 animal_age_days=30,
                 animal_age_days_from=40,
             )
+
+    def test_mouse_id_and_mouse_ids_are_mutually_exclusive(self):
+        with self.assertRaises(ValidationError):
+            RecordingSearchInput(
+                mouse_id="M1",
+                mouse_ids=["M1", "M2"],
+            )
+
+    def test_mouse_ids_with_property_filters_is_valid(self):
+        value = RecordingSearchInput(
+            mouse_ids=["M1", "M2"],
+            crossing="Gad2",
+            sex="F",
+        )
+        self.assertEqual(value.mouse_ids, ["M1", "M2"])
+        self.assertEqual(value.crossing, "Gad2")
+        self.assertEqual(value.sex, "F")
+
+    def test_new_property_fields_accept_valid_values(self):
+        value = RecordingSearchInput(
+            crossing="TMC1",
+            crossing_type="Single",
+            sex="F",
+            colour="black",
+            genotype="Gad2: het",
+            species="rat",
+            breeding_pair="P1",
+            status="Alive",
+            severity="Mild",
+        )
+        self.assertEqual(value.crossing, "TMC1")
+        self.assertEqual(value.crossing_type, "Single")
+        self.assertEqual(value.sex, "F")
+        self.assertEqual(value.colour, "black")
+        self.assertEqual(value.genotype, "Gad2: het")
+        self.assertEqual(value.species, "rat")
+        self.assertEqual(value.breeding_pair, "P1")
+        self.assertEqual(value.status, "Alive")
+        self.assertEqual(value.severity, "Mild")
 
 
 class RecordingSearchTests(TestCase):
@@ -61,6 +108,217 @@ class RecordingSearchTests(TestCase):
             values={"frequency": 8000},
         )
         cls.recording.mice.add(cls.mouse)
+
+    def _make_recording_with_mouse(self, mouse, **overrides):
+        recording = Recording.objects.create(
+            owner=self.user,
+            experiment=self.experiment,
+            recording_type=self.kind,
+            recording_date=date(2026, 11, 1),
+            data_paths=[],
+            values={},
+            **overrides,
+        )
+        recording.mice.add(mouse)
+        return recording
+
+    def test_filters_by_crossing_display_name(self):
+        crossing, _ = create_test_crossing(line_names=("Gad2",))
+        mouse = Mouse.objects.create(
+            mouse_id="AI-GAD2", protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing="gad2")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_legacy_crossing_text(self):
+        mouse = Mouse.objects.create(
+            mouse_id="AI-LEGACY", protocol=self.protocol,
+            crossing="Gad2 x Cdh23",
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing="gad2")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_crossing_line_name(self):
+        crossing, _ = create_test_crossing(line_names=("Tmc1",))
+        mouse = Mouse.objects.create(
+            mouse_id="AI-TMC1", protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing="tmc1")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_crossing_line_alias(self):
+        crossing, lines = create_test_crossing(line_names=("Gad2",))
+        lines[0].aliases = "GABA-A2;GABRA2"
+        lines[0].save()
+        mouse = Mouse.objects.create(
+            mouse_id="AI-ALIAS", protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing="GABRA2")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_crossing_type_single(self):
+        crossing, _ = create_test_crossing(line_names=("Gad2",))
+        mouse = Mouse.objects.create(
+            mouse_id="AI-SINGLE", protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing_type="Single")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_crossing_type_multiple(self):
+        crossing, _ = create_test_crossing(line_names=("Gad2", "Cdh23"))
+        mouse = Mouse.objects.create(
+            mouse_id="AI-MULT", protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing_type="Multiple")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_crossing_type_wt(self):
+        crossing, _ = create_test_crossing(
+            line_names=("C57",), wild_type_names=("C57",),
+        )
+        mouse = Mouse.objects.create(
+            mouse_id="AI-WT", protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(crossing_type="WT")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_sex(self):
+        female = Mouse.objects.create(mouse_id="AI-F", protocol=self.protocol, sex="F")
+        male = Mouse.objects.create(mouse_id="AI-M", protocol=self.protocol, sex="M")
+        rec_f = self._make_recording_with_mouse(female)
+        rec_m = self._make_recording_with_mouse(male)
+        results = list(filter_recordings(RecordingSearchInput(sex="F")))
+        self.assertIn(rec_f, results)
+        self.assertNotIn(rec_m, results)
+
+    def test_filters_by_sex_unknown_matches_empty(self):
+        unknown = Mouse.objects.create(mouse_id="AI-UNK", protocol=self.protocol, sex="")
+        rec = self._make_recording_with_mouse(unknown)
+        results = list(filter_recordings(RecordingSearchInput(sex="unknown")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_colour(self):
+        mouse = Mouse.objects.create(mouse_id="AI-BLK", protocol=self.protocol, colour="black")
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(colour="black")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_genotype(self):
+        mouse = Mouse.objects.create(
+            mouse_id="AI-GENO", protocol=self.protocol, genotype="Gad2: het; Cdh23: het",
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(genotype="Gad2")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_species(self):
+        crossing, _ = create_test_crossing(line_names=("Gad2",), species_name="Rat")
+        mouse = Mouse.objects.create(
+            mouse_id="AI-RAT", protocol=self.protocol, crossing_definition=crossing,
+        )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(species="rat")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_breeding_pair(self):
+        mouse = Mouse.objects.create(mouse_id="AI-BP", protocol=self.protocol, breeding_pair="P42")
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(breeding_pair="P42")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_status(self):
+        culled = Mouse.objects.create(mouse_id="AI-CULL", protocol=self.protocol, status="Culled")
+        rec = self._make_recording_with_mouse(culled)
+        results = list(filter_recordings(RecordingSearchInput(status="Culled")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_severity(self):
+        mouse = Mouse.objects.create(mouse_id="AI-SEV", protocol=self.protocol, severity="Mild")
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(severity="Mild")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_severity_unknown_matches_empty(self):
+        mouse = Mouse.objects.create(mouse_id="AI-NOSEV", protocol=self.protocol, severity="")
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(severity="unknown")))
+        self.assertIn(rec, results)
+
+    def test_mouse_ids_requires_all_listed_present(self):
+        mouse_a = Mouse.objects.create(mouse_id="AI-A", protocol=self.protocol)
+        mouse_b = Mouse.objects.create(mouse_id="AI-B", protocol=self.protocol)
+        mouse_c = Mouse.objects.create(mouse_id="AI-C", protocol=self.protocol)
+        rec_ab = Recording.objects.create(
+            owner=self.user, experiment=self.experiment,
+            recording_type=self.kind, recording_date=date(2026, 11, 1),
+            data_paths=[], values={},
+        )
+        rec_ab.mice.add(mouse_a, mouse_b)
+        rec_ac = Recording.objects.create(
+            owner=self.user, experiment=self.experiment,
+            recording_type=self.kind, recording_date=date(2026, 11, 1),
+            data_paths=[], values={},
+        )
+        rec_ac.mice.add(mouse_a, mouse_c)
+        results = list(filter_recordings(RecordingSearchInput(mouse_ids=["AI-A", "AI-B"])))
+        self.assertIn(rec_ab, results)
+        self.assertNotIn(rec_ac, results)
+        results = list(filter_recordings(RecordingSearchInput(mouse_ids=["AI-A", "AI-C"])))
+        self.assertIn(rec_ac, results)
+        self.assertNotIn(rec_ab, results)
+
+    def test_mouse_ids_combines_with_property_filters(self):
+        crossing, _ = create_test_crossing(line_names=("Gad2",))
+        mouse_gad2 = Mouse.objects.create(
+            mouse_id="AI-MG", protocol=self.protocol, crossing_definition=crossing,
+        )
+        mouse_other = Mouse.objects.create(mouse_id="AI-MO", protocol=self.protocol)
+        rec = Recording.objects.create(
+            owner=self.user, experiment=self.experiment,
+            recording_type=self.kind, recording_date=date(2026, 11, 1),
+            data_paths=[], values={},
+        )
+        rec.mice.add(mouse_gad2, mouse_other)
+        results = list(filter_recordings(RecordingSearchInput(
+            mouse_ids=["AI-MG", "AI-MO"], crossing="Gad2",
+        )))
+        self.assertIn(rec, results)
+
+    def test_crossing_and_sex_must_match_same_mouse(self):
+        crossing, _ = create_test_crossing(line_names=("Gad2",))
+        mouse_a = Mouse.objects.create(
+            mouse_id="AI-CA", protocol=self.protocol,
+            crossing_definition=crossing, sex="M",
+        )
+        mouse_b = Mouse.objects.create(mouse_id="AI-CB", protocol=self.protocol, sex="F")
+        rec = Recording.objects.create(
+            owner=self.user, experiment=self.experiment,
+            recording_type=self.kind, recording_date=date(2026, 11, 1),
+            data_paths=[], values={},
+        )
+        rec.mice.add(mouse_a, mouse_b)
+        # No single mouse is both Gad2 AND female
+        results = list(filter_recordings(RecordingSearchInput(crossing="Gad2", sex="F")))
+        self.assertNotIn(rec, results)
+        # But sex=F alone should match (mouse B is female)
+        results = list(filter_recordings(RecordingSearchInput(sex="F")))
+        self.assertIn(rec, results)
+        # And crossing=Gad2 alone should match (mouse A is Gad2)
+        results = list(filter_recordings(RecordingSearchInput(crossing="Gad2")))
+        self.assertIn(rec, results)
 
     def test_filters_relationships_and_serializes_result(self):
         filters = RecordingSearchInput(
