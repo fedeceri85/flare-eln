@@ -1,9 +1,10 @@
-from urllib.parse import parse_qs, urlsplit
+import json
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from django.test import override_settings
 from django.urls import reverse
 
-from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingType
+from ..models import Experiment, Mouse, Procedure, ProcedureType, Project, Protocol, Recording, RecordingType
 from .test_navigation import Markup
 from ._support import AuthenticatedTestCase
 
@@ -29,6 +30,7 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
         self.other_experiment = Experiment.objects.create(
             project=self.other_project, name="Other imaging", recording_type=self.recording_type,
         )
+        self.procedure_type = ProcedureType.objects.create(name="Pre-recording procedure")
         self.url = reverse("lab:edit_selected_mice_all")
         self.return_url = reverse("lab:mice_page") + "?page=2"
 
@@ -41,6 +43,21 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
             "recording-recording_type": str(self.recording_type.pk),
             "recording-project": str(self.project.pk),
             "recording-experiment": str(self.experiment.pk),
+            **overrides,
+        }
+
+    def save_payload(self, **overrides):
+        return {
+            "apply_bulk_edit": "1",
+            "selected_mouse": [mouse.pk for mouse in self.mice],
+            "return_url": self.return_url,
+            "mouse_editor_tab": "services",
+            "procedure_drafts": json.dumps([{
+                "procedure_type": self.procedure_type.pk,
+                "date": "2026-10-25",
+                "lab_member": "AB",
+                "lab_book_page": "12",
+            }]),
             **overrides,
         }
 
@@ -159,6 +176,98 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
                 self.assertEqual(return_query["return_url"], [self.return_url])
                 add_response = self.client.get(response["Location"])
                 self.assertEqual([mouse.pk for mouse in add_response.context["selected_mice"]], [mouse.pk for mouse in mice])
+
+    def test_selection_saves_pending_animal_changes_and_procedures_before_opening_recording(self):
+        response = self.client.post(self.url, self.save_payload(
+            **self.selection_data(),
+            update_status="on",
+            status="Culled",
+        ))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            urlsplit(response["Location"]).path,
+            reverse("lab:add_recording", args=[self.project.pk, self.experiment.pk]),
+        )
+        self.assertEqual(Procedure.objects.count(), len(self.mice))
+        self.assertEqual(set(Procedure.objects.values_list("mouse_id", flat=True)), {mouse.pk for mouse in self.mice})
+        for mouse in self.mice:
+            mouse.refresh_from_db()
+            self.assertEqual(mouse.status, "Culled")
+
+    def test_invalid_pending_changes_block_recording_navigation_without_partial_save(self):
+        invalid_draft = [{
+            "procedure_type": self.procedure_type.pk,
+            "date": "not-a-date",
+            "lab_member": "AB",
+            "lab_book_page": "12",
+        }]
+        response = self.client.post(self.url, self.save_payload(
+            **self.selection_data(),
+            procedure_drafts=json.dumps(invalid_draft),
+            update_status="on",
+            status="Culled",
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("procedure_drafts", response.context["form"].errors)
+        self.assertFalse(response.context["recording_destination_form"].errors)
+        self.assertFalse(Procedure.objects.exists())
+        for mouse in self.mice:
+            mouse.refresh_from_db()
+            self.assertEqual(mouse.status, "Alive")
+
+    def test_invalid_recording_destination_blocks_pending_animal_save(self):
+        response = self.client.post(self.url, self.save_payload(
+            **self.selection_data(**{
+                "recording-experiment": str(self.incompatible.pk),
+            }),
+            update_status="on",
+            status="Culled",
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("experiment", response.context["recording_destination_form"].errors)
+        self.assertFalse(Procedure.objects.exists())
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Alive"})
+
+    def test_direct_recording_workflow_link_saves_before_continuing(self):
+        old_resume_url = self.url + "?" + urlencode({
+            "selected_mouse": self.mice[0].pk,
+            "mouse_editor_tab": "services",
+            "recording_recording_type": self.recording_type.pk,
+            "recording_project": self.project.pk,
+        })
+        continuation = reverse("lab:add_experiment", args=[self.project.pk]) + "?" + urlencode({
+            "recording_type": self.recording_type.pk,
+            "resume_recording": "1",
+            "return_url": old_resume_url,
+        })
+        response = self.client.post(self.url, self.save_payload(
+            save_and_continue_url="http://testserver" + continuation,
+            update_status="on",
+            status="Culled",
+        ))
+        destination = urlsplit(response["Location"])
+        self.assertEqual(destination.path, reverse("lab:add_experiment", args=[self.project.pk]))
+        destination_query = parse_qs(destination.query)
+        self.assertEqual(destination_query["recording_type"], [str(self.recording_type.pk)])
+        resume = urlsplit(destination_query["return_url"][0])
+        self.assertEqual(resume.path, self.url)
+        resume_query = parse_qs(resume.query)
+        self.assertEqual(resume_query["selected_mouse"], [mouse.pk for mouse in self.mice])
+        self.assertEqual(resume_query["recording_recording_type"], [str(self.recording_type.pk)])
+        self.assertEqual(resume_query["recording_project"], [str(self.project.pk)])
+        self.assertEqual(Procedure.objects.count(), len(self.mice))
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Culled"})
+
+    def test_unsafe_save_continuation_is_rejected_without_saving(self):
+        response = self.client.post(self.url, self.save_payload(
+            save_and_continue_url="https://example.invalid/steal",
+            update_status="on",
+            status="Culled",
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "requested recording page is unavailable")
+        self.assertFalse(Procedure.objects.exists())
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Alive"})
 
     def test_incompatible_or_forged_destinations_are_rejected_without_updating_animals(self):
         for overrides in (

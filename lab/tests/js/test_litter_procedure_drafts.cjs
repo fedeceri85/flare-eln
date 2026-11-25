@@ -20,7 +20,7 @@ function element(extra = {}) {
   }, extra);
 }
 function fixture(initial = [], scope = 'litter', disabled = false) {
-  const fields = Object.fromEntries(['procedure_type', 'date', 'lab_member', 'lab_book_page'].map(name => [name, element()]));
+  const fields = Object.fromEntries(['procedure_type', 'date', 'lab_member', 'lab_book_page', 'notes'].map(name => [name, element()]));
   fields.procedure_type.options = [{ value: '1', textContent: 'Injection' }, { value: '2', textContent: 'Observation' }];
   const primary = element();
   const windowEvents = element();
@@ -61,7 +61,7 @@ function fixture(initial = [], scope = 'litter', disabled = false) {
     drafts() { return JSON.parse(stored.value); },
     confirm(value) { confirmed = value; },
     submit(type = '1', member = '') { fields.procedure_type.value = type; fields.lab_member.value = member; return form.emit('submit'); },
-    action(index, name) { rows.children[index].children[4].children[name === 'Edit' ? 0 : 1].emit('click'); },
+    action(index, name) { rows.children[index].children[Object.keys(fields).length].children[name === 'Edit' ? 0 : 1].emit('click'); },
   };
 }
 test('adds multiple procedures to table and hidden queue without a server request', () => {

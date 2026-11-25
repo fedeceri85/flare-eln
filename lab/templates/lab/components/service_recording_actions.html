@@ -38,6 +38,7 @@
                                     <a
                                         class="table-row-action"
                                         href="{{ action.url }}"
+                                        data-save-before-continue
                                     >
                                         Add record
                                     </a>
@@ -55,6 +56,7 @@
         {% endif %}
         {% if recording_destination_form %}
         </form>
+        <p role="status" aria-live="polite" data-save-continuation-status></p>
         <noscript><p>Enable JavaScript to select a project and compatible experiment.</p></noscript>
         {{ recording_destination_options|json_script:"animal-recording-destinations" }}
         {{ recording_project_options|json_script:"animal-recording-projects" }}

@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import datetime
 from hashlib import sha256
 import time
-from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 import json
 from uuid import uuid4
 
@@ -18,7 +18,8 @@ from django.db.models import Model
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
+from django.urls import Resolver404, resolve, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 
 from ..parentage import apply_parentage, parentage_transaction, parentage_lock
@@ -233,6 +234,52 @@ POSSIBLE_DUPLICATE_CONFIRM_FIELD = "confirm_possible_duplicate"
 
 
 POSSIBLE_DUPLICATE_SIGNATURE_FIELD = "possible_duplicate_signature"
+
+
+ANIMAL_EDITOR_CONTINUATION_ROUTES = {"add_experiment", "add_recording"}
+
+
+def animal_editor_continuation_url(request):
+    """Return a safe recording workflow URL submitted by the animal editor."""
+    raw_url = (request.POST.get("save_and_continue_url") or "").strip()
+    if not raw_url or not url_has_allowed_host_and_scheme(
+        raw_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return None
+    parts = urlsplit(raw_url)
+    try:
+        match = resolve(parts.path)
+    except (Resolver404, ValueError):
+        return None
+    if match.namespace != "lab" or match.url_name not in ANIMAL_EDITOR_CONTINUATION_ROUTES:
+        return None
+    return urlunsplit(("", "", parts.path, parts.query, parts.fragment))
+
+
+def refresh_animal_editor_continuation(url, recording_return_url, mouse_ids):
+    """Update a validated continuation after animal identifiers or scope change."""
+    match = resolve(urlsplit(url).path)
+    if match.url_name == "add_recording":
+        return url_with_query_params(
+            url,
+            return_url=recording_return_url,
+            mice=recording_mice_query_value(mouse_ids),
+            mouse=None,
+        )
+    if match.url_name == "add_experiment":
+        query = parse_qs(urlsplit(url).query)
+        old_resume_url = query.get("return_url", [""])[0]
+        old_resume_query = parse_qs(urlsplit(old_resume_url).query)
+        resume_url = url_with_query_params(
+            recording_return_url,
+            recording_recording_type=old_resume_query.get("recording_recording_type", [None])[0],
+            recording_project=old_resume_query.get("recording_project", [None])[0],
+            recording_experiment=None,
+        )
+        return url_with_query_params(url, return_url=resume_url)
+    return url
 
 
 def duplicate_warning_value(value):
@@ -657,7 +704,13 @@ def _edit_selected_mice(request, selected_protocol=None):
         initial=recording_destination_initial,
         prefix="recording",
     )
-    if selecting_recording and recording_destination_form.is_valid():
+    recording_destination_valid = (
+        recording_destination_form.is_valid()
+        if selecting_recording
+        else False
+    )
+    saving_before_recording = selecting_recording and "apply_bulk_edit" in request.POST
+    if selecting_recording and recording_destination_valid and not saving_before_recording:
         experiment = recording_destination_form.cleaned_data["experiment"]
         return redirect(url_with_query_params(
             add_recording_url(experiment.project, experiment),
@@ -675,14 +728,24 @@ def _edit_selected_mice(request, selected_protocol=None):
         ]
         return redirect(f"{bulk_url}?{urlencode(query_params)}")
 
-    if request.method == "POST" and not selecting_recording:
+    if request.method == "POST" and "apply_bulk_edit" in request.POST:
         form = BulkMouseUpdateForm(request.POST, selected_mice=selected_mice)
 
         if "preview_individual_mice" in request.POST:
             preview_response = bulk_individual_rows_preview(request, form)
             if preview_response is not None:
                 return preview_response
-        elif form.is_valid():
+        else:
+            form_valid = form.is_valid()
+            continuation_requested = bool((request.POST.get("save_and_continue_url") or "").strip())
+            continuation_url = animal_editor_continuation_url(request) if continuation_requested else None
+            if continuation_requested and continuation_url is None:
+                form.add_error(None, "The requested recording page is unavailable. No changes were saved.")
+                form_valid = False
+            if selecting_recording and not recording_destination_valid:
+                form_valid = False
+
+        if "preview_individual_mice" not in request.POST and form_valid:
             try:
                 apply_bulk_mouse_updates(selected_mice, form)
             except ValidationError as exc:
@@ -708,6 +771,13 @@ def _edit_selected_mice(request, selected_protocol=None):
                         selected_mouse=[renames.get(pk, pk) for pk in mouse_ids],
                     )
                     bulk_url = edit_selected_mice_url(updated_protocol)
+                saved_mouse_ids = [renames.get(mouse.pk, mouse.pk) for mouse in selected_mice]
+                recording_return_url = url_with_query_params(
+                    bulk_url,
+                    return_url=return_url,
+                    selected_mouse=saved_mouse_ids,
+                    mouse_editor_tab="services",
+                )
                 if renames:
                     parts = urlsplit(return_url)
                     for old_id, new_id in renames.items():
@@ -716,6 +786,19 @@ def _edit_selected_mice(request, selected_protocol=None):
                     return redirect(url_with_query_params(
                         bulk_url, selected_mouse=[renames.get(mouse.pk, mouse.pk) for mouse in selected_mice],
                         return_url=return_url, mouse_editor_tab=request.POST.get("mouse_editor_tab", "ids"),
+                    ))
+                if selecting_recording:
+                    experiment = recording_destination_form.cleaned_data["experiment"]
+                    return redirect(url_with_query_params(
+                        add_recording_url(experiment.project, experiment),
+                        return_url=recording_return_url,
+                        mice=recording_mice_query_value([mouse.pk for mouse in selected_mice]),
+                    ))
+                if continuation_url:
+                    return redirect(refresh_animal_editor_continuation(
+                        continuation_url,
+                        recording_return_url,
+                        saved_mouse_ids,
                     ))
                 return redirect(return_url)
     else:
