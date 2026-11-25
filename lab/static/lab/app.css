@@ -920,6 +920,9 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .bulk-fields { gap: 18px; }
 .bulk-title { font-size: 17px; color: #244768; }
 .bulk-help { color: var(--muted); line-height: 1.6; }
+.animal-recordings .subsection-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; color: #244768; margin: 14px 0 6px; padding-left: 10px; border-left: 2px solid #d9e7f8; }
+.animal-recordings .subsubsection-title { font-size: 13.5px; font-weight: 650; color: #42576c; margin: 12px 0 6px; padding-left: 18px; }
+.animal-recordings .table-card { margin-bottom: 6px; }
 .selected-list-items { display: flex; flex-wrap: wrap; gap: 7px; padding: 0; list-style: none; }
 .selected-list-item { background: var(--blue-soft); color: #2c527c; border: 1px solid #d9e7f8; border-radius: 6px; padding: 5px 10px; font-size: 12px; overflow-wrap: anywhere; }
 .error-summary { border: 1px solid #dfa6a3; border-left: 4px solid #b42318; border-radius: 8px; background: #fff7f6; padding: 18px 20px; margin-bottom: 24px; }
@@ -1412,14 +1415,29 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .data-table.recordings-table th { overflow-wrap: normal; word-break: normal; vertical-align: bottom; }
 .data-table.recordings-table .recording-date-cell { width: 90px; min-width: 90px; white-space: nowrap; }
 .data-table.recordings-table .recording-animals-cell { width: 200px; min-width: 160px; max-width: 260px; }
+.data-table.recordings-table .recording-crossing-cell { min-width: 130px; max-width: 260px; overflow-wrap: anywhere; }
+.data-table.recordings-table .recording-genotype-cell { min-width: 110px; max-width: 240px; overflow-wrap: anywhere; }
 .recording-animals > summary { cursor: pointer; color: var(--blue); }
 .recording-animals-controls { display: flex; align-items: flex-start; gap: 12px; }
 .recording-animals-controls > details { min-width: 0; }
 .recording-animals-controls > a { white-space: nowrap; }
 .recording-animals > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
 .recording-animals[open] > summary { margin-bottom: 6px; }
-.recording-animal-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 260px; max-width: 100%; min-width: 0; }
+.recording-animal-links { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 260px; max-width: 100%; min-width: 0; }
 .recording-animal-links .mouse-link { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.recording-animal { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; max-width: 100%; }
+.recording-animal-genetics { color: var(--muted); font-size: 0.85em; line-height: 1.35; overflow-wrap: anywhere; max-width: 100%; }
+.animal-expand-toggle { appearance: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: var(--blue); cursor: pointer; white-space: nowrap; }
+.animal-expand-toggle::before { content: "\25B6"; display: inline-block; margin-right: 0.45em; font-size: 0.8em; color: var(--muted); }
+.animal-expand-toggle[aria-expanded="true"]::before { content: "\25BC"; }
+.animal-expand-toggle:hover { text-decoration: underline; }
+.animal-expand-toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
+.recording-animal-child { background: #f7f8fa; }
+.recording-animal-child[hidden] { display: none !important; }
+.recording-animal-child:not([hidden]) { display: table-row; }
+.recording-animal-child td { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.recording-animal-child .recording-animals-cell a.mouse-link { display: inline-flex; align-items: baseline; gap: 6px; font-weight: 600; }
+.recording-animal-child :is(.recording-crossing-cell, .recording-genotype-cell) { color: var(--muted); }
 .animal-age { color: var(--muted); font-size: 0.88em; font-weight: 500; white-space: nowrap; }
 .animal-age-summary { margin-left: 4px; }
 .animal-age-unknown { font-weight: 400; }
@@ -1736,7 +1754,7 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .animal-tabs-navigation > .button-share { flex: 0 0 auto; margin-bottom: 8px; }
 .animal-tabs-navigation > .button-report { flex: 0 0 auto; margin-bottom: 8px; }
 .share-icon { flex: 0 0 auto; vertical-align: middle; }
-.table-row-action .share-icon { margin-right: 4px; }
+.table-row-action .share-icon { margin: 0; }
 .share-status { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 12px 20px; border-radius: 8px; background: #153d36; color: white; box-shadow: 0 4px 20px #0002; }
 @media (max-width: 900px) { .animal-tabs-navigation { flex-wrap: wrap; } .animal-tabs-navigation .mouse-editor-tabs { flex-basis: 100%; } }
 

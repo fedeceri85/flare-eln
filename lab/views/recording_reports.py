@@ -36,7 +36,13 @@ def recording_report(request, project_pk, experiment_pk):
     downloading = request.method == "POST" and "download" in source
     form = RecordingReportForm(source if downloading else None, initial={"scope": "selected" if ids else "all", "format": "pdf"})
     if downloading and form.is_valid():
-        recordings = experiment.recordings.select_related("experiment", "recording_type").prefetch_related("mice")
+        recordings = experiment.recordings.select_related("experiment", "recording_type").prefetch_related(
+            "mice",
+            "mice__crossing_definition",
+            "mice__crossing_definition__crossing_lines__line",
+            "mice__genotype_calls",
+            "mice__genotype_calls__mouse_line",
+        )
         if form.cleaned_data["scope"] == "selected":
             if not ids:
                 form.add_error("scope", "Select at least one recording in the table before exporting selected recordings.")

@@ -1,7 +1,6 @@
 """Recording forms and dynamic recording-field helpers."""
 
 import re
-from collections import OrderedDict
 from datetime import date
 
 from django import forms
@@ -119,8 +118,6 @@ class RecordingDestinationForm(forms.Form):
 
 class RecordingForm(forms.Form):
     VALUE_FIELD_PREFIX = "value_"
-    GENOTYPING_RECORDING_TYPE_SLUG = "genotyping"
-    GENOTYPING_CROSSING_FIELD_KEY = "crossing"
 
     mice = forms.CharField(
         required=False,
@@ -229,129 +226,6 @@ class RecordingForm(forms.Form):
 
             self.fields[field_name].initial = initial
 
-        if self.is_genotyping_recording():
-            self.configure_genotyping_crossing_field(initial_mouse_ids)
-
-    def is_genotyping_recording(self):
-        return bool(
-            self.recording_type
-            and self.recording_type.slug == self.GENOTYPING_RECORDING_TYPE_SLUG
-        )
-
-    def dynamic_field_name_for_key(self, key):
-        for field_name, recording_field in self.dynamic_fields:
-            if recording_field.key == key:
-                return field_name
-
-        return None
-
-    def configure_genotyping_crossing_field(self, initial_mouse_ids):
-        field_name = self.dynamic_field_name_for_key(
-            self.GENOTYPING_CROSSING_FIELD_KEY
-        )
-
-        if field_name is None:
-            return
-
-        field = self.fields[field_name]
-        field.required = False
-        field.disabled = True
-        field.help_text = "Inferred from selected animals."
-        field.initial = ""
-
-        if self.is_bound:
-            mouse_ids = self.split_mouse_ids(
-                self.data.get(self.add_prefix("mice"), "")
-            )
-        else:
-            mouse_ids = initial_mouse_ids
-
-        try:
-            field.initial = self.genotyping_crossing_label(
-                self.existing_mice_for_ids(mouse_ids)
-            )
-        except forms.ValidationError:
-            field.initial = ""
-
-    def existing_mice_for_ids(self, mouse_ids):
-        mice = []
-        seen_mouse_ids = set()
-
-        for mouse_id in mouse_ids:
-            normalized_mouse_id = mouse_id.lower()
-
-            if normalized_mouse_id in seen_mouse_ids:
-                continue
-
-            seen_mouse_ids.add(normalized_mouse_id)
-            mouse = self.mouse_queryset.filter(mouse_id__iexact=mouse_id).first()
-
-            if mouse is not None:
-                mice.append(mouse)
-
-        return mice
-
-    def genotyping_crossing_key_and_label(self, mouse):
-        if mouse.crossing_definition_id:
-            return (
-                ("structured", mouse.crossing_definition_id),
-                mouse.crossing_definition.display_name,
-            )
-
-        crossing = (mouse.crossing or "").strip()
-
-        if crossing:
-            return (("legacy", crossing.casefold()), crossing)
-
-        return None, ""
-
-    def genotyping_crossing_label(self, mice):
-        if not mice:
-            raise forms.ValidationError(
-                "Select at least one animal to infer the genotyping crossing."
-            )
-
-        missing_crossing_mouse_ids = []
-        crossing_groups = OrderedDict()
-
-        for mouse in mice:
-            crossing_key, crossing_label = self.genotyping_crossing_key_and_label(
-                mouse
-            )
-
-            if crossing_key is None:
-                missing_crossing_mouse_ids.append(mouse.mouse_id)
-                continue
-
-            crossing_groups.setdefault(
-                crossing_key,
-                {
-                    "label": crossing_label,
-                    "mouse_ids": [],
-                },
-            )
-            crossing_groups[crossing_key]["mouse_ids"].append(mouse.mouse_id)
-
-        if missing_crossing_mouse_ids:
-            raise forms.ValidationError(
-                "Select animals with a crossing before creating a genotyping "
-                "record: "
-                f"{', '.join(missing_crossing_mouse_ids)}."
-            )
-
-        if len(crossing_groups) > 1:
-            crossing_details = [
-                f"{', '.join(group['mouse_ids'])} ({group['label']})"
-                for group in crossing_groups.values()
-            ]
-            raise forms.ValidationError(
-                "Genotyping records can only include animals from one crossing. "
-                "Current selection includes: "
-                f"{'; '.join(crossing_details)}."
-            )
-
-        return next(iter(crossing_groups.values()))["label"]
-
     def clean_mice(self):
         mouse_ids = self.split_mouse_ids(self.cleaned_data.get("mice") or "")
 
@@ -386,29 +260,6 @@ class RecordingForm(forms.Form):
 
     def clean_data_paths(self):
         return parse_recording_paths(self.cleaned_data.get("data_paths"))
-
-    def clean(self):
-        cleaned_data = super().clean()
-
-        if not self.is_genotyping_recording() or self.errors.get("mice"):
-            return cleaned_data
-
-        try:
-            crossing_label = self.genotyping_crossing_label(
-                cleaned_data.get("mice") or []
-            )
-        except forms.ValidationError as exc:
-            self.add_error("mice", exc)
-            return cleaned_data
-
-        crossing_field_name = self.dynamic_field_name_for_key(
-            self.GENOTYPING_CROSSING_FIELD_KEY
-        )
-
-        if crossing_field_name is not None:
-            cleaned_data[crossing_field_name] = crossing_label
-
-        return cleaned_data
 
     @staticmethod
     def split_mouse_ids(mouse_ids):

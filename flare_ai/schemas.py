@@ -310,7 +310,7 @@ class RecordingSearchInput(BaseModel):
     )
     genotype: SearchText | None = Field(
         default=None,
-        description="Literal text in the saved genotype summary, including legacy records.",
+        description="Partial genotype: legacy genotype text, a structured genotype line name, or zygosity (e.g. 'Gad2' or 'Het').",
     )
     species: SearchText | None = Field(
         default=None, description="Species name from the linked crossing."

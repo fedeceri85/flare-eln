@@ -55,6 +55,14 @@ function fixture({scoped = false, empty = false, restored = false, animalTable =
         },
     });
     return {action, createUrl, editPath, returnUrl, rows, all, selectButton, count, events,
+        dispatchClick(target) {
+            let prevented = false;
+            clicks.forEach(fn => fn({
+                target,
+                preventDefault() { prevented = true; },
+            }));
+            return prevented;
+        },
         click(index, shiftKey = false) {
             this.clickRow(rows[index], shiftKey);
         },
@@ -222,4 +230,38 @@ test('replacing table rows discards the old anchor', () => {
     ui.rows.splice(0, ui.rows.length, ...replacements);
     ui.click(4, true);
     assert.deepEqual(ui.rows.map(row => row.checked), [false, false, false, false, true]);
+});
+
+test('recording animal toggles expand and collapse only their child rows', () => {
+    const ui = fixture();
+    const childRows = [{hidden: true}, {hidden: true}];
+    const otherRow = {hidden: true};
+    const table = {
+        querySelectorAll(selector) {
+            assert.equal(selector, '[data-animal-rows="recording-42"]');
+            return childRows;
+        },
+    };
+    const attributes = {
+        'data-animal-toggle': 'recording-42',
+        'aria-expanded': 'false',
+    };
+    const toggle = {
+        closest(selector) {
+            if (selector === '.animal-expand-toggle') return this;
+            if (selector === 'table') return table;
+            return null;
+        },
+        getAttribute(name) { return attributes[name]; },
+        setAttribute(name, value) { attributes[name] = value; },
+    };
+
+    assert.equal(ui.dispatchClick(toggle), true);
+    assert.equal(attributes['aria-expanded'], 'true');
+    assert.deepEqual(childRows.map(row => row.hidden), [false, false]);
+    assert.equal(otherRow.hidden, true);
+
+    ui.dispatchClick(toggle);
+    assert.equal(attributes['aria-expanded'], 'false');
+    assert.deepEqual(childRows.map(row => row.hidden), [true, true]);
 });

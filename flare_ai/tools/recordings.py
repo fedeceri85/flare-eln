@@ -136,7 +136,11 @@ def filter_recordings(filters: RecordingSearchInput):
         animal_conditions &= Q(mice__colour__icontains=filters.colour)
 
     if filters.genotype is not None:
-        animal_conditions &= Q(mice__genotype__icontains=filters.genotype)
+        animal_conditions &= (
+            Q(mice__genotype__icontains=filters.genotype)
+            | Q(mice__genotype_calls__zygosity__icontains=filters.genotype)
+            | Q(mice__genotype_calls__mouse_line__name__icontains=filters.genotype)
+        )
 
     if filters.species is not None:
         animal_conditions &= Q(

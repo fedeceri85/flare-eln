@@ -90,7 +90,7 @@ def animal_summary_context(request, mice, *, summary_url, edit_url):
     if active_tab not in available_tabs:
         active_tab = entry_tab
     summary_url = url_with_query_params(summary_url, mouse_editor_tab=active_tab)
-    summary = build_animal_summary(mice)
+    summary = build_animal_summary(mice, user=request.user)
     from ..family import build_family_sections, build_parent_groups
     family_url = url_with_query_params(summary_url, mouse_editor_tab="family")
     summary["family_return_url"] = family_url

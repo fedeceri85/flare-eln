@@ -745,7 +745,7 @@ def _edit_selected_mice(request, selected_protocol=None):
             "delete_selected_url": delete_url,
             "return_url": return_url,
             "can_add_bulk_procedure": can_add_bulk_procedure,
-            "animal_recording_sections": build_animal_recording_sections(selected_mice),
+            "animal_recording_sections": build_animal_recording_sections(selected_mice, request.user),
             "recording_destination_form": recording_destination_form,
             "recording_destination_options": recording_destination_form.destination_options,
             "recording_project_options": recording_destination_form.project_options,

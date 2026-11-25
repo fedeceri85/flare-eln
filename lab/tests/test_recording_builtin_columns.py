@@ -41,12 +41,22 @@ class RecordingBuiltinColumnTests(AuthenticatedTestCase):
                 self.assertIn('Metric', labels)
                 self.assertEqual(len(table['rows'][0]['cells']), len(table['columns']))
                 summary = self.client.get(reverse('lab:animal_summary', args=[self.mouse.pk]))
-                tables = {section['title']: section['table'] for section in summary.context['animal_recording_sections']}
-                labels = [column['label'] for column in tables[self.kind.display_plural_name]['columns']]
-                self.assertEqual('Paths' in labels, not paths)
+
+                def type_columns(type_name):
+                    labels = []
+                    for type_group in summary.context['animal_recording_sections']:
+                        if type_group['type_title'] != type_name:
+                            continue
+                        for project_group in type_group['projects']:
+                            for experiment in project_group['experiments']:
+                                labels.extend(column['label'] for column in experiment['table']['columns'] if 'label' in column)
+                    return labels
+
+                labels = type_columns(self.kind.display_plural_name)
+                self.assertEqual('Recording Paths' in labels, not paths)
                 self.assertEqual('Notes' in labels, not notes)
-                other_labels = [column['label'] for column in tables[self.other.display_plural_name]['columns']]
-                self.assertIn('Paths', other_labels); self.assertIn('Notes', other_labels)
+                other_labels = type_columns(self.other.display_plural_name)
+                self.assertIn('Recording Paths', other_labels); self.assertIn('Notes', other_labels)
                 self.recording.refresh_from_db()
                 self.assertEqual(self.recording.data_paths, ['/retained/data'])
                 self.assertEqual(self.recording.notes, 'Retained recording note')

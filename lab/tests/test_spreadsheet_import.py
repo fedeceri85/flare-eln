@@ -694,7 +694,10 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual([record.data_paths for record in records], [["/first", "/extra"], ["/second"], ["/later"]])
         self.assertEqual([record.recording_date for record in records], [date(2026, 4, 28), date(2026, 4, 28), date(2026, 4, 29)])
         self.assertEqual([list(record.mice.values_list("pk", flat=True)) for record in records], [["OFFICIAL-1"], ["SECOND"], ["SECOND"]])
-        self.assertEqual([record.values["crossing"] for record in records], [self.crossing.display_name, other_line.name, other_line.name])
+        self.assertEqual(
+            [record.mice.first().crossing_definition_id for record in records],
+            [self.crossing.pk, other_line.crossings.get().pk, other_line.crossings.get().pk],
+        )
         self.assertTrue(all(record.notes == "Shared batch notes" for record in records))
 
     def test_date_crossing_grouping_uses_approved_individual_crossing_override(self):
@@ -832,7 +835,11 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(result["recordings"], 1)
         record = self.experiment.recordings.get()
         self.assertEqual(record.mice.count(), 8)
-        self.assertEqual(record.values, {"crossing": self.crossing.display_name})
+        self.assertEqual(record.values, {})
+        self.assertEqual(
+            set(record.mice.values_list("crossing_definition_id", flat=True)),
+            {self.crossing.pk},
+        )
         self.assertEqual(set(MouseGenotype.objects.filter(mouse__in=record.mice.all()).values_list("zygosity", flat=True)), {"het"})
 
     def test_equivalent_birth_dates_sexes_and_genotypes_are_consistent(self):

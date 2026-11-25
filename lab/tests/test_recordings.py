@@ -5,7 +5,16 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.urls import reverse
 from .test_navigation import Markup
-from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingField, RecordingType
+from ..models import (
+    Experiment,
+    Mouse,
+    Project,
+    Protocol,
+    Recording,
+    RecordingField,
+    RecordingType,
+    genotype_category_labels,
+)
 from ._support import AuthenticatedTestCase, create_recording, create_test_crossing, crossing_post_data
 
 
@@ -132,10 +141,6 @@ class RecordingsPageTests(AuthenticatedTestCase):
             name="Genotyping",
             recording_type=genotyping_type,
         )
-        crossing_field = RecordingField.objects.get(
-            recording_type=genotyping_type,
-            key="crossing",
-        )
         add_url = reverse(
             "lab:add_recording",
             args=[
@@ -144,7 +149,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
             ],
         )
 
-        return genotyping_experiment, crossing_field, add_url
+        return genotyping_type, genotyping_experiment, add_url
 
     def test_experiment_name_links_to_recordings_page(self):
         response = self.client.get(
@@ -205,36 +210,60 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.mouse_2.date_of_birth = date(2026, 5, 20)
         self.mouse_2.save(update_fields=["date_of_birth"])
         self.newer_recording.mice.add(self.mouse_2)
+        row_id = f"recording-{self.newer_recording.pk}"
 
         response = self.client.get(self.recordings_url)
         markup = Markup(response.content.decode())
-        newer_row = markup.find("tr", id=f"recording-{self.newer_recording.pk}")[0]
+        newer_row = markup.find("tr", id=row_id)[0]
+        # The collapsed animal cell keeps the count and the age range.
         self.assertIn("2 animals", newer_row.text)
         self.assertIn("P56–P66", newer_row.text)
         self.assertIn("P56", newer_row.text)
         self.assertIn("P66", newer_row.text)
+        # Per-animal age badges expand into the child rows under the columns.
+        child_rows = [
+            node for node in markup.find("tr")
+            if node.attrs.get("data-animal-rows") == row_id
+        ]
+        self.assertEqual(len(child_rows), 2)
         badges = [
             node for node in markup.find("span")
-            if "animal-age" in node.attrs.get("class", "") and node.within("tr", id=f"recording-{self.newer_recording.pk}")
+            if "animal-age" in (node.attrs.get("class", "") or "").split()
+            and "animal-age-summary" not in (node.attrs.get("class", "") or "").split()
+            and node.within("tr", **{"data-animal-rows": row_id})
         ]
-        self.assertTrue(badges)
+        self.assertEqual(len(badges), 2)
         self.assertTrue(any(node.attrs.get("aria-label") == "Postnatal day 56" for node in badges))
+        self.assertTrue(any(node.attrs.get("aria-label") == "Postnatal day 66" for node in badges))
 
         self.imaging_type.show_animal_age = False
         self.imaging_type.save(update_fields=["show_animal_age"])
         response = self.client.get(self.recordings_url)
-        row = Markup(response.content.decode()).find("tr", id=f"recording-{self.newer_recording.pk}")[0]
+        markup = Markup(response.content.decode())
+        row = markup.find("tr", id=row_id)[0]
+        child_rows = [
+            node for node in markup.find("tr")
+            if node.attrs.get("data-animal-rows") == row_id
+        ]
         self.assertNotIn("P56", row.text)
         self.assertNotIn("P66", row.text)
+        self.assertFalse(any("P56" in tr.text or "P66" in tr.text for tr in child_rows))
 
     def test_recording_animal_age_summary_reports_unknown_ages(self):
         self.mouse_1.date_of_birth = date(2026, 5, 30)
         self.mouse_1.save(update_fields=["date_of_birth"])
         self.newer_recording.mice.add(self.mouse_2)
+        row_id = f"recording-{self.newer_recording.pk}"
         response = self.client.get(self.recordings_url)
-        row = Markup(response.content.decode()).find("tr", id=f"recording-{self.newer_recording.pk}")[0]
+        markup = Markup(response.content.decode())
+        row = markup.find("tr", id=row_id)[0]
         self.assertIn("P56 · 1 unknown", row.text)
-        self.assertIn("Age unknown", row.text)
+        # The per-animal "Age unknown" badge now lives in the child row.
+        child_rows = [
+            node for node in markup.find("tr")
+            if node.attrs.get("data-animal-rows") == row_id
+        ]
+        self.assertTrue(any("Age unknown" in tr.text for tr in child_rows))
 
     def test_recordings_page_honours_page_size(self):
         for index in range(30):
@@ -422,8 +451,8 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertNotContains(response, self.older_recording.data_paths[0])
         self.assertEqual(response.context["record_count"]["count"], 1)
 
-    def test_genotyping_crossing_filter_uses_crossing_autocomplete(self):
-        genotyping_experiment, crossing_field, _ = self.genotyping_recording_setup()
+    def test_crossing_filter_uses_crossing_autocomplete(self):
+        _, genotyping_experiment, _ = self.genotyping_recording_setup()
         recordings_url = reverse(
             "lab:recordings_page",
             args=[genotyping_experiment.project_id, genotyping_experiment.pk],
@@ -433,7 +462,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         crossing_filter = next(
             field
             for field in response.context["filter_form"]["fields"]
-            if field["name"] == f"field_{crossing_field.pk}"
+            if field["name"] == "crossing"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -446,7 +475,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "label_key": "label",
             },
         )
-        self.assertContains(response, f'name="field_{crossing_field.pk}"')
+        self.assertContains(response, 'name="crossing"')
         self.assertContains(response, 'data-filter-autocomplete-input="true"')
         self.assertContains(response, 'data-autocomplete-value-key="display_name"')
 
@@ -641,63 +670,10 @@ class RecordingsPageTests(AuthenticatedTestCase):
             self.mouse_2.pk,
         )
 
-    def test_genotyping_form_infers_crossing_from_selected_mice(self):
-        _, crossing_field, add_url = self.genotyping_recording_setup()
-        crossing, _ = create_test_crossing(("Genotyping Mut",))
-        self.assign_crossing_to_mouse(self.mouse_1, crossing)
-        self.assign_crossing_to_mouse(self.mouse_2, crossing)
-
-        response = self.client.get(
-            add_url,
-            {
-                "mice": f"{self.mouse_1.pk},{self.mouse_2.pk}",
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        form = response.context["form"]
-        crossing_field_name = form.dynamic_field_name(crossing_field)
-
-        self.assertTrue(form.fields[crossing_field_name].disabled)
-        self.assertEqual(
-            form.fields[crossing_field_name].initial,
-            crossing.display_name,
-        )
-
-    def test_genotyping_save_stores_inferred_crossing(self):
-        _, crossing_field, add_url = self.genotyping_recording_setup()
-        crossing, _ = create_test_crossing(("Genotyping Mut",))
-        self.assign_crossing_to_mouse(self.mouse_1, crossing)
-        self.assign_crossing_to_mouse(self.mouse_2, crossing)
-
-        response = self.client.post(
-            add_url,
-            {
-                "return_url": self.recordings_url,
-                "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
-                "recording_date": "2026-08-02",
-                "data_paths": "/data/genotyping/inferred-crossing",
-                f"value_{crossing_field.pk}": "Wrong crossing",
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        recording = Recording.objects.get(
-            data_paths=["/data/genotyping/inferred-crossing"]
-        )
-        self.assertEqual(recording.values["crossing"], crossing.display_name)
-        self.assertEqual(
-            list(
-                recording.mice.order_by("mouse_id").values_list(
-                    "mouse_id",
-                    flat=True,
-                )
-            ),
-            [self.mouse_1.pk, self.mouse_2.pk],
-        )
-
-    def test_genotyping_rejects_mice_from_different_crossings(self):
-        _, crossing_field, add_url = self.genotyping_recording_setup()
+    def test_genotyping_records_save_with_mixed_crossing_animals(self):
+        """Genotyping is no longer special-cased: the crossing is derived
+        from the animals, so mixed-crossing animals save like any type."""
+        _, _, add_url = self.genotyping_recording_setup()
         crossing, _ = create_test_crossing(("Genotyping Mut",))
         other_crossing, _ = create_test_crossing(("Other Mut",))
         self.assign_crossing_to_mouse(self.mouse_1, crossing)
@@ -710,44 +686,22 @@ class RecordingsPageTests(AuthenticatedTestCase):
                 "mice": f"{self.mouse_1.pk}\n{self.mouse_2.pk}",
                 "recording_date": "2026-08-02",
                 "data_paths": "/data/genotyping/mixed-crossing",
-                f"value_{crossing_field.pk}": crossing.display_name,
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            "Genotyping records can only include animals from one crossing.",
-            response.context["form"].errors["mice"][0],
+        self.assertEqual(response.status_code, 302)
+        recording = Recording.objects.get(
+            data_paths=["/data/genotyping/mixed-crossing"]
         )
-        self.assertFalse(
-            Recording.objects.filter(
-                data_paths=["/data/genotyping/mixed-crossing"],
-            ).exists()
-        )
-
-    def test_genotyping_rejects_mice_without_crossing(self):
-        _, crossing_field, add_url = self.genotyping_recording_setup()
-
-        response = self.client.post(
-            add_url,
-            {
-                "return_url": self.recordings_url,
-                "mice": self.mouse_1.pk,
-                "recording_date": "2026-08-02",
-                "data_paths": "/data/genotyping/missing-crossing",
-                f"value_{crossing_field.pk}": "",
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            "Select animals with a crossing before creating a genotyping record",
-            response.context["form"].errors["mice"][0],
-        )
-        self.assertFalse(
-            Recording.objects.filter(
-                data_paths=["/data/genotyping/missing-crossing"],
-            ).exists()
+        self.assertNotIn("crossing", recording.values)
+        self.assertEqual(
+            list(
+                recording.mice.order_by("mouse_id").values_list(
+                    "mouse_id",
+                    flat=True,
+                )
+            ),
+            [self.mouse_1.pk, self.mouse_2.pk],
         )
 
     def test_add_mouse_from_selector_opens_summary_with_recording_return_link(self):
@@ -913,10 +867,28 @@ class RecordingsPageTests(AuthenticatedTestCase):
             reverse("lab:animal_summary", args=[self.mouse_2.pk]),
         )
         markup = Markup(response.content.decode())
-        animal_links = next(node for node in markup.find("div", **{"class": "recording-animal-links"}) if self.mouse_1.pk in node.text and self.mouse_2.pk in node.text)
-        self.assertIn(self.mouse_1.pk, animal_links.text)
-        self.assertIn(self.mouse_2.pk, animal_links.text)
-        self.assertEqual(len([node for node in markup.find("a") if node.parent is animal_links]), 2)
+        row_id = f"recording-{recording.pk}"
+        child_rows = [
+            node for node in markup.find("tr")
+            if node.attrs.get("data-animal-rows") == row_id
+        ]
+        self.assertEqual(len(child_rows), 2)
+
+        def is_descendant(node, ancestor):
+            while node is not None:
+                if node.parent is ancestor:
+                    return True
+                node = node.parent
+            return False
+
+        child_links = [
+            node for node in markup.find("a", **{"class": "mouse-link"})
+            if any(is_descendant(node, tr) for tr in child_rows)
+        ]
+        self.assertEqual(len(child_links), 2)
+        child_text = " ".join(tr.text for tr in child_rows)
+        self.assertIn(self.mouse_1.pk, child_text)
+        self.assertIn(self.mouse_2.pk, child_text)
 
     def test_add_recording_rejects_ambiguous_mouse_partial_match(self):
         response = self.client.post(
@@ -994,6 +966,222 @@ class RecordingsPageTests(AuthenticatedTestCase):
         )
 
         self.assertEqual(str(path_cell["value"]), "&mdash;")
+
+    def test_genotype_is_split_into_crossing_and_zygosity_columns(self):
+        from ..forms import sync_mouse_structured_genetics
+        crossing, _ = create_test_crossing(("Alpha", "Beta"))
+        zygosity = {
+            line.pk: value
+            for line, value in zip(crossing.ordered_lines(), ("het", "hom"))
+        }
+        sync_mouse_structured_genetics(self.mouse_1, crossing, zygosity)
+        self.mouse_1.refresh_from_db()
+        self.assertEqual(self.mouse_1.genetics_genotype_display, "Alpha: Het; Beta: Hom")
+        self.assertEqual(self.mouse_1.genetics_genotype_zygosity_display, "Het; Hom")
+
+        response = self.client.get(self.recordings_url)
+        row = next(
+            row
+            for row in response.context["table"]["rows"]
+            if row["id"] == f"recording-{self.newer_recording.pk}"
+        )
+        classes = [cell["class"] for cell in row["cells"]]
+        values = {cell["class"]: cell.get("value") for cell in row["cells"]}
+        self.assertIn("recording-crossing-cell", classes)
+        self.assertIn("recording-genotype-cell", classes)
+        self.assertLess(
+            classes.index("recording-animals-cell"),
+            classes.index("recording-crossing-cell"),
+        )
+        self.assertLess(
+            classes.index("recording-crossing-cell"),
+            classes.index("recording-genotype-cell"),
+        )
+        self.assertLess(
+            classes.index("recording-genotype-cell"),
+            classes.index("recording-field-cell"),
+        )
+        self.assertEqual(values["recording-crossing-cell"], "Alpha x Beta")
+        self.assertEqual(values["recording-genotype-cell"], "Het; Hom")
+        self.assertNotIn("Alpha:", values["recording-genotype-cell"])
+        # A single animal's genetics are not repeated in the animal cell --
+        # the dedicated Crossing/Genotype columns already carry them.
+        self.assertNotIn("Alpha x Beta", str(values["recording-animals-cell"]))
+
+        # With several animals the animal cell collapses to an expand toggle and
+        # each animal's crossing/zygosity move into the hidden child rows.
+        self.newer_recording.mice.add(self.mouse_2)
+        response = self.client.get(self.recordings_url)
+        row = next(
+            row
+            for row in response.context["table"]["rows"]
+            if row["id"] == f"recording-{self.newer_recording.pk}"
+        )
+        animals_value = str(
+            next(cell["value"] for cell in row["cells"] if cell["class"] == "recording-animals-cell")
+        )
+        self.assertIn("animal-expand-toggle", animals_value)
+        self.assertIn("2 animals", animals_value)
+        self.assertNotIn("Alpha x Beta", animals_value)
+        animals_cell = next(
+            cell for cell in row["cells"] if cell["class"] == "recording-animals-cell"
+        )
+        self.assertEqual(animals_cell["secondary_action"]["value"], "Summary")
+
+        def child_value(child, cell_class):
+            return str(next(cell["value"] for cell in child["cells"] if cell["class"] == cell_class))
+
+        children = row["children"]
+        self.assertEqual(len(children), 2)
+        mouse_1_url = reverse("lab:animal_summary", args=[self.mouse_1.pk])
+        mouse_1_child = next(
+            child for child in children if mouse_1_url in child_value(child, "recording-animals-cell")
+        )
+        self.assertIn("Alpha x Beta", child_value(mouse_1_child, "recording-crossing-cell"))
+        self.assertEqual(child_value(mouse_1_child, "recording-genotype-cell"), "Het; Hom")
+
+    def test_compact_genotype_preserves_missing_call_positions(self):
+        from ..forms import sync_mouse_structured_genetics
+
+        crossing, lines = create_test_crossing(("Alpha missing", "Beta present"))
+        sync_mouse_structured_genetics(
+            self.mouse_1,
+            crossing,
+            {lines[0].pk: "het", lines[1].pk: "hom"},
+        )
+        self.mouse_1.genotype_calls.filter(mouse_line=lines[0]).delete()
+        self.mouse_1.refresh_from_db()
+
+        self.assertEqual(
+            self.mouse_1.genetics_genotype_zygosity_display,
+            "—; Hom",
+        )
+        response = self.client.get(self.recordings_url)
+        row = next(
+            row
+            for row in response.context["table"]["rows"]
+            if row["id"] == f"recording-{self.newer_recording.pk}"
+        )
+        genotype = next(
+            cell["value"]
+            for cell in row["cells"]
+            if cell["class"] == "recording-genotype-cell"
+        )
+        self.assertEqual(genotype, "—; Hom")
+
+    def test_recording_crossing_comes_only_from_linked_animals(self):
+        self.mouse_1.crossing = "Linked animal crossing"
+        self.mouse_1.save(update_fields=["crossing"])
+        self.newer_recording.values["crossing"] = "Obsolete recording crossing"
+        self.newer_recording.save(update_fields=["values"])
+
+        response = self.client.get(self.recordings_url)
+        row = next(
+            row
+            for row in response.context["table"]["rows"]
+            if row["id"] == f"recording-{self.newer_recording.pk}"
+        )
+        crossing = next(
+            cell["value"]
+            for cell in row["cells"]
+            if cell["class"] == "recording-crossing-cell"
+        )
+        self.assertEqual(crossing, "Linked animal crossing")
+        self.assertNotIn("Obsolete recording crossing", str(crossing))
+
+    def test_crossing_sort_supports_structured_legacy_and_missing_values(self):
+        self.mouse_1.crossing = "Zulu legacy"
+        self.mouse_1.save(update_fields=["crossing"])
+        self.mouse_2.crossing = "Alpha legacy"
+        self.mouse_2.save(update_fields=["crossing"])
+        crossing, _ = create_test_crossing(("Middle structured",))
+        structured_mouse = Mouse.objects.create(
+            mouse_id="REC-PAGE-M3",
+            protocol=self.protocol,
+            crossing_definition=crossing,
+        )
+        structured_recording = create_recording(
+            owner=self.user,
+            mouse=structured_mouse,
+            experiment=self.experiment,
+            recording_type=self.imaging_type,
+            recording_date=date(2026, 7, 15),
+        )
+        missing_mouse = Mouse.objects.create(
+            mouse_id="REC-PAGE-M4",
+            protocol=self.protocol,
+        )
+        missing_recording = create_recording(
+            owner=self.user,
+            mouse=missing_mouse,
+            experiment=self.experiment,
+            recording_type=self.imaging_type,
+            recording_date=date(2026, 7, 16),
+        )
+
+        def row_ids(direction):
+            response = self.client.get(
+                self.recordings_url,
+                {"sort": "crossing", "direction": direction},
+            )
+            return [row["id"] for row in response.context["table"]["rows"]]
+
+        self.assertEqual(
+            row_ids("asc"),
+            [
+                f"recording-{self.older_recording.pk}",
+                f"recording-{structured_recording.pk}",
+                f"recording-{self.newer_recording.pk}",
+                f"recording-{missing_recording.pk}",
+            ],
+        )
+        self.assertEqual(
+            row_ids("desc"),
+            [
+                f"recording-{self.newer_recording.pk}",
+                f"recording-{structured_recording.pk}",
+                f"recording-{self.older_recording.pk}",
+                f"recording-{missing_recording.pk}",
+            ],
+        )
+
+    def test_expandable_children_are_sorted_and_load_labels_once(self):
+        from ..forms import sync_mouse_structured_genetics
+
+        crossing, lines = create_test_crossing(("Expandable",))
+        first = Mouse.objects.create(mouse_id="REC-PAGE-A", protocol=self.protocol)
+        last = Mouse.objects.create(mouse_id="rec-page-z", protocol=self.protocol)
+        for mouse in (first, self.mouse_1, last):
+            sync_mouse_structured_genetics(
+                mouse,
+                crossing,
+                {lines[0].pk: "het"},
+            )
+        self.newer_recording.mice.set([last, self.mouse_1, first])
+
+        with patch(
+            "lab.ui.genotype_category_labels",
+            wraps=genotype_category_labels,
+        ) as labels:
+            response = self.client.get(self.recordings_url)
+
+        self.assertEqual(labels.call_count, 1)
+        row = next(
+            row
+            for row in response.context["table"]["rows"]
+            if row["id"] == f"recording-{self.newer_recording.pk}"
+        )
+        animal_values = [
+            str(next(
+                cell["value"]
+                for cell in child["cells"]
+                if cell["class"] == "recording-animals-cell"
+            ))
+            for child in row["children"]
+        ]
+        self.assertTrue(first.mouse_id in animal_values[0])
+        self.assertTrue(self.mouse_1.mouse_id in animal_values[1])
+        self.assertTrue(last.mouse_id in animal_values[2])
 
     def test_edit_recording_requires_owner_or_staff(self):
         response = self.client.post(

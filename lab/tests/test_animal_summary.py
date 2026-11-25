@@ -301,7 +301,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         other_user = get_user_model().objects.create_user(username="summary-viewer")
         self.client.force_login(other_user)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "View all")
+        self.assertContains(response, "Summary")
         self.assert_contextual_link(response, self.url, self.list_url)
         self.assertEqual(self.client.get(self.url).status_code, 200)
         self.assertEqual(self.client.get(reverse("lab:recording_animals", args=[self.project.pk, self.experiment.pk + 1000, self.recording.pk])).status_code, 404)
@@ -314,10 +314,10 @@ class AnimalSummaryTests(AuthenticatedTestCase):
 
     def test_recording_button_preserves_list_filters_and_pagination(self):
         response = self.client.get(self.list_state)
-        self.assertContains(response, "View all")
+        self.assertContains(response, "Summary")
         self.assert_contextual_link(response, self.url, self.list_state)
         markup = Markup(response.content.decode())
-        view_all = next(node for node in markup.find("a") if node.text.strip() == "View all")
+        view_all = next(node for node in markup.find("a") if node.text.strip() == "Summary")
         self.assertTrue(view_all.within("td", **{"class": "recording-animals-cell"}))
         self.assertFalse(view_all.within("details"))
         self.assertIn("2 animals", view_all.parent.text)
@@ -375,7 +375,17 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertEqual(panel.text.count("Selected genotyping record"), 1)
         self.assertEqual(panel.text.count("Single animal genotyping"), 1)
         self.assertNotIn("Unrelated genotyping record", panel.text)
-        self.assertEqual(sum(len(section["table"]["rows"]) for section in response.context["animal_recording_sections"]), 3)
+        self.assertEqual(
+            sum(
+                (
+                    len(experiment["table"]["rows"])
+                    for type_group in response.context["animal_recording_sections"]
+                    for project_group in type_group["projects"]
+                    for experiment in project_group["experiments"]
+                ),
+            ),
+            3,
+        )
 
     def test_services_recording_actions_date_and_animal_navigation(self):
         self.genotyping_recording(self.mice[:1])
@@ -406,10 +416,10 @@ class AnimalSummaryTests(AuthenticatedTestCase):
             self.assertIn('data-recording-gallery', images.attrs)
             self.assertEqual(urlsplit(images.attrs['href']).path, reverse('lab:recording_images', args=[self.project.pk, self.experiment.pk, self.recording.pk]))
             self.assertEqual(len(markup.find('dialog', **{'data-image-dialog': None})), 1)
-            view_all = [node for node in markup.find('a') if node.text.strip() == 'View all' and node.within('td', **{'class': 'recording-animals-cell'})]
-            self.assertEqual(len(view_all), 1)  # No redundant group link for the single-animal record.
-            self.assertEqual(urlsplit(view_all[0].attrs['href']).path, self.url)
-            self.assertEqual(parse_qs(urlsplit(view_all[0].attrs['href']).query)['return_url'], [response.wsgi_request.get_full_path()])
+            summary_links = [node for node in markup.find('a') if node.text.strip() == 'Summary' and node.within('td', **{'class': 'recording-animals-cell'})]
+            self.assertEqual(len(summary_links), 1)  # Only the multi-animal record exposes the per-animal summary.
+            self.assertEqual(urlsplit(summary_links[0].attrs['href']).path, self.url)
+            self.assertEqual(parse_qs(urlsplit(summary_links[0].attrs['href']).query)['return_url'], [response.wsgi_request.get_full_path()])
 
     def test_both_edit_routes_show_the_same_recordings_and_keep_service_creation(self):
         self.genotyping_recording(self.mice)

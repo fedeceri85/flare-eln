@@ -7,34 +7,76 @@ from django.urls import reverse
 
 from .forms import BulkMouseUpdateForm
 from .models import Procedure, Recording, format_postnatal_age, genotype_category_labels
-from .ui import build_recording_type_table, format_value, recording_attachment_counts
+from .ui import build_animal_recording_table, format_value, recording_attachment_counts
 
 
-def build_animal_recording_sections(mice):
-    """List each linked recording once, even when several selected animals share it."""
+def build_animal_recording_sections(mice, user=None):
+    """Group each linked recording under its type, project, and experiment.
+
+    Mirrors the main recordings table's hierarchy so the animal summary shows the
+    same columns, expandable animal rows, and row actions for every recording
+    linked to the selected animals (each recording appears once).
+    """
     recordings = (
         Recording.objects.filter(mice__in=mice).distinct()
         .select_related("experiment__project", "recording_type")
-        .prefetch_related("mice", "recording_type__fields")
-        .order_by("recording_type__name", "-recording_date", "recording_id")
+        .prefetch_related(
+            "mice", "recording_type__fields",
+            "mice__crossing_definition", "mice__crossing_definition__crossing_lines__line",
+            "mice__genotype_calls", "mice__genotype_calls__mouse_line",
+        )
+        .order_by(
+            "recording_type__name", "experiment__project__name", "experiment__name",
+            "-recording_date", "recording_id",
+        )
     )
     recordings = list(recordings)
     attachment_counts = recording_attachment_counts(recordings)
-    groups = {}
+
+    types = {}
     for recording in recordings:
-        group = groups.setdefault(recording.recording_type_id, {
-            "recording_type": recording.recording_type, "recordings": [],
+        type_group = types.setdefault(recording.recording_type_id, {
+            "recording_type": recording.recording_type,
+            "type_title": recording.recording_type.display_plural_name,
+            "projects": {},
         })
-        group["recordings"].append(recording)
-    return [
-        {
-            "title": group["recording_type"].display_plural_name,
-            "table": build_recording_type_table(
-                group["recording_type"], group["recordings"], include_animals=True, include_notes=True, attachment_counts=attachment_counts,
-            ),
-        }
-        for group in groups.values()
-    ]
+        project_group = type_group["projects"].setdefault(recording.experiment.project_id, {
+            "project": recording.experiment.project,
+            "project_title": str(recording.experiment.project),
+            "experiments": {},
+        })
+        experiment_group = project_group["experiments"].setdefault(recording.experiment_id, {
+            "experiment": recording.experiment,
+            "experiment_title": recording.experiment.name,
+            "recordings": [],
+        })
+        experiment_group["recordings"].append(recording)
+
+    sections = []
+    for type_group in types.values():
+        projects = []
+        for project_group in type_group["projects"].values():
+            experiments = []
+            for experiment_group in project_group["experiments"].values():
+                experiments.append({
+                    "experiment": experiment_group["experiment"],
+                    "experiment_title": experiment_group["experiment_title"],
+                    "table": build_animal_recording_table(
+                        type_group["recording_type"], experiment_group["recordings"], user,
+                        attachment_counts=attachment_counts,
+                    ),
+                })
+            projects.append({
+                "project": project_group["project"],
+                "project_title": project_group["project_title"],
+                "experiments": experiments,
+            })
+        sections.append({
+            "recording_type": type_group["recording_type"],
+            "type_title": type_group["type_title"],
+            "projects": projects,
+        })
+    return sections
 
 
 def summary_field(label, mice, values, keys=None):
@@ -87,7 +129,7 @@ def animal_genotype_details(mouse, labels):
     return results, legacy, genotype
 
 
-def build_animal_summary(mice):
+def build_animal_summary(mice, user=None):
     mice = list(mice)
     if not mice:
         return {}
@@ -147,6 +189,6 @@ def build_animal_summary(mice):
         "summary_notes": summary_field("Notes", mice, [mouse.notes or "—" for mouse in mice]),
         "individual_rows": individual_rows,
         "single_mouse_mode": len(mice) == 1,
-        "animal_recording_sections": build_animal_recording_sections(mice),
+        "animal_recording_sections": build_animal_recording_sections(mice, user),
         "procedures": procedures,
     }

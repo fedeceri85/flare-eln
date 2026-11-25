@@ -38,8 +38,6 @@ def targets(experiment):
         ("notes", "Recording notes", ["notes"]),
     ]
     for field in experiment.recording_type.fields.filter(active=True):
-        if experiment.recording_type.slug == "genotyping" and field.key == "crossing":
-            continue
         result.append((f"field:{field.key}", field.label, [field.label, field.key]))
     result.extend((f"animal:{key}", label, hints) for key, label, hints in ANIMAL_FIELDS)
     return result

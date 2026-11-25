@@ -9,6 +9,7 @@ from flare_ai.tools.recordings import filter_recordings, search_recordings
 from lab.models import (
     Experiment,
     Mouse,
+    MouseGenotype,
     Project,
     Protocol,
     Recording,
@@ -220,6 +221,16 @@ class RecordingSearchTests(TestCase):
         mouse = Mouse.objects.create(
             mouse_id="AI-GENO", protocol=self.protocol, genotype="Gad2: het; Cdh23: het",
         )
+        rec = self._make_recording_with_mouse(mouse)
+        results = list(filter_recordings(RecordingSearchInput(genotype="Gad2")))
+        self.assertIn(rec, results)
+
+    def test_filters_by_structured_genotype_calls(self):
+        _, lines = create_test_crossing(line_names=("Gad2",))
+        mouse = Mouse.objects.create(
+            mouse_id="AI-CALL", protocol=self.protocol,
+        )
+        MouseGenotype.objects.create(mouse=mouse, mouse_line=lines[0], zygosity="het")
         rec = self._make_recording_with_mouse(mouse)
         results = list(filter_recordings(RecordingSearchInput(genotype="Gad2")))
         self.assertIn(rec, results)

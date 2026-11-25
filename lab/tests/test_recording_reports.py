@@ -1,12 +1,22 @@
 from datetime import date, datetime
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from ..models import Experiment, Mouse, Project, Protocol, Recording, RecordingField, RecordingType
+from ..models import (
+    Experiment,
+    Mouse,
+    Project,
+    Protocol,
+    Recording,
+    RecordingField,
+    RecordingType,
+    genotype_category_labels,
+)
 from ..recording_reports import render_recording_pdf
 from .test_navigation import Markup
 from ._support import AuthenticatedTestCase
@@ -128,6 +138,69 @@ class RecordingReportTests(AuthenticatedTestCase):
         self.assertEqual(sheet["A2"].data_type, "s")
         self.assertIn(self.project.name, sheet["A2"].value)
         self.assertEqual(sheet.cell(5, headings.index("Count") + 1).value, 0)
+
+    def test_export_splits_crossing_and_zygosity_genotype_columns(self):
+        from ..forms import sync_mouse_structured_genetics
+        from ._support import create_test_crossing
+        crossing, _ = create_test_crossing(("Alpha", "Beta"))
+        mouse = self.recordings[0].mice.first()
+        zygosity = {
+            line.pk: value
+            for line, value in zip(crossing.ordered_lines(), ("het", "hom"))
+        }
+        sync_mouse_structured_genetics(mouse, crossing, zygosity)
+        mouse.refresh_from_db()
+        self.assertEqual(mouse.genetics_genotype_display, "Alpha: Het; Beta: Hom")
+        self.assertEqual(mouse.genetics_genotype_zygosity_display, "Het; Hom")
+
+        response = self.download()
+        sheet = load_workbook(BytesIO(response.content)).active
+        headings = [cell.value for cell in sheet[3]]
+        self.assertIn("Crossing", headings)
+        self.assertIn("Genotype", headings)
+        self.assertLess(headings.index("Crossing"), headings.index("Genotype"))
+        data_rows = [
+            dict(zip(headings, [cell.value for cell in sheet_row]))
+            for sheet_row in sheet.iter_rows(min_row=4)
+        ]
+        target = next(row for row in data_rows if row["Animals"] == mouse.mouse_id)
+        self.assertEqual(target["Crossing"], "Alpha x Beta")
+        self.assertEqual(target["Genotype"], "Het; Hom")
+        self.assertNotIn("Alpha:", target["Genotype"])
+
+        mouse.genotype_calls.filter(mouse_line=crossing.ordered_lines()[0]).delete()
+        with patch(
+            "lab.recording_reports.genotype_category_labels",
+            wraps=genotype_category_labels,
+        ) as labels:
+            response = self.download()
+        self.assertEqual(labels.call_count, 1)
+        sheet = load_workbook(BytesIO(response.content)).active
+        headings = [cell.value for cell in sheet[3]]
+        data_rows = [
+            dict(zip(headings, [cell.value for cell in sheet_row]))
+            for sheet_row in sheet.iter_rows(min_row=4)
+        ]
+        target = next(row for row in data_rows if row["Animals"] == mouse.mouse_id)
+        self.assertEqual(target["Genotype"], "—; Hom")
+
+    def test_export_crossing_comes_only_from_linked_animals(self):
+        recording = self.recordings[0]
+        mouse = recording.mice.get()
+        mouse.crossing = "Linked export crossing"
+        mouse.save(update_fields=["crossing"])
+        recording.values["crossing"] = "Obsolete export crossing"
+        recording.save(update_fields=["values"])
+        response = self.download()
+        sheet = load_workbook(BytesIO(response.content)).active
+        headings = [cell.value for cell in sheet[3]]
+        rows = [
+            dict(zip(headings, [cell.value for cell in sheet_row]))
+            for sheet_row in sheet.iter_rows(min_row=4)
+        ]
+        target = next(row for row in rows if row["Date"].day == 1)
+        self.assertEqual(target["Crossing"], "Linked export crossing")
+        self.assertNotEqual(target["Crossing"], "Obsolete export crossing")
 
     def test_age_export_column_can_be_disabled_per_recording_type(self):
         self.kind.show_animal_age = False

@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
 
-from .models import Mouse, RecordingImage, format_postnatal_age
+from .models import Mouse, RecordingImage, format_postnatal_age, genotype_category_labels
 
 
 EMPTY_VALUE = format_html("&mdash;")
@@ -321,6 +321,19 @@ RECORDING_FILTER_SPECS = [
         "placeholder": "Type animal ID",
     },
     {
+        "name": "crossing",
+        "label": "Crossing",
+        "type": "text",
+        "placeholder": "Type crossing",
+        "autocomplete": CROSSING_FILTER_AUTOCOMPLETE,
+    },
+    {
+        "name": "genotype",
+        "label": "Genotype",
+        "type": "text",
+        "placeholder": "Type genotype",
+    },
+    {
         "name": "notes",
         "label": "Notes",
         "type": "text",
@@ -452,44 +465,7 @@ def build_mice_page_filter_specs():
     ]
 
 
-BASE_RECORDING_COLUMN_SPECS = [
-    {
-        "key": "recording_date",
-        "label": "Date",
-        "format": "date",
-        "cell_class": "recording-date-cell",
-        "url": lambda recording: selected_recording_url(recording),
-        "link_class": "mouse-link",
-    },
-    {
-        "key": "experiment__project",
-        "label": "Project",
-        "url": lambda recording: reverse(
-            "lab:experiments_page",
-            args=[recording.experiment.project_id],
-        ),
-        "link_class": "mouse-link",
-    },
-    {
-        "key": "experiment__name",
-        "label": "Experiment",
-        "url": lambda recording: experiment_recordings_url(recording),
-        "link_class": "mouse-link",
-    },
-]
-
-
-RECORDING_PATH_COLUMN_SPEC = [
-    {
-        "key": "data_paths",
-        "label": "Paths",
-        "format": "recording_paths",
-        "cell_class": "path-cell",
-    },
-]
-
-
-RECORDINGS_PAGE_BASE_COLUMN_SPECS = [
+RECORDINGS_PAGE_LEADING_COLUMN_SPECS = [
     {"key": "recording_date", "sort": "recording_date", "label": "Date", "format": "date", "cell_class": "recording-date-cell"},
     {
         "key": "mice",
@@ -497,6 +473,21 @@ RECORDINGS_PAGE_BASE_COLUMN_SPECS = [
         "label": "Animals",
         "format": "recording_mice",
         "cell_class": "recording-animals-cell",
+    },
+]
+RECORDINGS_PAGE_GENETICS_COLUMN_SPECS = [
+    {
+        "key": "crossing",
+        "sort": "crossing",
+        "label": "Crossing",
+        "format": "recording_crossing",
+        "cell_class": "recording-crossing-cell",
+    },
+    {
+        "key": "genotype",
+        "label": "Genotype",
+        "format": "recording_genotype",
+        "cell_class": "recording-genotype-cell",
     },
 ]
 
@@ -1011,7 +1002,9 @@ def build_service_experiment_cards(experiments):
 def visible_recording_columns(specs, recording_type):
     return [spec for spec in specs if not (
         (spec.get("key") == "data_paths" and getattr(recording_type, "hide_data_paths_in_table", False)) or
-        (spec.get("key") == "notes" and getattr(recording_type, "hide_notes_in_table", False))
+        (spec.get("key") == "notes" and getattr(recording_type, "hide_notes_in_table", False)) or
+        (spec.get("key") == "crossing" and getattr(recording_type, "hide_crossing_in_table", False)) or
+        (spec.get("key") == "genotype" and getattr(recording_type, "hide_genotype_in_table", False))
     )]
 
 
@@ -1021,12 +1014,33 @@ def recording_attachment_counts(recordings):
         .annotate(total=Count("pk")).values_list("recording_id", "total")) if ids else {}
 
 
-def recording_animals_cell(recording, spec):
-    cell = build_cell(recording, spec)
-    if spec.get("format") == "recording_mice" and len(recording.mice.all()) > 1:
-        cell["secondary_action"] = {"value": "View all", "url": reverse("lab:recording_animals", args=[
+def recording_animals_cell(
+    recording,
+    spec,
+    *,
+    expandable=False,
+    genotype_labels=None,
+):
+    if spec.get("format") != "recording_mice":
+        return build_cell(recording, spec, genotype_labels=genotype_labels)
+
+    mice = list(recording.mice.all())
+    if len(mice) > 1:
+        secondary_action = {"value": "Summary" if expandable else "View all", "url": reverse("lab:recording_animals", args=[
             recording.experiment.project_id, recording.experiment_id, recording.pk,
         ])}
+        if expandable:
+            return {
+                "class": spec.get("cell_class", ""),
+                "value": format_animal_expand_toggle(recording, len(mice)),
+                "secondary_action": secondary_action,
+            }
+
+        cell = build_cell(recording, spec, genotype_labels=genotype_labels)
+        cell["secondary_action"] = secondary_action
+        return cell
+
+    cell = build_cell(recording, spec, genotype_labels=genotype_labels)
     return cell
 
 
@@ -1036,89 +1050,86 @@ def recording_image_action(recording, count):
         "url": reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk])}
 
 
-def build_recording_type_table(recording_type, recordings, *, include_animals=False, include_notes=False, attachment_counts=None):
+def build_animal_recording_table(recording_type, recordings, user=None, *, attachment_counts=None):
+    """Render the animal summary's recordings like the main recordings table.
+
+    Uses the same data columns and expandable per-animal rows as
+    :func:`build_recordings_table`, but without the selection column or
+    sortable headers (the summary has no filter state), omits the
+    crossing/genotype columns (redundant in the animal summary context),
+    and adds a "See in Experiment" shortcut alongside the shared actions.
+    """
     recordings = list(recordings)
-    attachment_counts = recording_attachment_counts(recordings) if attachment_counts is None else attachment_counts
-    base_specs = [dict(spec) for spec in BASE_RECORDING_COLUMN_SPECS]
-    base_specs[0].pop("url", None)
-    base_specs[0].pop("link_class", None)
-    path_specs = list(RECORDING_PATH_COLUMN_SPEC)
-    if include_animals:
-        base_specs.insert(1, RECORDINGS_PAGE_BASE_COLUMN_SPECS[1])
-    if include_notes:
-        path_specs.append(RECORDINGS_PAGE_TRAILING_COLUMN_SPECS[1])
-    path_specs = visible_recording_columns(path_specs, recording_type)
+    attachment_counts = (
+        recording_attachment_counts(recordings) if attachment_counts is None else attachment_counts
+    )
+    leading_specs = visible_recording_columns(RECORDINGS_PAGE_LEADING_COLUMN_SPECS, recording_type)
+    genetics_specs = []
+    trailing_specs = visible_recording_columns(RECORDINGS_PAGE_TRAILING_COLUMN_SPECS, recording_type)
     display_fields = [
         field
         for field in recording_type.fields.all()
         if field.active and field.display_in_table
     ]
-    base_columns = [
-        {
-            "label": spec["label"],
-            "class": spec.get("cell_class", ""),
-        }
-        for spec in base_specs
-    ]
-    field_columns = [
-        {
-            "label": recording_field_label(field),
-            "class": "compact-text-cell",
-        }
-        for field in display_fields
-    ]
-    path_columns = [
-        {
-            "label": spec["label"],
-            "class": spec.get("cell_class", ""),
-        }
-        for spec in path_specs
+    genotype_labels = (
+        genotype_category_labels()
+        if any(spec.get("format") == "recording_genotype" for spec in genetics_specs)
+        else None
+    )
+    columns = [
+        *[{"label": spec["label"], "class": spec.get("cell_class", "")} for spec in [*leading_specs, *genetics_specs]],
+        *[{"label": recording_field_label(field), "class": "recording-field-cell"} for field in display_fields],
+        *[{"label": spec["label"], "class": spec.get("cell_class", "")} for spec in trailing_specs],
+        {"label": "Actions", "class": "action-cell"},
     ]
     rows = []
-
     for recording in recordings:
+        can_modify = recording.can_be_modified_by(user)
+        image_count = attachment_counts.get(recording.pk, 0)
+        edit_url = reverse(
+            "lab:edit_recording",
+            args=[recording.experiment.project_id, recording.experiment_id, recording.pk],
+        )
+        animal_children = (
+            recording_animal_children(
+                recording, leading_specs, genetics_specs, display_fields, trailing_specs,
+                genotype_labels=genotype_labels, include_select_cell=False,
+            )
+            if recording.mice.count() > 1
+            else None
+        )
         rows.append(
             {
+                "id": f"recording-{recording.pk}",
                 "cells": [
-                    *[
-                        recording_animals_cell(recording, spec)
-                        for spec in base_specs
-                    ],
+                    *[recording_animals_cell(recording, spec, expandable=True, genotype_labels=genotype_labels) for spec in leading_specs],
+                    *[build_cell(recording, spec, genotype_labels=genotype_labels) for spec in genetics_specs],
                     *[
                         {
-                            "value": format_recording_field_value(
-                                recording.values.get(field.key),
-                                field.data_type,
-                            ),
-                            "class": "compact-text-cell",
+                            "value": format_recording_field_value(recording.values.get(field.key), field.data_type),
+                            "class": "recording-field-cell",
                         }
                         for field in display_fields
                     ],
-                    *[
-                        build_cell(recording, spec)
-                        for spec in path_specs
-                    ],
-                    {"class": "action-cell", "actions": [
-                        {"value": "See in Experiment", "url": selected_recording_url(recording)},
-                        {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
-                        *([recording_image_action(recording, attachment_counts[recording.pk])] if attachment_counts.get(recording.pk) else []),
-                    ]},
+                    *[build_cell(recording, spec) for spec in trailing_specs],
+                    {
+                        "class": "action-cell",
+                        "actions": [
+                            {"value": "See in Experiment", "url": selected_recording_url(recording)},
+                            *([{"value": "Edit", "url": edit_url}] if can_modify else []),
+                            {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
+                            *([recording_image_action(recording, image_count)] if image_count else []),
+                        ],
+                    },
                 ],
+                **({"children": animal_children} if animal_children else {}),
             }
         )
-
     return {
         "class": "recordings-table",
-        "columns": [
-            *base_columns,
-            *field_columns,
-            *path_columns,
-            {"label": "Actions", "class": "action-cell"},
-        ],
+        "columns": columns,
         "rows": rows,
-        "empty_message": (
-            f"No {recording_type.display_plural_name.lower()} recorded."
-        ),
+        "empty_message": f"No {recording_type.display_plural_name.lower()} recorded.",
     }
 
 
@@ -1136,6 +1147,8 @@ def build_recordings_table(
     recordings = list(recordings)
     attachment_counts = recording_attachment_counts(recordings)
     trailing_specs = visible_recording_columns(RECORDINGS_PAGE_TRAILING_COLUMN_SPECS, recording_type)
+    leading_specs = visible_recording_columns(RECORDINGS_PAGE_LEADING_COLUMN_SPECS, recording_type)
+    genetics_specs = visible_recording_columns(RECORDINGS_PAGE_GENETICS_COLUMN_SPECS, recording_type)
     display_fields = []
 
     if recording_type is not None:
@@ -1154,7 +1167,8 @@ def build_recordings_table(
         },
         *build_sortable_columns(
             [
-                *RECORDINGS_PAGE_BASE_COLUMN_SPECS,
+                *leading_specs,
+                *genetics_specs,
                 *[{"label": recording_field_label(field), "sort": f"field:{field.key}", "cell_class": "recording-field-cell"} for field in display_fields],
                 *trailing_specs,
             ],
@@ -1163,11 +1177,28 @@ def build_recordings_table(
         {"label": "Actions", "class": "action-cell"},
     ]
     rows = []
+    genotype_labels = (
+        genotype_category_labels()
+        if any(spec.get("format") == "recording_genotype" for spec in genetics_specs)
+        else None
+    )
 
     for recording in recordings:
         can_modify = recording.can_be_modified_by(user)
         image_count = attachment_counts.get(recording.pk, 0)
-        base_cells = [recording_animals_cell(recording, spec) for spec in RECORDINGS_PAGE_BASE_COLUMN_SPECS]
+        leading_cells = [
+            recording_animals_cell(
+                recording,
+                spec,
+                expandable=True,
+                genotype_labels=genotype_labels,
+            )
+            for spec in leading_specs
+        ]
+        genetics_cells = [
+            build_cell(recording, spec, genotype_labels=genotype_labels)
+            for spec in genetics_specs
+        ]
         is_selected = recording.pk == selected_recording_id
         edit_url = reverse(
             "lab:edit_recording",
@@ -1176,6 +1207,18 @@ def build_recordings_table(
                 recording.experiment_id,
                 recording.pk,
             ],
+        )
+        animal_children = (
+            recording_animal_children(
+                recording,
+                leading_specs,
+                genetics_specs,
+                display_fields,
+                trailing_specs,
+                genotype_labels=genotype_labels,
+            )
+            if recording.mice.count() > 1
+            else None
         )
         rows.append(
             {
@@ -1193,7 +1236,8 @@ def build_recordings_table(
                         ),
                         "value": "",
                     },
-                    *base_cells,
+                    *leading_cells,
+                    *genetics_cells,
                     *[
                         {
                             "value": format_recording_field_value(
@@ -1211,12 +1255,13 @@ def build_recordings_table(
                     {
                         "class": "action-cell",
                         "actions": [
-                            *([{"value": "View", "url": edit_url}] if can_modify else []),
+                            *([{"value": "Edit", "url": edit_url}] if can_modify else []),
                             {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
                             *([recording_image_action(recording, image_count)] if image_count else []),
                         ],
                     },
                 ],
+                **({"children": animal_children} if animal_children else {}),
             }
         )
 
@@ -1359,11 +1404,15 @@ def build_sortable_columns(
     return columns
 
 
-def build_cell(obj, spec):
+def build_cell(obj, spec, *, genotype_labels=None):
     if spec.get("format") == "crossing_type_summary":
         value = format_crossing_type_summary(obj)
     elif spec.get("format") == "recording_mice":
-        value = format_recording_mice_links(obj)
+        value = format_recording_mice_links(obj, genotype_labels=genotype_labels)
+    elif spec.get("format") == "recording_crossing":
+        value = format_recording_crossing(obj)
+    elif spec.get("format") == "recording_genotype":
+        value = format_recording_genotype(obj, genotype_labels=genotype_labels)
     else:
         value = format_value(resolve_attr(obj, spec["key"]), spec.get("format"))
     cell = {
@@ -1379,7 +1428,7 @@ def build_cell(obj, spec):
     return cell
 
 
-def format_recording_mice_links(recording):
+def format_recording_mice_links(recording, *, genotype_labels=None):
     mice = sorted(
         recording.mice.all(),
         key=lambda mouse: mouse.mouse_id.lower(),
@@ -1389,20 +1438,33 @@ def format_recording_mice_links(recording):
         return EMPTY_VALUE
 
     show_age = recording.recording_type.show_animal_age
-    links = format_html_join(
+    # A single animal's genetics already appear in the dedicated Crossing
+    # and Genotype columns, so it is only repeated per-animal when the
+    # recording groups several animals together.
+    show_genetics = len(mice) > 1
+    if show_genetics and genotype_labels is None:
+        genotype_labels = genotype_category_labels()
+    animal_links = format_html_join(
         "",
-        '<a class="mouse-link" href="{}"><span>{}</span>{}</a>',
+        '<div class="recording-animal">'
+        '<a class="mouse-link" href="{}"><span>{}</span>{}</a>'
+        '{}</div>',
         (
             (
                 reverse("lab:animal_summary", args=[mouse.pk]),
                 mouse.mouse_id,
                 recording_animal_age_badge(mouse, recording.recording_date)
                 if show_age else "",
+                format_animal_genetics_line(mouse, genotype_labels)
+                if show_genetics else "",
             )
             for mouse in mice
         ),
     )
-    animal_links = format_html('<div class="recording-animal-links">{}</div>', links)
+    animal_links = format_html(
+        '<div class="recording-animal-links">{}</div>',
+        animal_links,
+    )
 
     if len(mice) > 1:
         age_summary = (
@@ -1416,6 +1478,149 @@ def format_recording_mice_links(recording):
         )
 
     return animal_links
+
+
+def format_animal_expand_toggle(recording, count):
+    show_age = recording.recording_type.show_animal_age
+    age_summary = (
+        recording_animal_age_summary(recording.mice.all(), recording.recording_date)
+        if show_age
+        else ""
+    )
+    return format_html(
+        '<button type="button" class="animal-expand-toggle" '
+        'data-animal-toggle="recording-{}" aria-expanded="false">{} animals{}</button>',
+        recording.pk,
+        count,
+        age_summary,
+    )
+
+
+def format_animal_id_link(mouse, recording):
+    show_age = recording.recording_type.show_animal_age
+    age_badge = (
+        recording_animal_age_badge(mouse, recording.recording_date) if show_age else ""
+    )
+    return format_html(
+        '<a class="mouse-link" href="{}"><span>{}</span>{}</a>',
+        reverse("lab:animal_summary", args=[mouse.pk]),
+        mouse.mouse_id,
+        age_badge,
+    )
+
+
+def recording_animal_children(
+    recording,
+    leading_specs,
+    genetics_specs,
+    display_fields,
+    trailing_specs,
+    *,
+    genotype_labels=None,
+    include_select_cell=True,
+):
+    children = []
+    if genotype_labels is None and any(
+        spec.get("format") == "recording_genotype" for spec in genetics_specs
+    ):
+        genotype_labels = genotype_category_labels()
+    mice = sorted(
+        recording.mice.all(),
+        key=lambda mouse: (mouse.mouse_id.lower(), mouse.mouse_id),
+    )
+    for mouse in mice:
+        cells = [{"class": "select-cell", "value": ""}] if include_select_cell else []
+        for spec in leading_specs:
+            cls = spec.get("cell_class", "")
+            if spec.get("format") == "recording_mice":
+                cells.append({"class": cls, "value": format_animal_id_link(mouse, recording)})
+            else:
+                cells.append({"class": cls, "value": ""})
+        for spec in genetics_specs:
+            cls = spec.get("cell_class", "")
+            if spec.get("format") == "recording_crossing":
+                cells.append({"class": cls, "value": mouse.genetics_crossing_display or ""})
+            elif spec.get("format") == "recording_genotype":
+                cells.append({
+                    "class": cls,
+                    "value": mouse.genetics_genotype_zygosity_display_with_labels(
+                        genotype_labels
+                    ) or "",
+                })
+            else:
+                cells.append({"class": cls, "value": ""})
+        for _ in display_fields:
+            cells.append({"class": "recording-field-cell", "value": ""})
+        for spec in trailing_specs:
+            cells.append({"class": spec.get("cell_class", ""), "value": ""})
+        cells.append({"class": "action-cell", "value": ""})
+        children.append({"class": "recording-animal-child", "cells": cells})
+    return children
+
+
+def format_animal_genetics_line(mouse, labels=None):
+    if labels is None:
+        labels = genotype_category_labels()
+    bits = [
+        (mouse.genetics_crossing_display or "").strip(),
+        (mouse.genetics_genotype_zygosity_display_with_labels(labels) or "").strip(),
+    ]
+    bits = [bit for bit in bits if bit]
+
+    if not bits:
+        return ""
+
+    # Crossing on its own line, zygosity on the following line.
+    return format_html(
+        '<div class="recording-animal-genetics">{}</div>',
+        format_html_join("", "<div>{}</div>", ((bit,) for bit in bits)),
+    )
+
+
+def recording_mouse_genetics_labels(recording, attribute, *, genotype_labels=None):
+    labels = []
+
+    for mouse in sorted(recording.mice.all(), key=lambda mouse: mouse.mouse_id.lower()):
+        if attribute in ("genetics_genotype_display", "genetics_genotype_zygosity"):
+            if genotype_labels is None:
+                genotype_labels = genotype_category_labels()
+            if attribute == "genetics_genotype_zygosity":
+                value = mouse.genetics_genotype_zygosity_display_with_labels(genotype_labels)
+            else:
+                value = mouse.genetics_genotype_display_with_labels(genotype_labels)
+        else:
+            value = getattr(mouse, attribute)
+
+        label = (value or "").strip()
+
+        if label and label not in labels:
+            labels.append(label)
+
+    return labels
+
+
+def format_recording_crossing(recording):
+    labels = recording_mouse_genetics_labels(recording, "genetics_crossing_display")
+
+    if not labels:
+        return EMPTY_VALUE
+    if len(labels) == 1:
+        return format_html("{}", labels[0])
+    return format_html("{}", f"{len(labels)} crossings")
+
+
+def format_recording_genotype(recording, *, genotype_labels=None):
+    labels = recording_mouse_genetics_labels(
+        recording,
+        "genetics_genotype_zygosity",
+        genotype_labels=genotype_labels,
+    )
+
+    if not labels:
+        return EMPTY_VALUE
+    if len(labels) == 1:
+        return format_html("{}", labels[0])
+    return format_html("{}", "varies")
 
 
 def recording_animal_age_badge(mouse, recording_date):

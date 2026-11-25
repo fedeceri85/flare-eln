@@ -396,8 +396,6 @@ def build_review(draft, approvals=None, *, parentage_context=None):
                 raise ValidationError("Recording date is required; map a column or enter a shared date.")
             dynamic = {}
             for field_name, field in form.dynamic_fields:
-                if form.is_genotyping_recording() and field.key == "crossing":
-                    continue
                 current_label = mapped_label(definition, table, f"field:{field.key}", field.label)
                 raw = mapped_value(definition, table, row, f"field:{field.key}")
                 if raw != "":
@@ -437,12 +435,6 @@ def build_review(draft, approvals=None, *, parentage_context=None):
     for record in grouped.values():
         try:
             mice = [by_key[k] for k in record["animal_keys"]]
-            if form.is_genotyping_recording():
-                crossings = {a["crossing_id"] for a in mice}
-                if len(crossings) != 1 or None in crossings:
-                    raise ValidationError("Genotyping recordings require animals from one crossing.")
-                if any(field.key == "crossing" for _, field in form.dynamic_fields):
-                    record["values"]["crossing"] = Crossing.objects.get(pk=next(iter(crossings))).display_name
             candidate = Recording(experiment=experiment, recording_type=experiment.recording_type,
                                   recording_date=record["scalars"]["recording_date"],
                                   notes=record["scalars"].get("notes", ""), data_paths=record["paths"], values=record["values"])

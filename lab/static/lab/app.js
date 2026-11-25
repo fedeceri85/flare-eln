@@ -182,3 +182,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
+
+// Toggle per-animal sub-rows (recordings table) so each animal's Crossing and
+// Genotype values expand in line with its ID under the matching column headers.
+document.addEventListener("click", function (event) {
+    const toggle = event.target.closest(".animal-expand-toggle");
+    if (!toggle) return;
+    event.preventDefault();
+    const key = toggle.getAttribute("data-animal-toggle");
+    if (!key) return;
+    const table = toggle.closest("table");
+    if (!table) return;
+    const rows = Array.from(table.querySelectorAll('[data-animal-rows="' + key + '"]'));
+    if (!rows.length) return;
+    const willExpand = toggle.getAttribute("aria-expanded") !== "true";
+    toggle.setAttribute("aria-expanded", String(willExpand));
+    rows.forEach(function (row) { row.hidden = !willExpand; });
+});

@@ -12,7 +12,7 @@ from django.db.models import (
     Q, Subquery, TextField, Value,
 )
 from django.db.models.fields.json import KeyTextTransform, compile_json_path
-from django.db.models.functions import Cast, Lower, NullIf
+from django.db.models.functions import Cast, Coalesce, Lower, NullIf
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -23,7 +23,6 @@ from ..forms.recording_images import RecordingImageUploadForm
 from ..recording_images import discard_image_files, save_images
 from ..models import Mouse, RecordingField
 from ..ui import (
-    CROSSING_FILTER_AUTOCOMPLETE,
     RECORDING_FILTER_SPECS,
     apply_filter_specs,
     build_filter_form,
@@ -166,9 +165,22 @@ class NullableJSONTextTransform(KeyTextTransform):
 
 def order_recordings(recordings, recording_type, sort, direction):
     first_animal = Mouse.objects.filter(recordings=OuterRef("pk")).order_by(Lower("mouse_id"), "mouse_id").values("mouse_id")[:1]
+    first_animal_crossing = (
+        Mouse.objects.filter(recordings=OuterRef("pk"))
+        .annotate(
+            _crossing_sort=Coalesce(
+                NullIf("crossing_definition__display_name", Value("")),
+                NullIf("crossing", Value("")),
+                output_field=TextField(),
+            )
+        )
+        .order_by(Lower("mouse_id"), "mouse_id")
+        .values("_crossing_sort")[:1]
+    )
     expressions = {
         "recording_date": F("recording_date"),
         "mice": Lower(Subquery(first_animal)),
+        "crossing": Lower(Subquery(first_animal_crossing)),
         "data_paths": Lower(NullIf(KeyTextTransform(0, "data_paths"), Value(""), output_field=TextField())),
         "notes": Lower(NullIf(F("notes"), Value(""), output_field=TextField())),
     }
@@ -177,6 +189,8 @@ def order_recordings(recordings, recording_type, sort, direction):
             expressions.pop("data_paths")
         if recording_type.hide_notes_in_table:
             expressions.pop("notes")
+        if recording_type.hide_crossing_in_table:
+            expressions.pop("crossing")
         for field in recording_type.fields.all():
             if not field.active or not field.display_in_table:
                 continue
@@ -283,9 +297,6 @@ def recording_field_filter_specs(recording_type):
                 }
             )
 
-            if recording_field.key == "crossing":
-                spec["autocomplete"] = CROSSING_FILTER_AUTOCOMPLETE
-
         filter_specs.append(spec)
 
     return filter_specs
@@ -368,7 +379,11 @@ def recordings_page(request, project_pk, experiment_pk):
     recordings = (
         experiment.recordings
         .select_related("owner", "experiment", "recording_type")
-        .prefetch_related("mice")
+        .prefetch_related(
+            "mice", "mice__crossing_definition",
+            "mice__crossing_definition__crossing_lines__line",
+            "mice__genotype_calls", "mice__genotype_calls__mouse_line",
+        )
         .all()
     )
     recordings = apply_filter_specs(
@@ -415,6 +430,23 @@ def recordings_page(request, project_pk, experiment_pk):
             )
 
         recordings = recordings.filter(**age_lookup)
+
+    crossing_value = filter_values.get("crossing")
+    if crossing_value:
+        # Match recordings where any animal belongs to this crossing, whether it
+        # is stored as a structured crossing definition or a legacy text value.
+        recordings = recordings.filter(
+            Q(mice__crossing_definition__display_name__icontains=crossing_value)
+            | Q(mice__crossing__icontains=crossing_value)
+        )
+
+    genotype_value = filter_values.get("genotype")
+    if genotype_value:
+        recordings = recordings.filter(
+            Q(mice__genotype__icontains=genotype_value)
+            | Q(mice__genotype_calls__zygosity__icontains=genotype_value)
+            | Q(mice__genotype_calls__mouse_line__name__icontains=genotype_value)
+        )
 
     recordings, sort, direction = order_recordings(
         recordings.distinct(), experiment.recording_type,

@@ -1,3 +1,6 @@
+24/11/2026
+- Display genotyping and crossing in all experiments, not just the genotyping ones.
+
 22/11/2026
 - AI assistant now sees the lab's active crossings in its vocabulary up front (e.g. TMC1), so short animal codes are recognised without an extra tool call; inactive crossings are excluded and the list is capped with a pointer to list_crossings.
 - AI assistant now recognises short animal codes such as gene symbols (e.g. TMC1) as crossings or constituent lines and routes them to the crossing search before giving up.

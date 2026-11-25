@@ -217,6 +217,13 @@ class Crossing(models.Model):
         return f"{self.species} - {self.display_name}"
 
     def ordered_lines(self):
+        cache = getattr(self, "_prefetched_objects_cache", None)
+        if cache is not None and "crossing_lines" in cache:
+            memberships = sorted(
+                cache["crossing_lines"],
+                key=lambda membership: (membership.position, membership.crossing_line_id),
+            )
+            return [membership.line for membership in memberships]
         return [
             membership.line
             for membership in self.crossing_lines.select_related("line").order_by(
@@ -403,27 +410,70 @@ class Mouse(models.Model):
 
         return self.get_crossing_type_display()
 
-    @property
-    def genetics_genotype_display(self):
+    def genetics_genotype_display_with_labels(self, labels):
         if not self.crossing_definition_id:
             return self.genotype
 
-        calls_by_line = {
-            call.mouse_line_id: call
-            for call in self.genotype_calls.select_related("mouse_line")
-        }
+        calls_by_line = {call.mouse_line_id: call for call in self._genotype_calls()}
         genotype_calls = [
             calls_by_line[line.pk]
             for line in self.crossing_definition.ordered_lines()
             if line.pk in calls_by_line
         ]
 
-        labels = genotype_category_labels()
         return "; ".join(
             f"{call.mouse_line.name}: {labels.get(call.zygosity, call.zygosity)}"
             + (" (uncertain)" if call.is_uncertain else "")
             for call in genotype_calls
         )
+
+    def genetics_genotype_zygosity_display_with_labels(self, labels):
+        """Compact zygosity-only string in crossing-line order.
+
+        Used in the recordings table and its exports, where the crossing
+        column sits alongside and the reader maps zygosity to line by
+        position. Returns e.g. ``"Het; Het; Hom"`` instead of the full
+        ``"Gria2: Het; GCaMP: Het; Neuro: Hom"`` form.
+        """
+        if not self.crossing_definition_id:
+            return self.genotype
+
+        calls_by_line = {call.mouse_line_id: call for call in self._genotype_calls()}
+        values = []
+
+        for line in self.crossing_definition.ordered_lines():
+            call = calls_by_line.get(line.pk)
+            if call is None:
+                values.append("—")
+                continue
+
+            values.append(
+                labels.get(call.zygosity, call.zygosity)
+                + (" (uncertain)" if call.is_uncertain else "")
+            )
+
+        return "; ".join(values)
+
+    def _genotype_calls(self):
+        """Return this mouse's genotype calls, using the prefetch cache when
+        available so rendering does not trigger a per-mouse query.
+
+        ``select_related`` on a related manager creates a new queryset that
+        bypasses ``prefetch_related`` results, so we only fall back to it when
+        the calls were not prefetched.
+        """
+        cache = getattr(self, "_prefetched_objects_cache", None)
+        if cache is not None and "genotype_calls" in cache:
+            return list(cache["genotype_calls"])
+        return list(self.genotype_calls.select_related("mouse_line"))
+
+    @property
+    def genetics_genotype_display(self):
+        return self.genetics_genotype_display_with_labels(genotype_category_labels())
+
+    @property
+    def genetics_genotype_zygosity_display(self):
+        return self.genetics_genotype_zygosity_display_with_labels(genotype_category_labels())
 
 
 class CrossingLine(models.Model):
@@ -815,6 +865,8 @@ class RecordingType(models.Model):
 
     hide_data_paths_in_table = models.BooleanField(default=False)
     hide_notes_in_table = models.BooleanField(default=False)
+    hide_crossing_in_table = models.BooleanField(default=False)
+    hide_genotype_in_table = models.BooleanField(default=False)
     show_animal_age = models.BooleanField(
         default=True,
         verbose_name="Show animal age",

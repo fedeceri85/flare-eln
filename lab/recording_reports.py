@@ -7,7 +7,7 @@ from xml.sax.saxutils import escape
 
 from django.utils import timezone
 
-from .models import format_postnatal_age
+from .models import format_postnatal_age, genotype_category_labels
 from .ui import recording_field_label
 
 
@@ -20,11 +20,14 @@ def recording_report_data(experiment, recordings):
     if show_animal_age:
         headings.append("Age at recording")
         widths.append(20)
+    headings.extend(["Crossing", "Genotype"])
+    widths.extend([28, 28])
     headings.extend(recording_field_label(field) for field in fields)
     widths.extend(24 for _ in fields)
     headings.extend(["Recording Paths", "Notes"])
     widths.extend([40, 44])
     rows = []
+    genotype_labels = genotype_category_labels()
     for recording in recordings:
         mice = sorted(
             recording.mice.all(), key=lambda mouse: mouse.mouse_id.lower()
@@ -47,6 +50,22 @@ def recording_report_data(experiment, recordings):
                 format_postnatal_age(mouse.age_on(recording.recording_date)) or "—"
                 for mouse in mice
             ))
+        row.extend([
+            "\n".join(
+                (mouse.genetics_crossing_display or "").strip() or "—"
+                for mouse in mice
+            ),
+            "\n".join(
+                (
+                    mouse.genetics_genotype_zygosity_display_with_labels(
+                        genotype_labels
+                    )
+                    or ""
+                ).strip()
+                or "—"
+                for mouse in mice
+            ),
+        ])
         row.extend(values)
         row.extend(["\n".join(recording.data_paths), recording.notes])
         rows.append(row)
