@@ -746,6 +746,9 @@ def _edit_selected_mice(request, selected_protocol=None):
             "return_url": return_url,
             "can_add_bulk_procedure": can_add_bulk_procedure,
             "animal_recording_sections": build_animal_recording_sections(selected_mice, request.user),
+            # Where the shared recordings component's per-experiment export links
+            # should send the user back after choosing a report format.
+            "export_return_url": recording_return_url,
             "recording_destination_form": recording_destination_form,
             "recording_destination_options": recording_destination_form.destination_options,
             "recording_project_options": recording_destination_form.project_options,

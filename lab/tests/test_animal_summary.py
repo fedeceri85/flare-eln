@@ -387,6 +387,44 @@ class AnimalSummaryTests(AuthenticatedTestCase):
             3,
         )
 
+    def test_services_offer_export_for_each_experiment_returning_to_the_summary(self):
+        self.genotyping_recording(self.mice[:1])
+        response, markup = self.summary(mouse_editor_tab="services")
+        self.services_panel(response)
+        experiments = [
+            experiment_group["experiment"]
+            for type_group in response.context["animal_recording_sections"]
+            for project_group in type_group["projects"]
+            for experiment_group in project_group["experiments"]
+        ]
+        export_links = [node for node in markup.find("a") if node.text.strip() == "Export" and node.within("section", id="mouse-panel-services")]
+        self.assertEqual(len(export_links), len(experiments))
+        for link, experiment in zip(export_links, experiments):
+            self.assertIn("button", link.attrs["class"])
+            url = urlsplit(link.attrs["href"])
+            self.assertEqual(url.path, reverse("lab:recording_report", args=[experiment.project_id, experiment.pk]))
+            self.assertEqual(parse_qs(url.query)["return_url"], [response.context["export_return_url"]])
+
+    def test_editor_services_offer_export_returning_to_the_editor(self):
+        self.genotyping_recording(self.mice[:1])
+        response = self.client.get(self.edit_url, {
+            "selected_mouse": [mouse.pk for mouse in self.mice], "mouse_editor_tab": "services",
+        })
+        self.assertEqual(response.status_code, 200)
+        markup, _ = self.services_panel(response)
+        experiments = [
+            experiment_group["experiment"]
+            for type_group in response.context["animal_recording_sections"]
+            for project_group in type_group["projects"]
+            for experiment_group in project_group["experiments"]
+        ]
+        export_links = [node for node in markup.find("a") if node.text.strip() == "Export" and node.within("section", id="mouse-panel-services")]
+        self.assertEqual(len(export_links), len(experiments))
+        for link, experiment in zip(export_links, experiments):
+            url = urlsplit(link.attrs["href"])
+            self.assertEqual(url.path, reverse("lab:recording_report", args=[experiment.project_id, experiment.pk]))
+            self.assertEqual(parse_qs(url.query)["return_url"], [response.context["export_return_url"]])
+
     def test_services_recording_actions_date_and_animal_navigation(self):
         self.genotyping_recording(self.mice[:1])
         image = RecordingImage.objects.create(recording=self.recording,

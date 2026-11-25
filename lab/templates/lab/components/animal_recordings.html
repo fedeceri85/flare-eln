@@ -7,7 +7,9 @@
             {% for project_group in type_group.projects %}
                 <h4 class="subsection-title">Project: {{ project_group.project_title }}</h4>
                 {% for experiment_group in project_group.experiments %}
-                    <h5 class="subsubsection-title">Experiment: {{ experiment_group.experiment_title }}</h5>
+                    <h5 class="subsubsection-title">Experiment: {{ experiment_group.experiment_title }}
+                        <a class="button" title="Export all recordings for this experiment" href="{% url 'lab:recording_report' experiment_group.experiment.project.pk experiment_group.experiment.pk %}?return_url={{ export_return_url|urlencode }}">Export</a>
+                    </h5>
                     {% include "lab/components/table.html" with table=experiment_group.table %}
                 {% endfor %}
             {% endfor %}

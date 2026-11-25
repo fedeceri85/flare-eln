@@ -116,6 +116,9 @@ def animal_summary_context(request, mice, *, summary_url, edit_url):
         ),
         "read_only": True,
         "summary_url": summary_url,
+        # Where the shared recordings component's per-experiment export links
+        # should send the user back after choosing a report format.
+        "export_return_url": summary_url,
         "active_tab": active_tab,
         "edit_animals_url": url_with_query_params(
             edit_url, selected_mouse=[mouse.pk for mouse in mice],
