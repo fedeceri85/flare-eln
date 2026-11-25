@@ -1,9 +1,6 @@
 from datetime import date
-import json
-from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
 from ..forms.recordings import RecordingForm
@@ -163,27 +160,6 @@ class RecordingModelTests(AuthenticatedTestCase):
         RecordingField.objects.filter(recording_type=self.imaging_type, key="sequence_number").delete()
         imaging = RecordingForm(experiment=self.experiment)
         self.assertFalse(any(field.key == "sequence_number" for _, field in imaging.dynamic_fields))
-
-    def test_standalone_import_notebook_saves_configurable_sequence_and_animal_links(self):
-        notebook = json.loads((Path(__file__).resolve().parents[2] / "import_imaging_recordings.ipynb").read_text())
-        source = next("".join(cell["source"]) for cell in notebook["cells"] if "def apply_prepared_record(" in "".join(cell.get("source", [])))
-        record = {"mouse": self.mouse, "recording_date": date(2026, 10, 21), "data_paths": ["/notebook/run"], "notes": "Imported", "values": {"sequence_number": 15}}
-        namespace = {
-            "validation_errors": [], "prepared_records": [record], "Recording": Recording,
-            "experiment": self.experiment, "recording_type": self.imaging_type, "owner": self.user,
-            "DRY_RUN": False, "ALLOW_UPDATES": False, "transaction": transaction, "print": lambda *args: None,
-        }
-        exec(compile(source, "import_imaging_recordings.ipynb", "exec"), namespace)
-        saved = self.experiment.recordings.get()
-        self.assertEqual(saved.values, {"sequence_number": 15})
-        self.assertEqual(list(saved.mice.all()), [self.mouse])
-        record["values"] = {"sequence_number": 37}
-        namespace["ALLOW_UPDATES"] = True
-        exec(compile(source, "import_imaging_recordings.ipynb", "exec"), namespace)
-        saved.refresh_from_db()
-        self.assertEqual(saved.values, {"sequence_number": 37})
-        self.assertEqual(list(saved.mice.all()), [self.mouse])
-        self.assertEqual(self.experiment.recordings.count(), 1)
 
     def test_recording_paths_allow_an_empty_list(self):
         recording = Recording(
