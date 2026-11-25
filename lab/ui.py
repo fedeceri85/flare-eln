@@ -1736,14 +1736,6 @@ def format_procedure_status(procedures, severity_exceeded=False):
             )
         )
 
-    if procedure.lab_book_page:
-        parts.append(
-            format_html(
-                '<div class="procedure-detail">Page {}</div>',
-                procedure.lab_book_page,
-            )
-        )
-
     return format_html_join("", "{}", ((part,) for part in parts))
 
 

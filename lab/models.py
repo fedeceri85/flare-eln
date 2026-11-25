@@ -713,7 +713,6 @@ class Procedure(models.Model):
 
     date = models.DateField(null=True, blank=True)
     lab_member = models.CharField(max_length=100, blank=True)
-    lab_book_page = models.CharField(max_length=50, blank=True)
 
     mouse = models.ForeignKey(
         Mouse,

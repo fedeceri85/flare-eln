@@ -20,7 +20,7 @@ class ExistingProcedureBulkTests(TestCase):
         self.outside = Mouse.objects.create(mouse_id="Outside", protocol=self.other_protocol)
         self.types = [ProcedureType.objects.create(name=name) for name in ("First", "Second")]
         self.records = [Procedure.objects.create(mouse=mouse, procedure_type=self.types[index % 2],
-                         date=date(2026, 1, index + 1), lab_member="Original", lab_book_page="42", notes="Keep notes")
+                         date=date(2026, 1, index + 1), lab_member="Original", notes="Keep notes")
                         for index, mouse in enumerate([self.mice[0], self.mice[0], self.mice[1], self.outside])]
         self.client.force_login(get_user_model().objects.create_user(username="procedure-editor"))
         self.urls = [reverse("lab:edit_selected_mice_all"), reverse("lab:edit_selected_mice_licence_protocol", kwargs={
@@ -65,19 +65,16 @@ class ExistingProcedureBulkTests(TestCase):
                     record.refresh_from_db()
                     self.assertEqual(record.lab_member, "Updated" if index in (0, 2) else "Original")
                     self.assertEqual(record.notes, "Keep notes")
-                    self.assertEqual(record.lab_book_page, "42")
                     self.assertEqual(record.mouse_id, ([self.mice[0], self.mice[0], self.mice[1], self.outside][index]).pk)
                 self.assertFalse(Mouse.objects.filter(notes="Wrong").exists())
 
     def test_checked_blank_fields_clear_and_unchecked_values_ignored(self):
         data = self.data(**{"existing_procedures-update_date": "on", "existing_procedures-date": "",
-                            "existing_procedures-update_lab_book_page": "on", "existing_procedures-lab_book_page": "",
                             "existing_procedures-lab_member": "", "existing_procedures-procedure_type": "invalid"})
         self.assertEqual(self.post(self.save_data(data)).status_code, 200)
         self.records[0].refresh_from_db()
         self.assertIsNone(self.records[0].date)
         self.assertEqual(self.records[0].lab_member, "")
-        self.assertEqual(self.records[0].lab_book_page, "")
         self.assertEqual(self.records[0].procedure_type_id, self.types[0].pk)
 
     def test_checked_type_requires_valid_choice(self):
@@ -195,7 +192,7 @@ class ExistingProcedureBulkTests(TestCase):
         self.assertFalse(Procedure.objects.filter(lab_member="Updated").exists())
 
     def test_unchecked_invalid_fields_are_ignored_and_preview_shows_before_after(self):
-        data = self.data(**{"existing_procedures-date": "invalid", "existing_procedures-lab_book_page": "x" * 100})
+        data = self.data(**{"existing_procedures-date": "invalid"})
         response = self.post(data)
         self.assertEqual(response.status_code, 200)
         preview = response.context["procedure_preview"]
@@ -205,7 +202,6 @@ class ExistingProcedureBulkTests(TestCase):
         self.assertEqual(self.post({**data, "existing_procedure_action": "save", "existing_procedures-snapshot": token}).status_code, 200)
         self.records[0].refresh_from_db()
         self.assertEqual(self.records[0].date, date(2026, 1, 1))
-        self.assertEqual(self.records[0].lab_book_page, "42")
 
     def deletion_data(self):
         response = self.client.get(self.url, {"selected_mouse": [mouse.pk for mouse in self.mice]})

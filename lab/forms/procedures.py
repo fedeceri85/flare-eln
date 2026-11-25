@@ -13,13 +13,11 @@ class BaseProcedureForm(forms.ModelForm):
             "procedure_type",
             "date",
             "lab_member",
-            "lab_book_page",
             "notes",
         ]
         labels = {
             "procedure_type": "Procedure type",
             "date": "Date",
-            "lab_book_page": "Lab-book page",
         }
         widgets = {
             "date": forms.DateInput(
@@ -96,13 +94,13 @@ def validate_procedure_drafts(drafts):
     for index, draft in enumerate(drafts, 1):
         if (not isinstance(draft, dict)
                 or any(not isinstance(draft.get(name, ""), str)
-                       for name in ("date", "lab_member", "lab_book_page", "notes"))
+                       for name in ("date", "lab_member", "notes"))
                 or not isinstance(draft.get("procedure_type", ""), (str, int))
                 or isinstance(draft.get("procedure_type"), bool)):
             raise forms.ValidationError(f"Procedure {index}: invalid procedure details.")
         procedure_form = BulkProcedureCreateForm({
             f"new_procedure-{name}": draft.get(name, "")
-            for name in ("procedure_type", "date", "lab_member", "lab_book_page", "notes")
+            for name in ("procedure_type", "date", "lab_member", "notes")
         })
         if not procedure_form.is_valid():
             errors = "; ".join(
@@ -126,9 +124,7 @@ class ExistingProcedureBulkForm(forms.Form):
     date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}, format=HTML_DATE_FORMAT))
     update_lab_member = forms.BooleanField(required=False, label="Update lab member")
     lab_member = forms.CharField(required=False, max_length=100)
-    update_lab_book_page = forms.BooleanField(required=False, label="Update lab-book page")
-    lab_book_page = forms.CharField(required=False, max_length=50, label="Lab-book page")
-    editable_fields = ("procedure_type", "date", "lab_member", "lab_book_page")
+    editable_fields = ("procedure_type", "date", "lab_member")
 
     def __init__(self, *args, procedures, deleting=False, **kwargs):
         self.deleting = deleting

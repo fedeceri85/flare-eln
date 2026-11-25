@@ -42,7 +42,7 @@ class ProcedureNotesTests(TestCase):
         self.assertTrue(html.find("textarea", name="notes"))
         response = self.client.post(url, {
             "procedure_type": self.procedure.procedure_type_id,
-            "date": "", "lab_member": "AB", "lab_book_page": "42",
+            "date": "", "lab_member": "AB",
             "notes": "Newly captured notes",
         })
         self.assertEqual(response.status_code, 302)
@@ -55,7 +55,7 @@ class ProcedureNotesTests(TestCase):
             url,
             {
                 "procedure_type": self.procedure.procedure_type_id,
-                "date": "", "lab_member": "AB", "lab_book_page": "42",
+                "date": "", "lab_member": "AB",
                 "notes": "Procedure notes after save",
             },
             follow=True,
@@ -94,7 +94,7 @@ class ProcedureNotesTests(TestCase):
             individual.request["PATH_INFO"],
             {
                 "procedure_type": self.procedure.procedure_type_id,
-                "date": "", "lab_member": "AB", "lab_book_page": "42",
+                "date": "", "lab_member": "AB",
                 "notes": "Saved from the procedures tab",
             },
             follow=True,
@@ -136,7 +136,7 @@ class ProcedureNotesTests(TestCase):
             edit_link,
             {
                 "procedure_type": self.procedure.procedure_type_id,
-                "date": "", "lab_member": "AB", "lab_book_page": "42",
+                "date": "", "lab_member": "AB",
                 "notes": "Saved from the procedures tab",
             },
             follow=True,

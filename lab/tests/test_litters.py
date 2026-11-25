@@ -62,7 +62,6 @@ class AddLitterTests(AuthenticatedTestCase):
             "procedure_type": "",
             "procedure_date": "",
             "procedure_lab_member": "",
-            "procedure_lab_book_page": "",
             **crossing_post_data(self.crossing, self.crossing_lines),
         }
         payload.update(overrides)
@@ -152,7 +151,7 @@ class AddLitterTests(AuthenticatedTestCase):
                 mouse_id_prefix="L-",
                 procedure_drafts=json.dumps([{
                     "procedure_type": self.procedure_type.pk, "date": "2026-07-25",
-                    "lab_member": "AB", "lab_book_page": "42",
+                    "lab_member": "AB",
                 }]),
             ),
         )
@@ -212,9 +211,6 @@ class AddLitterTests(AuthenticatedTestCase):
         )
         self.assertTrue(
             all(procedure.lab_member == "AB" for procedure in procedures)
-        )
-        self.assertTrue(
-            all(procedure.lab_book_page == "42" for procedure in procedures)
         )
         self.assertTrue(
             all(procedure.date == date(2026, 7, 25) for procedure in procedures)

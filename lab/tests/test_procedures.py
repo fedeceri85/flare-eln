@@ -398,14 +398,12 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(self.current_year, 7, 1),
             lab_member="EARLIER-MEMBER",
-            lab_book_page="1",
         )
         Procedure.objects.create(
             mouse=self.mouse_a1,
             procedure_type=self.procedure_type,
             date=date(self.current_year, 7, 22),
             lab_member="NEW",
-            lab_book_page="2",
         )
 
         response = self.client.get(
@@ -421,9 +419,7 @@ class ProcedurePageLicenceTests(AuthenticatedTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "2 procedures total")
         self.assertContains(response, "NEW")
-        self.assertContains(response, "Page 2")
         self.assertNotContains(response, "EARLIER-MEMBER")
-        self.assertNotContains(response, "Page 1")
 
     def test_protocol_page_marks_procedure_checkmarks_when_severity_exceeded(self):
         self.protocol_a1.max_severity = "Mild"

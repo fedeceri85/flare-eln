@@ -14,7 +14,7 @@ from .forms import ExistingProcedureBulkForm
 from .models import Mouse, Procedure, ProcedureType
 
 SALT = "lab.existing-procedure-bulk.v1"
-FIELDS = ("procedure_type_id", "date", "lab_member", "lab_book_page")
+FIELDS = ("procedure_type_id", "date", "lab_member")
 
 
 def procedure_queryset(mice, protocol=None):

@@ -351,7 +351,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(2026, 7, 1),
             lab_member="OLD",
-            lab_book_page="1",
         )
 
         response = self.client.post(
@@ -369,8 +368,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "procedure_date": "2026-07-15",
                 "update_procedure_lab_member": "on",
                 "procedure_lab_member": "AB",
-                "update_procedure_lab_book_page": "on",
-                "procedure_lab_book_page": "42",
             },
         )
 
@@ -387,7 +384,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
 
         existing_procedure.refresh_from_db()
         self.assertEqual(existing_procedure.lab_member, "OLD")
-        self.assertEqual(existing_procedure.lab_book_page, "1")
         self.assertEqual(existing_procedure.date, date(2026, 7, 1))
 
         self.assertEqual(Procedure.objects.count(), 1)
@@ -943,7 +939,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "return_url": self.return_url,
                 "selected_mouse": [self.mouse_1.pk],
                 "procedure_drafts": json.dumps([{"procedure_type": self.procedure_type.pk,
-                                                  "date": "2026-07-20", "lab_member": "AB", "lab_book_page": "42"}]),
+                                                  "date": "2026-07-20", "lab_member": "AB"}]),
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
@@ -955,7 +951,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         )
         self.assertEqual(procedure.date, date(2026, 7, 20))
         self.assertEqual(procedure.lab_member, "AB")
-        self.assertEqual(procedure.lab_book_page, "42")
 
     def test_single_mouse_edit_adds_duplicate_procedure(self):
         existing_procedure = Procedure.objects.create(
@@ -963,7 +958,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(2026, 7, 1),
             lab_member="OLD",
-            lab_book_page="1",
         )
 
         response = self.client.post(
@@ -973,7 +967,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "return_url": self.return_url,
                 "selected_mouse": [self.mouse_1.pk],
                 "procedure_drafts": json.dumps([{"procedure_type": self.procedure_type.pk,
-                                                  "date": "2026-07-21", "lab_member": "CD", "lab_book_page": "99"}]),
+                                                  "date": "2026-07-21", "lab_member": "CD"}]),
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
@@ -989,7 +983,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         existing_procedure.refresh_from_db()
         self.assertEqual(existing_procedure.date, date(2026, 7, 1))
         self.assertEqual(existing_procedure.lab_member, "OLD")
-        self.assertEqual(existing_procedure.lab_book_page, "1")
 
         new_procedure = Procedure.objects.exclude(
             pk=existing_procedure.pk,
@@ -999,7 +992,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         )
         self.assertEqual(new_procedure.date, date(2026, 7, 21))
         self.assertEqual(new_procedure.lab_member, "CD")
-        self.assertEqual(new_procedure.lab_book_page, "99")
 
     def test_mouse_edit_renders_procedure_date_edit_and_delete_buttons(self):
         Procedure.objects.create(
@@ -1007,7 +999,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(2026, 7, 20),
             lab_member="AB",
-            lab_book_page="42",
         )
 
         response = self.client.get(
@@ -1026,14 +1017,12 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(2026, 7, 20),
             lab_member="AB",
-            lab_book_page="42",
         )
         other_procedure = Procedure.objects.create(
             mouse=self.mouse_1,
             procedure_type=self.procedure_type,
             date=date(2026, 7, 22),
             lab_member="EF",
-            lab_book_page="88",
         )
         edit_url = reverse(
             "lab:edit_mouse_procedure",
@@ -1051,7 +1040,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "procedure_type": self.procedure_type.pk,
                 "date": "2026-07-21",
                 "lab_member": "CD",
-                "lab_book_page": "99",
             },
         )
 
@@ -1066,10 +1054,8 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         other_procedure.refresh_from_db()
         self.assertEqual(procedure_to_edit.date, date(2026, 7, 21))
         self.assertEqual(procedure_to_edit.lab_member, "CD")
-        self.assertEqual(procedure_to_edit.lab_book_page, "99")
         self.assertEqual(other_procedure.date, date(2026, 7, 22))
         self.assertEqual(other_procedure.lab_member, "EF")
-        self.assertEqual(other_procedure.lab_book_page, "88")
 
     def test_animal_summary_renders_procedure_date(self):
         Procedure.objects.create(
@@ -1077,7 +1063,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(2026, 7, 20),
             lab_member="AB",
-            lab_book_page="42",
         )
 
         response = self.client.get(
@@ -1093,7 +1078,6 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             procedure_type=self.procedure_type,
             date=date(2026, 7, 20),
             lab_member="AB",
-            lab_book_page="42",
         )
 
         response = self.client.post(

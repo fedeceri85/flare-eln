@@ -547,7 +547,7 @@ def commit_import(draft_id, owner, experiment, approvals):
     procedure_ids = []
     for entry in preview["procedures"]:
         mouse = Mouse.objects.select_related("protocol").get(pk=saved[entry["animal_key"]].pk)
-        form = ProcedureCreateForm(data={key: entry[key] for key in ("procedure_type", "date", "lab_member", "lab_book_page")}, mouse=mouse)
+        form = ProcedureCreateForm(data={key: entry[key] for key in ("procedure_type", "date", "lab_member")}, mouse=mouse)
         if not form.is_valid():
             raise ValidationError([f"Animal {mouse.pk}, {field}: {', '.join(messages)}" for field, messages in form.errors.items()])
         procedure = form.save(commit=False)

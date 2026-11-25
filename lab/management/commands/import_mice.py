@@ -264,9 +264,6 @@ class Command(BaseCommand):
                         "mouse": mouse,
                         "procedure_type": procedure_type,
                         "lab_member": self.clean_text(row[self.COL_LAB_MEMBER]),
-                        "lab_book_page": self.clean_text(
-                            row[self.COL_LAB_BOOK_PAGE]
-                        ),
                     }
                     procedure_created = False
 

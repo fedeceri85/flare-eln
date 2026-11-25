@@ -42,7 +42,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         procedure_type = ProcedureType.objects.create(name="Summary procedure")
         self.procedure = Procedure.objects.create(
             mouse=self.mice[0], procedure_type=procedure_type, date=date(2026, 2, 3),
-            lab_member="Scientist", lab_book_page="Page 15", notes="Procedure notes",
+            lab_member="Scientist", notes="Procedure notes",
         )
         Procedure.objects.create(mouse=self.other_mouse, procedure_type=procedure_type, lab_member="Unrelated scientist")
 
@@ -226,7 +226,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
     def test_procedures_only_include_linked_animals_and_preserve_notes(self):
         response, markup = self.summary(mouse_editor_tab="procedures")
         panel = next(node for node in markup.find("section") if node.attrs.get("id") == "mouse-panel-procedures")
-        for text in (self.mice[0].pk, "Summary procedure", "03/02/2026", "Scientist", "Page 15", "Procedure notes"):
+        for text in (self.mice[0].pk, "Summary procedure", "03/02/2026", "Scientist", "Procedure notes"):
             self.assertIn(text, panel.text)
         self.assertNotContains(response, "Unrelated scientist")
         self.assertEqual(list(response.context["procedures"]), [self.procedure])
@@ -610,7 +610,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
             if node.within("section", **{"data-mouse-tab-panel": "procedures"})
         ]
         self.assertEqual(
-            ["Animal ID", "Procedure type", "Date", "Age", "Lab member", "Lab-book page", "Notes", "Actions"],
+            ["Animal ID", "Procedure type", "Date", "Age", "Lab member", "Notes", "Actions"],
             headings,
         )
         self.assertContains(response, "P32")

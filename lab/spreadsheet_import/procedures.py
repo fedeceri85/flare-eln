@@ -7,7 +7,7 @@ def procedure_definitions(raw):
     return [{
         "procedure_type": entry["procedure_type"].pk,
         "date": entry["date"].isoformat() if entry["date"] else "",
-        "lab_member": entry["lab_member"], "lab_book_page": entry["lab_book_page"],
+        "lab_member": entry["lab_member"],
     } for entry in validate_procedure_drafts(raw)]
 
 
@@ -39,6 +39,6 @@ def build_procedure_review(definition, animals, approvals):
                 "procedure_type": entry["procedure_type"].pk,
                 "procedure_name": entry["procedure_type"].name,
                 "date": entry["date"].isoformat() if entry["date"] else "",
-                "lab_member": entry["lab_member"], "lab_book_page": entry["lab_book_page"],
+                "lab_member": entry["lab_member"],
             })
     return rows, errors

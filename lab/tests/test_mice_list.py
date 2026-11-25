@@ -377,7 +377,7 @@ class MicePageTests(AuthenticatedTestCase):
                 "notes": "No protocol litter",
                 "procedure_drafts": json.dumps([{
                     "procedure_type": self.procedure_type.pk, "date": "2026-07-29",
-                    "lab_member": "AB", "lab_book_page": "10",
+                    "lab_member": "AB",
                 }]),
                 **crossing_post_data(crossing, lines),
             },

@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const importing = form.dataset?.procedureScope === "import";
     const editingAnimals = form.dataset?.procedureScope === "animal";
     const scope = importing ? "import" : editingAnimals ? "selection" : "litter";
-    const names = ["procedure_type", "date", "lab_member", "lab_book_page", "notes"];
+    const names = ["procedure_type", "date", "lab_member", "notes"];
     const fields = Object.fromEntries(names.map(name => [name, form.elements.namedItem("new_procedure-" + name)]));
     const rows = document.querySelector("[data-litter-procedures-rows]");
     const table = document.querySelector("[data-litter-procedures-table]");

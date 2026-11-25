@@ -1251,7 +1251,7 @@ class SpreadsheetImportTests(TestCase):
 
     def procedure_entry(self, **changes):
         kind, _ = ProcedureType.objects.get_or_create(name="Import test procedure")
-        return {"procedure_type": kind.pk, "date": "2026-10-21", "lab_member": "AB", "lab_book_page": "001", **changes}
+        return {"procedure_type": kind.pk, "date": "2026-10-21", "lab_member": "AB", **changes}
 
     def test_penultimate_step_reuses_add_animals_procedure_editor_without_nested_forms(self):
         draft = self.draft()
@@ -1286,7 +1286,6 @@ class SpreadsheetImportTests(TestCase):
         self.assertEqual(result["procedures"], 2)
         rows = list(self.mouse.procedures.order_by("pk"))
         self.assertEqual(rows[0].date, date(2026, 10, 21))
-        self.assertEqual(rows[0].lab_book_page, "001")
         self.assertIsNone(rows[1].date)
         self.assertEqual(rows[1].lab_member, "CD")
         self.assertEqual(commit_import(draft.pk, self.user, self.experiment, []), result)
@@ -1342,7 +1341,7 @@ class SpreadsheetImportTests(TestCase):
     def test_review_shows_procedures_with_each_animals_details_and_change_approvals(self):
         draft = self.draft("Date,Mouse ID,Sex\n28.04.26,OFFICIAL-1,Female\n28.04.26,NEW-ID,Female\n")
         draft.configuration["defaults"].update(protocol_id=self.protocol.pk, crossing_id=self.crossing.pk)
-        draft.configuration["procedure_drafts"] = [self.procedure_entry(), self.procedure_entry(date="", lab_member="CD", lab_book_page="")]
+        draft.configuration["procedure_drafts"] = [self.procedure_entry(), self.procedure_entry(date="", lab_member="CD")]
         preview = self.reviewed(draft)
         response = self.client.get(self.url(draft), {"step": "review"})
         markup = Markup(response.content.decode())
@@ -1356,7 +1355,7 @@ class SpreadsheetImportTests(TestCase):
             self.assertIn(animal["mouse_id"], row.text)
             self.assertIn("Link" if animal["existing"] else "Create", row.text)
             self.assertEqual(row.text.count("Import test procedure"), 2)
-            for detail in ("2026-10-21", "AB", "001", "CD", "—"):
+            for detail in ("2026-10-21", "AB", "CD", "—"):
                 self.assertIn(detail, row.text)
             if animal["existing"]:
                 self.assertIn("Apply Sex", row.text)
@@ -1369,7 +1368,7 @@ class SpreadsheetImportTests(TestCase):
     def test_invalid_procedure_queue_preserves_draft_and_creates_nothing(self):
         draft = self.draft()
         valid = self.procedure_entry()
-        invalids = ["text", [None], [{**valid, "procedure_type": 999999}], [{**valid, "procedure_type": True}], [{**valid, "date": "bad"}], [{**valid, "lab_member": []}], [{**valid, "lab_book_page": "x" * 51}], [valid] * 101]
+        invalids = ["text", [None], [{**valid, "procedure_type": 999999}], [{**valid, "procedure_type": True}], [{**valid, "date": "bad"}], [{**valid, "lab_member": []}], [{**valid, "lab_member": "x" * 101}], [valid] * 101]
         for entries in invalids:
             with self.subTest(entries=str(entries)[:80]):
                 page = self.client.get(self.url(draft), {"step": "procedures"})
@@ -1418,7 +1417,7 @@ class SpreadsheetImportTests(TestCase):
         second = self.draft("Mouse ID,Date\nOFFICIAL-1,30.04.26\n")
         second.configuration = json.loads(json.dumps(first.configuration))
         self.assertEqual(len(build_review(second)["procedures"]), 1)
-        self.assertEqual(set(second.configuration["procedure_drafts"][0]), {"procedure_type", "date", "lab_member", "lab_book_page"})
+        self.assertEqual(set(second.configuration["procedure_drafts"][0]), {"procedure_type", "date", "lab_member"})
 
     def test_procedure_failure_rolls_back_recordings_animals_and_approved_updates(self):
         draft = self.draft("Date,Mouse ID,Sex\n28.04.26,OFFICIAL-1,Female\n28.04.26,NEW-ID,Female\n")

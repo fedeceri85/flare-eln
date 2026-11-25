@@ -303,7 +303,7 @@ requires removing existing procedures first.
 For existing procedures, tick the exact procedure rows and the fields to change.
 Enter new values → **Preview procedure changes** → review Before/After →
 **Save procedure changes**. Checked blanks clear optional dates, lab members
-or lab-book pages. Previews expire after one hour. These edits save separately
+or lab members. Previews expire after one hour. These edits save separately
 from animal details. A procedure row's **Edit** opens an individual editor with
 **Save procedure**. **Delete selected procedures** has its own confirmation and
 targets the selected procedure records only.

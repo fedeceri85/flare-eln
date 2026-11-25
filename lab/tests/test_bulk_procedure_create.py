@@ -26,7 +26,7 @@ class BulkProcedureCreationTests(TestCase):
         self.url = self.urls[0]
 
     def draft(self, **extra):
-        return {"procedure_type": self.kind.pk, "date": "2026-10-21", "lab_member": "AB", "lab_book_page": "007", **extra}
+        return {"procedure_type": self.kind.pk, "date": "2026-10-21", "lab_member": "AB", **extra}
 
     def payload(self, drafts=None, **extra):
         return {"apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
@@ -52,7 +52,7 @@ class BulkProcedureCreationTests(TestCase):
             self.assertEqual(response.status_code, 302)
         self.assertEqual(Procedure.objects.count(), 4)
         for record in Procedure.objects.all():
-            self.assertEqual((record.date, record.lab_member, record.lab_book_page), (date(2026, 10, 21), "AB", "007"))
+            self.assertEqual((record.date, record.lab_member), (date(2026, 10, 21), "AB"))
         for mouse in self.mice:
             mouse.refresh_from_db()
             self.assertEqual((mouse.status, mouse.notes, mouse.protocol_id), ("Alive", "Keep notes", self.protocol.pk))
@@ -131,9 +131,9 @@ class BulkProcedureCreationTests(TestCase):
         self.assertEqual(set(Procedure.objects.values_list("mouse_id", flat=True)), {"Renamed animal", self.mice[1].pk})
 
     def test_optional_details_and_malformed_lists(self):
-        response = self.client.post(self.url, self.payload([self.draft(date="", lab_member="", lab_book_page="")]))
+        response = self.client.post(self.url, self.payload([self.draft(date="", lab_member="")]))
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(all(record.date is None and record.lab_member == "" and record.lab_book_page == "" for record in Procedure.objects.all()))
+        self.assertTrue(all(record.date is None and record.lab_member == "" for record in Procedure.objects.all()))
         for value in ('{}', '[null]', 'invalid', json.dumps([self.draft()] * 101)):
             response = self.client.post(self.url, self.payload([], procedure_drafts=value))
             self.assertEqual(response.status_code, 200)

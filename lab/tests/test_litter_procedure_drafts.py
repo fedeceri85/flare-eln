@@ -28,7 +28,7 @@ class LitterProcedureDraftTests(TestCase):
 
     def test_multiple_and_repeated_types_create_separate_records_per_mouse(self):
         drafts = [
-            {"procedure_type": self.types[0].pk, "date": "2026-10-21", "lab_member": "AB", "lab_book_page": "001"},
+            {"procedure_type": self.types[0].pk, "date": "2026-10-21", "lab_member": "AB"},
             {"procedure_type": self.types[1].pk},
             {"procedure_type": self.types[0].pk, "date": "", "lab_member": "CD"},
         ]
@@ -40,7 +40,6 @@ class LitterProcedureDraftTests(TestCase):
             records = list(mouse.procedures.order_by("pk"))
             self.assertEqual([record.procedure_type_id for record in records], [draft["procedure_type"] for draft in drafts])
             self.assertEqual(str(records[0].date), "2026-10-21")
-            self.assertEqual(records[0].lab_book_page, "001")
             self.assertIsNone(records[2].date)
             self.assertEqual(records[2].lab_member, "CD")
 

@@ -56,7 +56,6 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
                 "procedure_type": self.procedure_type.pk,
                 "date": "2026-10-25",
                 "lab_member": "AB",
-                "lab_book_page": "12",
             }]),
             **overrides,
         }
@@ -199,7 +198,6 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
             "procedure_type": self.procedure_type.pk,
             "date": "not-a-date",
             "lab_member": "AB",
-            "lab_book_page": "12",
         }]
         response = self.client.post(self.url, self.save_payload(
             **self.selection_data(),
