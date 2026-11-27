@@ -1,6 +1,6 @@
 <section class="media-uploader" data-media-uploader{% if upload_form_id %} data-media-upload-form="{{ upload_form_id }}" data-media-remove-form="import-media-remove"{% endif %}>
     <h2>Media</h2>
-    {% if shared %}<p class="import-help">These images will be attached to every recording created by this import, including separate date and crossing groups.</p>{% else %}<p class="bulk-help">Add images to save with this recording.</p>{% endif %}
+    {% if shared %}<p class="import-help">These images will be attached to every recording created by this import, including separate date and crossing groups.</p>{% else %}<p class="bulk-help">Add images or PDF documents to save with this recording.</p>{% endif %}
     <div class="media-dropzone" data-media-dropzone>
         <span>Drag and drop images here</span>
         <span class="media-dropzone-or">or</span>
@@ -9,8 +9,16 @@
         <small>JPEG, PNG, WebP or TIFF · up to 10 images at a time · 20 MB each · multipage TIFFs use the first page</small>
     </div>
     <p class="media-status" data-media-status role="status" aria-live="polite"></p>
-    {% for field in media_form %}{% for error in field.errors %}<p class="error-list">{{ error }}</p>{% endfor %}{% endfor %}
+    {% for error in media_form.images.errors %}<p class="error-list">{{ error }}</p>{% endfor %}
     <div class="media-items" data-media-items>{% if shared %}{% include "lab/components/import_media_items.html" %}{% endif %}</div>
+    {% if media_form.documents %}
+        <div class="recording-document-upload">
+            <label for="{{ media_form.documents.id_for_label }}">{{ media_form.documents.label }}</label>
+            {{ media_form.documents }}
+            <small>{{ media_form.documents.help_text }}</small>
+            {% for error in media_form.documents.errors %}<p class="error-list">{{ error }}</p>{% endfor %}
+        </div>
+    {% endif %}
     {% if upload_form_id %}
         <button class="button" type="submit" form="{{ upload_form_id }}" data-media-upload-fallback>Upload images</button>
         <button class="button" type="button" data-media-retry hidden>Retry upload</button>

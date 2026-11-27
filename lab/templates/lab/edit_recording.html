@@ -29,9 +29,9 @@
         {% include "lab/components/form_actions.html" %}
     </form>
     <section class="form-card recording-images-section">
-        <h2>Images</h2>
+        <h2>Attachments</h2>
         <p>Attach compressed viewing copies and browse this recording’s images.</p>
-        <a class="button" href="{% url 'lab:recording_images' project.pk experiment.pk recording.pk %}" data-recording-gallery>Manage images</a>
+        <a class="button" href="{% url 'lab:recording_images' project.pk experiment.pk recording.pk %}" data-recording-gallery data-gallery-tab="images">Manage attachments</a>
     </section>
     {% include "lab/components/recording_image_dialog.html" %}
 {% endblock %}

@@ -13,7 +13,9 @@ from django.urls import reverse
 from PIL import Image
 
 from ..models import Experiment, Project, Recording, RecordingImage, RecordingType
-from ..recording_images import compress_image, image_path, save_images
+from ..recording_images import (
+    compress_image, document_path, image_path, save_documents, save_images,
+)
 
 
 def upload(name="sample.png", size=(400, 200), mode="RGB", **save_options):
@@ -22,6 +24,10 @@ def upload(name="sample.png", size=(400, 200), mode="RGB", **save_options):
         output, format="JPEG" if name.endswith(".jpg") else "PNG", **save_options,
     )
     return SimpleUploadedFile(name, output.getvalue())
+
+
+def pdf_upload(name="protocol.pdf", data=b"%PDF-1.7\nrecording document\n%%EOF"):
+    return SimpleUploadedFile(name, data, content_type="application/pdf")
 
 
 @override_settings(ALLOWED_HOSTS=["testserver"])
@@ -326,3 +332,75 @@ class RecordingImageTests(TestCase):
             response = self.client.post(url, {"recording_date": "2026-10-26", "mice": "", "media-images": upload()})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.experiment.recordings.filter(recording_date="2026-10-26").exists())
+
+    def test_pdf_upload_payload_table_icon_and_private_download(self):
+        response = self.client.post(
+            self.url, {"action": "upload_documents", "documents": [pdf_upload()]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["document_registered_count"], 1)
+        self.assertEqual(payload["documents"][0]["name"], "protocol.pdf")
+        document = self.recording.documents.get()
+        self.assertEqual(Path(document.storage_location.directory), self.root / "default")
+        self.assertEqual(document_path(document).read_bytes(), b"%PDF-1.7\nrecording document\n%%EOF")
+        table = self.client.get(self.list_url)
+        self.assertContains(table, 'data-gallery-tab="documents"')
+        self.assertContains(table, "PDF documents (1)")
+        download = self.client.get(payload["documents"][0]["download_url"])
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(download["Content-Type"], "application/pdf")
+        self.assertTrue(download["Content-Disposition"].startswith("attachment;"))
+        self.client.logout()
+        self.assertEqual(self.client.get(payload["documents"][0]["download_url"]).status_code, 302)
+
+    def test_invalid_pdf_batches_write_nothing_and_enforce_limits(self):
+        response = self.client.post(
+            self.url,
+            {"action": "upload_documents", "documents": [pdf_upload(), pdf_upload("bad.pdf", b"not pdf")]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.recording.documents.exists())
+        self.assertFalse(list(self.root.rglob("*.pdf")))
+        with self.assertRaises(ValidationError):
+            save_documents(self.recording, [pdf_upload(str(index) + ".pdf") for index in range(11)])
+        oversized = pdf_upload()
+        oversized.size = 10 * 1024 * 1024 + 1
+        with self.assertRaises(ValidationError):
+            save_documents(self.recording, [oversized])
+
+    def test_pdf_permissions_missing_file_and_scoped_removal(self):
+        document = save_documents(self.recording, [pdf_upload()])[0]
+        download_url = reverse("lab:recording_document_file", args=[document.pk])
+        self.client.force_login(self.viewer)
+        self.assertEqual(self.client.get(download_url).status_code, 200)
+        self.assertEqual(self.client.post(self.url, {"action": "remove_document", "document_id": document.pk}).status_code, 403)
+        self.client.force_login(self.owner)
+        path = document_path(document)
+        path.unlink()
+        payload = self.gallery().json()
+        self.assertEqual(payload["document_unavailable_count"], 1)
+        self.assertEqual(payload["documents"], [])
+        self.assertEqual(self.client.get(download_url).status_code, 404)
+        other = Recording.objects.create(owner=self.owner, experiment=self.experiment, recording_type=self.kind, recording_date="2026-10-24")
+        other_url = reverse("lab:recording_images", args=[self.project.pk, self.experiment.pk, other.pk])
+        self.assertEqual(self.client.post(other_url, {"action": "remove_document", "document_id": document.pk}).status_code, 404)
+
+    def test_manual_add_saves_images_and_documents_atomically(self):
+        url = reverse("lab:add_recording", args=[self.project.pk, self.experiment.pk])
+        result = self.client.post(url, {
+            "recording_date": "2026-10-27", "mice": "", "media-images": upload(),
+            "media-documents": [pdf_upload()],
+        })
+        self.assertEqual(result.status_code, 302)
+        created = self.experiment.recordings.get(recording_date="2026-10-27")
+        self.assertEqual(created.images.count(), 1)
+        self.assertEqual(created.documents.count(), 1)
+        response = self.client.post(url, {
+            "recording_date": "2026-10-28", "mice": "", "media-images": upload(),
+            "media-documents": pdf_upload("bad.pdf", b"invalid"),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.experiment.recordings.filter(recording_date="2026-10-28").exists())

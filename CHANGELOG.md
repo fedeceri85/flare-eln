@@ -1,3 +1,6 @@
+26/11/2026
+- Added PDF upload support.
+
 24/11/2026
 - Display genotyping and crossing in all experiments, not just the genotyping ones.
 

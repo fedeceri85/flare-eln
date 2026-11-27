@@ -1,11 +1,11 @@
 {% extends "lab/base.html" %}
 {% load static %}
-{% block title %}Recording images{% endblock %}
-{% block page_title %}Recording images{% endblock %}
+{% block title %}Recording attachments{% endblock %}
+{% block page_title %}Recording attachments{% endblock %}
 {% block page_subtitle %}<p>{{ experiment.name }} · {{ recording.recording_date|date:"d/m/Y" }}</p>{% endblock %}
 {% block content %}
     {% if errors %}<div class="message message-error" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
-    <a class="button" href="{{ request.get_full_path }}" data-recording-gallery>Open image gallery</a>
+    <a class="button" href="{{ request.get_full_path }}" data-recording-gallery data-gallery-tab="images">Open attachment manager</a>
     {% if gallery.unavailable_count %}<p class="message">{{ gallery.unavailable_count }} registered image attachment{{ gallery.unavailable_count|pluralize }} currently unavailable. Check image storage or run the attachment audit.</p>{% endif %}
     <div class="recording-image-cards">
         {% for image in gallery.images %}
@@ -22,6 +22,16 @@
             </section>
         {% empty %}<p>No images available.</p>{% endfor %}
     </div>
+    {% if gallery.document_unavailable_count %}<p class="message">{{ gallery.document_unavailable_count }} registered PDF document{{ gallery.document_unavailable_count|pluralize }} currently unavailable. Check media storage.</p>{% endif %}
+    <section class="form-card">
+        <h2>Documents</h2>
+        <div class="gallery-document-list">
+            {% for document in gallery.documents %}
+                <div class="gallery-document-row"><span>{{ document.name }}</span><a class="button" href="{{ document.download_url }}">Download</a>
+                {% if gallery.can_modify %}<form method="post">{% csrf_token %}<input type="hidden" name="document_id" value="{{ document.id }}"><button type="submit" name="action" value="remove_document" class="button button-danger">Remove</button></form>{% endif %}</div>
+            {% empty %}<p>No PDF documents available.</p>{% endfor %}
+        </div>
+    </section>
     {% if gallery.can_modify %}
         <section class="form-card">
             <h2>Add images</h2>
@@ -32,7 +42,17 @@
             </form>
         </section>
     {% endif %}
+    {% if gallery.can_modify %}
+        <section class="form-card">
+            <h2>Add PDF documents</h2>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}<input type="hidden" name="action" value="upload_documents">
+                {% include "lab/components/form_fields.html" with form=document_upload_form %}
+                <button type="submit" class="button button-primary">Upload documents</button>
+            </form>
+        </section>
+    {% endif %}
     <p><a href="{{ return_url }}">Back to recordings</a></p>
     {% include "lab/components/recording_image_dialog.html" %}
 {% endblock %}
-{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-images-4"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'lab/recording_images.js' %}?v=recording-attachments-1"></script>{% endblock %}

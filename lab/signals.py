@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete
 
 from .models import LoginEvent
-from .models import RecordingImage, SpreadsheetImportImage
+from .models import RecordingDocument, RecordingImage, SpreadsheetImportImage
 
 
 @receiver(post_delete, sender=RecordingImage, dispatch_uid="lab_recording_image_deleted")
@@ -16,6 +16,12 @@ from .models import RecordingImage, SpreadsheetImportImage
 def remove_recording_image_file(sender, instance, **kwargs):
     from .recording_images import delete_image_file
     transaction.on_commit(lambda: delete_image_file(instance))
+
+
+@receiver(post_delete, sender=RecordingDocument, dispatch_uid="lab_recording_document_deleted")
+def remove_recording_document_file(sender, instance, **kwargs):
+    from .recording_images import delete_document_file
+    transaction.on_commit(lambda: delete_document_file(instance))
 
 
 def request_ip_address(request):

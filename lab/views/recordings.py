@@ -19,8 +19,10 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST, require_safe
 
 from ..forms import RecordingForm, normalize_choice_values
-from ..forms.recording_images import RecordingImageUploadForm
-from ..recording_images import discard_image_files, save_images
+from ..forms.recording_images import RecordingMediaUploadForm
+from ..recording_images import (
+    discard_document_files, discard_image_files, save_documents, save_images,
+)
 from ..models import Mouse, RecordingField
 from ..ui import (
     RECORDING_FILTER_SPECS,
@@ -659,7 +661,7 @@ def add_recording(request, project_pk, experiment_pk):
         )
         return redirect(recordings_url)
 
-    media_form = RecordingImageUploadForm(
+    media_form = RecordingMediaUploadForm(
         request.POST if request.method == "POST" else None,
         request.FILES if request.method == "POST" else None,
         prefix="media", optional=True,
@@ -679,14 +681,18 @@ def add_recording(request, project_pk, experiment_pk):
 
         if form.is_valid() and media_form.is_valid():
             images = []
+            documents = []
             try:
                 with transaction.atomic():
                     recording = form.save()
                     if media_form.cleaned_data["images"]:
                         images = save_images(recording, media_form.cleaned_data["images"])
+                    if media_form.cleaned_data["documents"]:
+                        documents = save_documents(recording, media_form.cleaned_data["documents"])
             except (ValidationError, OSError, IntegrityError) as exc:
                 discard_image_files(images)
-                form.add_error(None, exc if isinstance(exc, ValidationError) else "The recording or its images could not be saved. Check image storage and try again.")
+                discard_document_files(documents)
+                form.add_error(None, exc if isinstance(exc, ValidationError) else "The recording or its attachments could not be saved. Check media storage and try again.")
             else:
                 discard_recording_form_draft(request)
                 messages.success(request, f"Recording {recording.pk} was created successfully.")

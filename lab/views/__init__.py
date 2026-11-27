@@ -4,7 +4,7 @@ Implementations live in feature modules; URLs continue to import this package.
 """
 
 from .spreadsheet_import import import_image_file, import_recordings, import_shared_images
-from .recording_images import recording_images, recording_image_file
+from .recording_images import recording_document_file, recording_images, recording_image_file
 from .settings import (
     settings_page, import_templates, rename_import_template, delete_import_template,
     genotype_categories, edit_genotype_category, recording_types, edit_recording_type,

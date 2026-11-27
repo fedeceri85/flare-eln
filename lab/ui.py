@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.template.defaultfilters import linebreaksbr
 from django.utils.html import format_html, format_html_join
 
-from .models import Mouse, RecordingImage, format_postnatal_age, genotype_category_labels
+from .models import Mouse, RecordingDocument, RecordingImage, format_postnatal_age, genotype_category_labels
 
 
 EMPTY_VALUE = format_html("&mdash;")
@@ -1010,8 +1010,16 @@ def visible_recording_columns(specs, recording_type):
 
 def recording_attachment_counts(recordings):
     ids = [recording.pk for recording in recordings]
-    return dict(RecordingImage.objects.filter(recording_id__in=ids).values("recording_id")
-        .annotate(total=Count("pk")).values_list("recording_id", "total")) if ids else {}
+    if not ids:
+        return {}
+    counts = {recording_id: {"images": total, "documents": 0} for recording_id, total in
+        RecordingImage.objects.filter(recording_id__in=ids).values("recording_id")
+        .annotate(total=Count("pk")).values_list("recording_id", "total")}
+    for recording_id, total in (RecordingDocument.objects.filter(recording_id__in=ids)
+            .values("recording_id").annotate(total=Count("pk"))
+            .values_list("recording_id", "total")):
+        counts.setdefault(recording_id, {"images": 0, "documents": 0})["documents"] = total
+    return counts
 
 
 def recording_animals_cell(
@@ -1044,10 +1052,19 @@ def recording_animals_cell(
     return cell
 
 
-def recording_image_action(recording, count):
-    return {"value": f"Images ({count})", "gallery": True,
-        "title": "Registered image attachments; availability is checked when opened",
-        "url": reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk])}
+def recording_attachment_actions(recording, counts):
+    url = reverse("lab:recording_images", args=[recording.experiment.project_id, recording.experiment_id, recording.pk])
+    image_count = counts.get("images", 0)
+    document_count = counts.get("documents", 0)
+    # Keep zero-count controls in the DOM but hidden so an upload through the
+    # dialog can reveal the corresponding icon without refreshing the table.
+    return [
+        {"value": "Images", "gallery": True, "gallery_tab": "images", "icon": "image",
+            "count": image_count, "hidden": not image_count, "title": "Open recording images", "url": url},
+        {"value": "PDF documents", "gallery": True, "gallery_tab": "documents", "icon": "pdf",
+            "count": document_count, "hidden": not document_count,
+            "title": "Open recording PDF documents", "url": url},
+    ]
 
 
 def build_animal_recording_table(recording_type, recordings, user=None, *, attachment_counts=None):
@@ -1085,7 +1102,7 @@ def build_animal_recording_table(recording_type, recordings, user=None, *, attac
     rows = []
     for recording in recordings:
         can_modify = recording.can_be_modified_by(user)
-        image_count = attachment_counts.get(recording.pk, 0)
+        counts = attachment_counts.get(recording.pk, {"images": 0, "documents": 0})
         edit_url = reverse(
             "lab:edit_recording",
             args=[recording.experiment.project_id, recording.experiment_id, recording.pk],
@@ -1118,7 +1135,7 @@ def build_animal_recording_table(recording_type, recordings, user=None, *, attac
                             {"value": "See in Experiment", "url": selected_recording_url(recording)},
                             *([{"value": "Edit", "url": edit_url}] if can_modify else []),
                             {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
-                            *([recording_image_action(recording, image_count)] if image_count else []),
+                            *recording_attachment_actions(recording, counts),
                         ],
                     },
                 ],
@@ -1185,7 +1202,7 @@ def build_recordings_table(
 
     for recording in recordings:
         can_modify = recording.can_be_modified_by(user)
-        image_count = attachment_counts.get(recording.pk, 0)
+        counts = attachment_counts.get(recording.pk, {"images": 0, "documents": 0})
         leading_cells = [
             recording_animals_cell(
                 recording,
@@ -1257,7 +1274,7 @@ def build_recordings_table(
                         "actions": [
                             *([{"value": "Edit", "url": edit_url}] if can_modify else []),
                             {"value": "Share", "url": reverse("lab:create_recording_share", args=[recording.pk]), "share": True},
-                            *([recording_image_action(recording, image_count)] if image_count else []),
+                            *recording_attachment_actions(recording, counts),
                         ],
                     },
                 ],

@@ -1130,6 +1130,20 @@ class RecordingImage(models.Model):
         indexes = [models.Index(fields=["storage_location", "filename"], name="recording_image_file_idx")]
 
 
+class RecordingDocument(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recording = models.ForeignKey(Recording, on_delete=models.CASCADE, related_name="documents")
+    storage_location = models.ForeignKey(ImageStorageLocation, on_delete=models.PROTECT)
+    filename = models.CharField(max_length=255)
+    original_name = models.CharField(max_length=255)
+    size_bytes = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["storage_location", "filename"], name="recording_document_file_idx")]
+
+
 class SpreadsheetImportImage(models.Model):
     """Compressed shared images awaiting a reviewed spreadsheet import."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

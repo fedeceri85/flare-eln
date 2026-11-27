@@ -11,12 +11,14 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .models import ImageStorageLocation, RecordingImage, SpreadsheetImportImage
+from .models import ImageStorageLocation, RecordingDocument, RecordingImage, SpreadsheetImportImage
 
 logger = logging.getLogger(__name__)
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
 MAX_BATCH_IMAGES = 10
+MAX_DOCUMENT_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_BATCH_DOCUMENTS = 10
 
 
 def validate_directory(value):
@@ -44,19 +46,27 @@ def upload_location():
     try:
         directory.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise ValidationError("Image storage is unavailable. Ask an administrator to check the deployment media folder.") from exc
+        raise ValidationError("Media storage is unavailable. Ask an administrator to check the deployment media folder.") from exc
     try:
         directory = validate_directory(str(directory))
     except ValidationError as exc:
-        raise ValidationError("Image storage is unavailable. Ask an administrator to check the deployment media folder.") from exc
+        raise ValidationError("Media storage is unavailable. Ask an administrator to check the deployment media folder.") from exc
     return ImageStorageLocation.objects.get_or_create(directory=directory)[0]
 
 
 def image_path(image):
-    root = Path(image.storage_location.directory).resolve()
-    path = (root / image.filename).resolve()
+    return attachment_path(image, "Image")
+
+
+def document_path(document):
+    return attachment_path(document, "Document")
+
+
+def attachment_path(attachment, label):
+    root = Path(attachment.storage_location.directory).resolve()
+    path = (root / attachment.filename).resolve()
     if not path.is_relative_to(root):
-        raise ValueError("Image path is outside its storage folder.")
+        raise ValueError(f"{label} path is outside its storage folder.")
     return path
 
 
@@ -94,6 +104,43 @@ def read_image(image):
         return None
 
 
+def document_status(document):
+    try:
+        path = document_path(document)
+        size = path.stat().st_size
+        if not 0 < size <= MAX_DOCUMENT_UPLOAD_BYTES:
+            return "invalid size"
+        with path.open("rb") as source:
+            header = source.read(1024)
+        return "available" if b"%PDF-" in header else "invalid format"
+    except FileNotFoundError:
+        return "missing"
+    except ValueError:
+        return "invalid path"
+    except OSError:
+        return "unreadable"
+
+
+def document_available(document):
+    return document_status(document) == "available"
+
+
+def available_documents(recording):
+    cached = getattr(recording, "_prefetched_objects_cache", {}).get("documents")
+    documents = cached if cached is not None else recording.documents.select_related("storage_location")
+    return [document for document in documents if document_available(document)]
+
+
+def read_document(document):
+    """Read a validated PDF fully so storage errors become a normal 404."""
+    try:
+        with document_path(document).open("rb") as source:
+            data = source.read(MAX_DOCUMENT_UPLOAD_BYTES + 1)
+        return data if data and len(data) <= MAX_DOCUMENT_UPLOAD_BYTES and b"%PDF-" in data[:1024] else None
+    except (OSError, ValueError):
+        return None
+
+
 def compress_image(upload):
     if upload.size > MAX_UPLOAD_BYTES:
         raise ValidationError(f"{upload.name}: choose an image smaller than 20 MB.")
@@ -120,6 +167,55 @@ def compress_image(upload):
 
 def save_images(recording, uploads):
     return _save_image_batch(RecordingImage, {"recording": recording}, uploads)
+
+
+def validate_document(upload):
+    if upload.size > MAX_DOCUMENT_UPLOAD_BYTES:
+        raise ValidationError(f"{upload.name}: choose a PDF no larger than 10 MB.")
+    if Path(upload.name).suffix.lower() != ".pdf":
+        raise ValidationError(f"{upload.name}: choose a PDF document.")
+    try:
+        upload.seek(0)
+        data = upload.read(MAX_DOCUMENT_UPLOAD_BYTES + 1)
+        upload.seek(0)
+    except (OSError, ValueError) as exc:
+        raise ValidationError(f"{upload.name}: this PDF could not be read.") from exc
+    if not data or len(data) > MAX_DOCUMENT_UPLOAD_BYTES or b"%PDF-" not in data[:1024]:
+        raise ValidationError(f"{upload.name}: this file is not a valid PDF document.")
+    return data
+
+
+def save_documents(recording, uploads):
+    if not uploads:
+        raise ValidationError("Choose at least one PDF document.")
+    if len(uploads) > MAX_BATCH_DOCUMENTS:
+        raise ValidationError("Choose up to 10 PDF documents at a time.")
+    processed = [(upload, validate_document(upload)) for upload in uploads]
+    location = upload_location()
+    written, saved = [], []
+    try:
+        with transaction.atomic():
+            for upload, data in processed:
+                filename = f"{uuid4().hex}.pdf"
+                path = Path(location.directory) / filename
+                with path.open("xb") as target:
+                    written.append(path)
+                    target.write(data)
+                saved.append(RecordingDocument.objects.create(
+                    recording=recording,
+                    storage_location=location,
+                    filename=filename,
+                    original_name=Path(upload.name).name[:255],
+                    size_bytes=len(data),
+                ))
+    except Exception:
+        for path in written:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Could not clean up recording document %s", path)
+        raise
+    return saved
 
 
 def save_import_images(draft, uploads):
@@ -168,10 +264,23 @@ def delete_image_file(image):
     discard_image_files([image])
 
 
+def delete_document_file(document):
+    discard_document_files([document])
+
+
 def discard_image_files(images):
     """Remove newly written files after an enclosing database transaction fails."""
     for image in images:
         _unlink_image_file(image)
+
+
+def discard_document_files(documents):
+    """Remove newly written PDF files after an enclosing transaction fails."""
+    for document in documents:
+        try:
+            document_path(document).unlink(missing_ok=True)
+        except (OSError, ValueError):
+            logger.info("Recording document file unavailable during removal: %s", document.pk)
 
 
 def _unlink_image_file(image):

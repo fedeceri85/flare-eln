@@ -29,6 +29,7 @@ urlpatterns = [
     path("import-images/<uuid:image_id>/", protected(views.import_image_file), name="import_image_file"),
     path("projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/import/<uuid:draft_id>/images/", protected(views.import_shared_images), name="import_shared_images"),
     path("recording-images/<uuid:image_id>/", protected(views.recording_image_file), name="recording_image_file"),
+    path("recording-documents/<uuid:document_id>/", protected(views.recording_document_file), name="recording_document_file"),
     path("projects/<int:project_pk>/experiments/<int:experiment_pk>/recordings/<int:recording_pk>/images/", protected(views.recording_images), name="recording_images"),
     path("settings/maintenance/", protected(maintenance), name="maintenance"),
     path("settings/", protected(views.settings_page), name="settings_page"),

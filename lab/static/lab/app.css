@@ -1480,6 +1480,15 @@ input[type="checkbox"] { accent-color: var(--blue); }
 .recording-gallery :is(input:not([type="hidden"]), textarea) { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 5px; font: inherit; }
 .recording-gallery small { color: var(--muted); }
 .recording-gallery .actions { flex-wrap: wrap; }
+.gallery-tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--border); }
+.gallery-tabs [data-gallery-tab-button] { padding: 9px 14px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+.gallery-tabs [data-gallery-tab-button][aria-selected="true"] { border-bottom-color: var(--blue); color: var(--blue); }
+.gallery-document-list, .gallery-documents { display: grid; gap: 10px; }
+.gallery-document-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.gallery-document-row > span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.gallery-document-row form { display: block; margin: 0; }
+.recording-document-upload { display: grid; gap: 8px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.table-row-action svg { display: block; }
 .recording-image-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; margin: 20px 0; }
 .recording-image-card { min-width: 0; padding: 20px; }
 .recording-image-card img { max-width: 100%; width: 100px; height: 72px; object-fit: contain; }
