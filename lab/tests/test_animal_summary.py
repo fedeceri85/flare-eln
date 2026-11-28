@@ -112,6 +112,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         for response in (direct, selected):
             self.assertEqual(response.status_code, 200)
             self.assertTemplateUsed(response, "lab/animal_summary.html")
+            self.assertContains(response, "data-sticky-header")
             self.assertTrue(response.context["single_mouse_mode"])
             self.assertEqual(response.context["selected_mice"], [mouse])
             self.assertEqual(response.context["active_tab"], "services")
@@ -188,6 +189,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
             with self.subTest(url=url):
                 response = self.client.get(url, params)
                 self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "data-sticky-header")
                 markup = Markup(response.content.decode())
                 headings = [node.text.strip() for node in markup.find("th", scope="col")
                             if node.within("section", id="mouse-panel-individual")]

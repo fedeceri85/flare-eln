@@ -1,6 +1,6 @@
 {% load navigation genotypes %}
 {% with table=rows|genotype_table %}
-<table class="data-table litter-mouse-table individual-mouse-table">
+<table class="data-table litter-mouse-table individual-mouse-table" data-sticky-header>
     {% if crossing %}<caption class="individual-crossing-label"><span>Crossing</span> {{ crossing }}</caption>{% endif %}
     <colgroup>
         <col class="individual-mouse-id-column">

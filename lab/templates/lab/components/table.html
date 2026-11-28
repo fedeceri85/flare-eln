@@ -18,7 +18,7 @@
         {% endif %}
 
         <div class="table-scroll">
-            <table class="data-table {{ table.class }}">
+            <table class="data-table {{ table.class }}"{% if table.sticky_header %} data-sticky-header{% endif %}>
                 <thead>
                     <tr>
                         {% for column in table.columns %}

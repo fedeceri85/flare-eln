@@ -55,7 +55,6 @@
                     <tr><td>{{ row.record.mouse_id }}</td><td>{{ row.record.procedure_type }}</td><td>{{ row.record.date|date:"d/m/Y"|default:"—" }}</td><td>{{ change.label }}</td><td>{{ change.before|default_if_none:"—"|default:"—" }}</td><td>{{ change.after|default_if_none:"—"|default:"—" }}</td></tr>
                 {% endfor %}{% endfor %}
                 </tbody></table></div>
-                <p>This preview expires after one hour. Saving changes only these selected procedure records.</p>
             {% endif %}
         </div>
     </form>

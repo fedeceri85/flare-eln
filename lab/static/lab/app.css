@@ -218,6 +218,46 @@ button.button {
     z-index: 3;
 }
 
+/* Floating column titles for data-sticky-header tables (see
+   sticky_table_headers.js): fixed just below the sticky bar stack while
+   the page scrolls, aligned to and horizontally synced with the table.
+   The z-index sits above the table's own sticky cells (z-index 1–3) but
+   below every sticky chrome bar (tabs 24, action bar 25, app header 40),
+   so the strip can never cover the bars it docks below. */
+.sticky-header-float {
+    position: fixed;
+    z-index: 22;
+    display: none;
+    background: #f0f4f9;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    box-shadow: 0 10px 24px #17395c21;
+}
+
+.sticky-header-float.is-visible {
+    display: block;
+}
+
+.sticky-header-float-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    /* The strip follows the table's own scrollbar — it never shows one of its own. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.sticky-header-float-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.sticky-header-float table {
+    table-layout: fixed;
+}
+
+.sticky-header-float th {
+    border-bottom: none;
+}
+
 .data-table tr:hover td {
     background: #f7fafc;
 }
@@ -282,7 +322,7 @@ button.button {
 }
 
 .data-table.procedure-matrix .date-cell {
-    width: 68px;
+    width: 36px;
 }
 
 .data-table.procedure-matrix .tiny-cell {
@@ -293,9 +333,13 @@ button.button {
     width: 74px;
 }
 
+.data-table.procedure-matrix .genotype-text-cell {
+    width: 120px;   
+}
+
 .data-table.procedure-matrix .status-cell,
 .data-table.procedure-matrix .severity-cell {
-    width: 58px;
+    width: 36px;
 }
 
 .data-table.procedure-matrix .notes-cell {

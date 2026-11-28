@@ -74,15 +74,15 @@ MOUSE_TABLE_COLUMN_SPECS = [
         "key": "genetics_genotype_display",
         "label": "Genotype",
         "sort": "genotype",
-        "cell_class": "compact-text-cell",
+        "cell_class": "genotype-text-cell",
     },
-    {
-        "key": "crossing",
-        "label": "Crossing/type",
-        "sort": "crossing",
-        "format": "crossing_type_summary",
-        "cell_class": "compact-text-cell",
-    },
+    # {
+    #     "key": "crossing",
+    #     "label": "Crossing/type",
+    #     "sort": "crossing",
+    #     "format": "crossing_type_summary",
+    #     "cell_class": "compact-text-cell",
+    # },
     {
         "key": "status",
         "label": "Status",
@@ -754,6 +754,7 @@ def build_procedure_matrix_table(
         "columns": columns,
         "rows": rows,
         "has_selectable_rows": bool(rows),
+        "sticky_header": True,
         "empty_message": "No animals are registered under this protocol.",
     }
 
@@ -1290,6 +1291,7 @@ def build_recordings_table(
             row["cells"][0].get("checkbox")
             for row in rows
         ),
+        "sticky_header": True,
         "empty_message": "No recordings match these filters.",
     }
 

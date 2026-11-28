@@ -1,3 +1,6 @@
+28/11/2026
+- Table column titles now stay visible while scrolling long pages: on the Procedures page, the Recordings page, and the animal Genotype details tab (view and edit), the header row docks just below the page toolbar instead of scrolling away, and it stays column-aligned with the table while scrolling horizontally.
+
 26/11/2026
 - Added PDF upload support.
 

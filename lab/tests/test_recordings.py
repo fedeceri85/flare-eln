@@ -199,6 +199,7 @@ class RecordingsPageTests(AuthenticatedTestCase):
         self.assertContains(response, "Select all")
         self.assertContains(response, "data-table-select-all-button")
         self.assertContains(response, 'aria-label="Select all recordings"')
+        self.assertContains(response, "data-sticky-header")
         self.assertContains(response, 'name="per_page"')
         self.assertEqual(response.context["page_size_control"]["current"], 25)
         for page_size in (25, 50, 100, 150, 200):

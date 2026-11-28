@@ -6,7 +6,7 @@
 {% block content %}
 <div class="recordings-page record-list-page">
     <div class="table-card"><div class="table-scroll">
-        <table class="data-table procedure-matrix recordings-table">
+        <table class="data-table procedure-matrix recordings-table" data-sticky-header>
             <thead><tr><th scope="col" class="recording-date-cell">Date</th><th scope="col" class="recording-animals-cell">Animals</th><th scope="col" class="path-cell">Recording Paths</th></tr></thead>
             <tbody>{% for recording in recordings %}<tr>
                 <td class="recording-date-cell">{{ recording.recording_date|date:'d/m/Y' }}</td>
