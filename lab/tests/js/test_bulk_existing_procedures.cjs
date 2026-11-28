@@ -29,17 +29,21 @@ function makeEditor(preview = true) {
   const field = element({ name: 'existing_procedures-lab_member', value: 'New member' });
   const snapshot = element({ name: 'existing_procedures-snapshot', value: preview ? 'signed-token' : '' });
   const save = element({ disabled: !preview, hidden: !preview });
+  const cancel = element({ disabled: false, hidden: !preview });
   const deleteButton = element({ disabled: false, hidden: false });
   const previewButton = element();
   const status = element();
   const count = element();
   const previewContainer = { cleared: false, replaceChildren() { this.cleared = true; } };
-  const group = { querySelector(selector) { return selector.includes('.bulk-input') ? field : toggle; } };
+  const group = {
+    querySelector(selector) { return selector.includes('.bulk-input') ? field : toggle; },
+    querySelectorAll(selector) { return selector.includes('.bulk-input') ? [field] : [toggle]; },
+  };
   const form = element({
     dataset: {},
-    elements: [all, ...rows, toggle, field, snapshot, previewButton, save, deleteButton],
+    elements: [all, ...rows, toggle, field, snapshot, previewButton, save, cancel, deleteButton],
     querySelector(selector) {
-      return ({ '[data-procedure-select-all]': all, '[data-procedure-save]': save, '[data-procedure-delete]': deleteButton,
+      return ({ '[data-procedure-select-all]': all, '[data-procedure-save]': save, '[data-procedure-cancel]': cancel, '[data-procedure-delete]': deleteButton,
         '[name="existing_procedures-snapshot"]': snapshot, '[data-procedure-status]': status,
         '[data-procedure-selection-count]': count, '[data-procedure-preview]': previewContainer })[selector];
     },
@@ -50,7 +54,7 @@ function makeEditor(preview = true) {
   });
   const section = { replaced: null, querySelector() { return form; }, querySelectorAll() { return []; },
     replaceWith(replacement) { this.replaced = replacement; } };
-  return { section, form, rows, all, toggle, field, snapshot, save, deleteButton, status, count, previewContainer, previewButton };
+  return { section, form, rows, all, toggle, field, snapshot, save, cancel, deleteButton, status, count, previewContainer, previewButton };
 }
 function fixture() {
   const ui = makeEditor();
@@ -204,4 +208,20 @@ test('confirmed deletion only refreshes the procedure editor', async () => {
   await pending;
   assert.equal(ui.section.replaced, ui.replacement.section);
   assert.equal(ui.primaryMouseForm.notes, 'Unsaved mouse edits');
+});
+
+test('cancel clears the preview, hides save and cancel and stays out of the network', async () => {
+  const ui = fixture();
+  assert.equal(ui.save.hidden, false);
+  assert.equal(ui.cancel.hidden, false);
+  assert.equal(ui.snapshot.value, 'signed-token');
+  assert.equal(ui.previewContainer.cleared, false);
+  await ui.cancel.emit('click');
+  assert.equal(ui.snapshot.value, '');
+  assert.equal(ui.save.disabled, true);
+  assert.equal(ui.save.hidden, true);
+  assert.equal(ui.cancel.hidden, true);
+  assert.equal(ui.previewContainer.cleared, true);
+  assert.match(ui.status.textContent, /Preview cancelled/);
+  assert.equal(ui.submitted, undefined);
 });

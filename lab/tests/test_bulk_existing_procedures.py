@@ -77,6 +77,37 @@ class ExistingProcedureBulkTests(TestCase):
         self.assertEqual(self.records[0].lab_member, "")
         self.assertEqual(self.records[0].procedure_type_id, self.types[0].pk)
 
+    def test_notes_can_be_bulk_updated_cleared_and_are_isolated_from_mouse_notes(self):
+        data = {"selected_mouse": [mouse.pk for mouse in self.mice],
+                "existing_procedure_action": "preview",
+                "existing_procedures-selected_procedures": [self.records[0].pk, self.records[2].pk],
+                "existing_procedures-update_notes": "on", "existing_procedures-notes": "Bulk note",
+                "update_notes": "on", "notes": "Mouse note"}
+        response = self.post(data)
+        self.assertEqual(response.status_code, 200)
+        preview = response.context["procedure_preview"]
+        self.assertEqual(preview[0]["changes"], [{"label": "Notes", "before": "Keep notes", "after": "Bulk note"}])
+        token = response.context["existing_procedure_form"]["snapshot"].value()
+        self.assertEqual(self.post({**data, "existing_procedure_action": "save", "existing_procedures-snapshot": token}).status_code, 200)
+        self.records[0].refresh_from_db()
+        self.records[2].refresh_from_db()
+        self.records[1].refresh_from_db()
+        self.assertEqual(self.records[0].notes, "Bulk note")
+        self.assertEqual(self.records[2].notes, "Bulk note")
+        self.assertEqual(self.records[1].notes, "Keep notes")
+        self.assertFalse(Mouse.objects.filter(notes="Mouse note").exists())
+
+        blank = {"selected_mouse": [mouse.pk for mouse in self.mice],
+                 "existing_procedure_action": "preview",
+                 "existing_procedures-selected_procedures": [self.records[0].pk],
+                 "existing_procedures-update_notes": "on", "existing_procedures-notes": ""}
+        response = self.post(blank)
+        self.assertEqual(response.status_code, 200)
+        token = response.context["existing_procedure_form"]["snapshot"].value()
+        self.assertEqual(self.post({**blank, "existing_procedure_action": "save", "existing_procedures-snapshot": token}).status_code, 200)
+        self.records[0].refresh_from_db()
+        self.assertEqual(self.records[0].notes, "")
+
     def test_checked_type_requires_valid_choice(self):
         for value in ("", "999999", "nonsense"):
             data = self.data(**{"existing_procedures-update_procedure_type": "on", "existing_procedures-procedure_type": value})
@@ -163,6 +194,8 @@ class ExistingProcedureBulkTests(TestCase):
         self.assertLess(html.index('>Delete selected</button>'), html.index('id="primary-form"'))
         self.assertGreater(html.index('data-existing-procedure-editor'), html.index('</form>', html.index('id="primary-form"')))
         self.assertIn('name="existing_procedures-update_date"', html)
+        self.assertIn('name="existing_procedures-update_notes"', html)
+        self.assertIn('name="existing_procedures-notes"', html)
         self.assertIn("<th>Notes</th>", html)
         self.assertIn('<td class="animal-summary-value">Keep notes</td>', html)
         rows = response.context["existing_procedure_rows"]

@@ -46,7 +46,6 @@ class AIProviderSettingsForm(forms.Form):
         required=False,
         max_length=100,
         widget=forms.TextInput(attrs={"placeholder": "Marcott-E"}),
-        help_text="Short display label only — it is shown to users, never read as instructions.",
         validators=[validate_assistant_name],
     )
 

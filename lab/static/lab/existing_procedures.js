@@ -6,6 +6,7 @@
         const rows = [...form.querySelectorAll('[data-procedure-row-checkbox]')];
         const all = form.querySelector('[data-procedure-select-all]');
         const save = form.querySelector('[data-procedure-save]');
+        const cancel = form.querySelector('[data-procedure-cancel]');
         const deleteButton = form.querySelector('[data-procedure-delete]');
         const confirmations = [save].filter(Boolean);
         const snapshot = form.querySelector('[name="existing_procedures-snapshot"]');
@@ -30,9 +31,16 @@
             form.querySelector('[data-procedure-preview]').replaceChildren();
             count();
         }
+        function cancelPreview() {
+            invalidate();
+            if (cancel) cancel.hidden = true;
+            status.textContent = 'Preview cancelled. Adjust the fields or preview again.';
+        }
         function toggleFields() {
             form.querySelectorAll('[data-procedure-update-field]').forEach(group => {
-                group.querySelector('.bulk-input input, .bulk-input select').disabled = !group.querySelector('input[type="checkbox"]').checked;
+                group.querySelectorAll('.bulk-input input, .bulk-input select, .bulk-input textarea').forEach(field => {
+                    field.disabled = !group.querySelector('input[type="checkbox"]').checked;
+                });
             });
         }
         if (all) all.addEventListener('change', () => {
@@ -44,6 +52,10 @@
         });
         form.addEventListener('change', event => {
             if (event.target !== all) { toggleFields(); invalidate(); }
+        });
+        if (cancel) cancel.addEventListener('click', () => {
+            if (pending || saving) return;
+            cancelPreview();
         });
         form.addEventListener('submit', async event => {
             event.preventDefault();

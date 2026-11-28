@@ -124,7 +124,9 @@ class ExistingProcedureBulkForm(forms.Form):
     date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}, format=HTML_DATE_FORMAT))
     update_lab_member = forms.BooleanField(required=False, label="Update lab member")
     lab_member = forms.CharField(required=False, max_length=100)
-    editable_fields = ("procedure_type", "date", "lab_member")
+    update_notes = forms.BooleanField(required=False, label="Update notes")
+    notes = forms.CharField(required=False, label="Notes", widget=forms.Textarea(attrs={"rows": 2}))
+    editable_fields = ("procedure_type", "date", "lab_member", "notes")
 
     def __init__(self, *args, procedures, deleting=False, **kwargs):
         self.deleting = deleting

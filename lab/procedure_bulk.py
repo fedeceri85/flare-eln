@@ -32,7 +32,7 @@ def normalized_updates(updates):
 
 
 def snapshot_state(scope, updates, records, deleting=False):
-    record_fields = (*FIELDS, "notes") if deleting else FIELDS
+    record_fields = (*FIELDS, "notes")
     return {
         "scope": scope,
         "operation": "delete" if deleting else "update",

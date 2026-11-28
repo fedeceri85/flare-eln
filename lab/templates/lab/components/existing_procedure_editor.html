@@ -30,8 +30,8 @@
                 </tbody>
             </table></div></div>
             <fieldset class="procedure-fields" hidden data-procedure-js-only data-procedure-controls>
-                <legend>Changes to selected records</legend>
-                <p>Unchecked fields stay unchanged. Check a field and leave it blank to clear its date or lab member.</p>
+                <legend>Bulk changes to selected records</legend>
+                <p>Unchecked fields stay unchanged. Check a field and leave it blank to clear its date, lab member, or notes.</p>
                 <div class="procedure-create-grid">
                     {% for item in existing_procedure_form.update_fields %}
                         <div class="bulk-field" data-procedure-update-field>
@@ -43,6 +43,7 @@
                 <div class="actions procedure-actions">
                     <button class="button" type="submit" name="existing_procedure_action" value="preview">Preview procedure changes</button>
                     <button class="button button-primary" type="submit" name="existing_procedure_action" value="save" data-procedure-save {% if not procedure_preview %}disabled hidden{% endif %}>Save procedure changes</button>
+                    <button class="button" type="button" data-procedure-cancel {% if not procedure_preview %}hidden{% endif %}>Cancel</button>
                     <button class="button button-danger" type="submit" name="existing_procedure_action" value="delete" formnovalidate data-procedure-delete>Delete selected procedures</button>
                 </div>
             </fieldset>
