@@ -55,7 +55,7 @@ class CompactAutomaticIdTests(TestCase):
         self.assertEqual(generate_mouse_id(dob, "Pair 12", crossing, "03"), expected)
         protocol = Protocol.objects.create(protocol_number=98, licence_reference="COMPACT", name="Compact")
         mouse = Mouse.objects.create(mouse_id=expected, protocol=protocol)
-        self.assertEqual(generate_mouse_id(dob, "Pair 12", crossing, "03"), expected + "_1")
+        self.assertEqual(generate_mouse_id(dob, "Pair 12", crossing, "03"), expected + "_01")
         lines[0].name = "Renamed Cre"
         lines[0].save()
         mouse.refresh_from_db()
@@ -132,7 +132,7 @@ class LitterIdentityTests(TestCase):
         self.assertEqual(form.cleaned_data["mouse_id_prefix"], "261021_GeneAGe_bp4_")
         self.assertIn('readonly', str(form["mouse_id_prefix"]))
         mice, _ = create_litter_mice(self.protocol, form)
-        self.assertEqual(mice[0].pk, "261021_GeneAGe_bp4_1")
+        self.assertEqual(mice[0].pk, "261021_GeneAGe_bp4_01")
 
     def test_generated_prefix_requires_birth_date_and_breeding_pair(self):
         form = LitterCreateForm(self.payload(no_id_available="on", date_of_birth="", breeding_pair=""))
@@ -171,7 +171,7 @@ class LitterIdentityTests(TestCase):
             f"pup_1_{gene}": "het", f"pup_1_{gene}_uncertain": "on",
         }), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         result = response.json()
-        self.assertIn("261021_GeneAGe_bp4_1", result["html"])
+        self.assertIn("261021_GeneAGe_bp4_01", result["html"])
         self.assertIn('value="blue"', result["html"])
         self.assertIn('value="het" selected', result["html"])
         self.assertIn('checked', result["html"])

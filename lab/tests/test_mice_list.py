@@ -308,7 +308,7 @@ class MicePageTests(AuthenticatedTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
-            Mouse.objects.filter(mouse_id="260102_Mut1Mu_linea_1").exists()
+            Mouse.objects.filter(mouse_id="260102_Mut1Mu_linea_01").exists()
         )
 
     def test_mouse_id_preview_uses_structured_crossing_without_species_or_cross_separator(self):

@@ -252,13 +252,13 @@ class AddLitterTests(AuthenticatedTestCase):
         self.assertEqual(
             list(Mouse.objects.order_by("mouse_id").values_list("mouse_id", flat=True)),
             [
-                "260102_Gad2_linea_5",
-                "260102_Gad2_linea_6",
+                "260102_Gad2_linea_05",
+                "260102_Gad2_linea_06",
             ],
         )
 
     def test_add_litter_rejects_duplicate_generated_ids(self):
-        Mouse.objects.create(mouse_id="260102_Gad2_linea_5", protocol=self.protocol)
+        Mouse.objects.create(mouse_id="260102_Gad2_linea_05", protocol=self.protocol)
         response = self.client.post(self.add_litter_url, self.litter_payload(
             mouse_numbers="5", no_id_available="on",
         ))

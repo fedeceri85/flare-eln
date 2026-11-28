@@ -166,6 +166,13 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             self.data = self.data.copy()
             self.data[self.add_prefix("mouse_id_prefix")] = prefix
             self.fields["mouse_id_prefix"].widget.attrs["readonly"] = True
+        automatic_ids = bool(
+            self.data.get(self.add_prefix("no_id_available"))
+        )
+        self.id_numbers = {
+            number: number.zfill(2) if automatic_ids else number
+            for number in self.numbers
+        }
         self.single_mouse_mode = len(self.numbers) <= 1
         configure_genotype_modes(self, individual_default=True)
         self.configure_individual_detail_overrides()
@@ -209,7 +216,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                 genotype_fields.append(self[name])
             self.mouse_rows.append({
                 "number": number,
-                "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{number}',
+                "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{self.id_numbers[number]}',
                 "local_identifier": self[f"{stem}_marking"],
                 "sex": self[f"{stem}_sex"], "genotype_fields": genotype_fields,
                 "crossing": row_crossing.display_name if row_crossing else "",
@@ -244,7 +251,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                 items.append({"checkbox": self[toggle], "field": self[field_name], "target": name})
             self.individual_detail_fields[number] = items
             self.individual_detail_rows.append({
-                "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{number}', "fields": items})
+                "mouse_id": f'{self.data.get(self.add_prefix("mouse_id_prefix"), "")}{self.id_numbers[number]}', "fields": items})
 
     @property
     def individual_detail_errors(self):
@@ -291,7 +298,12 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
                 if not cleaned_data.get(field_name):
                     self.add_error(field_name, "Required when No ID available is checked.")
         prefix = cleaned_data.get("mouse_id_prefix", "")
-        mouse_ids = [f"{prefix}{number}" for number in self.numbers]
+        mouse_ids = [f"{prefix}{self.id_numbers[number]}" for number in self.numbers]
+        if len(mouse_ids) != len(set(mouse_ids)):
+            self.add_error(
+                "mouse_numbers",
+                "Animal numbers produce duplicate automatic IDs.",
+            )
         if any(len(mouse_id) > 100 for mouse_id in mouse_ids):
             self.add_error("mouse_id_prefix", "Animal IDs must be 100 characters or fewer.")
         existing_ids = list(Mouse.objects.filter(pk__in=mouse_ids).values_list("pk", flat=True)[:5])
@@ -363,7 +375,7 @@ class LitterCreateForm(MouseStructuredGeneticsMixin, forms.Form):
             lines = crossing.ordered_lines() if crossing else []
             yield {
                 "details": values,
-                "mouse_id": f"{prefix}{number}",
+                "mouse_id": f"{prefix}{self.id_numbers[number]}",
                 "tattoo": self.cleaned_data.get(f"{stem}_marking", ""),
                 "marking_type": self.cleaned_data.get("marking_type", ""),
                 "sex": self.cleaned_data.get(f"{stem}_sex", ""),

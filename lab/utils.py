@@ -42,7 +42,7 @@ def generate_mouse_id(date_of_birth, breeding_pair, crossing, tattoo):
     mouse_id = base
     counter = 1
     while Mouse.objects.filter(mouse_id=mouse_id).exists():
-        mouse_id = f"{base}_{counter}"
+        mouse_id = f"{base}_{str(counter).zfill(2)}"
         counter += 1
     return mouse_id
 
