@@ -223,7 +223,7 @@ class Command(BaseCommand):
                     "genotype": genotype,
                     "crossing": crossing,
                     "crossing_type": crossing_type,
-                    "status": "Culled" if cull_date else "Alive",
+                    "status": "Deceased" if cull_date else "Alive",
                     "protocol": protocol,
                     "protocol_start_date": self.parse_date(
                         row[self.COL_PROTOCOL_START]

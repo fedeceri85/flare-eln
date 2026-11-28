@@ -171,7 +171,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             "protocol_start_date": "2026-02-03", "notes": "Individual note",
         }, update_date_of_birth="on", date_of_birth="2026-01-01",
             update_breeding_pair="on", breeding_pair="Shared pair",
-            update_status="on", status="Culled", update_severity="on", severity="Mild",
+            update_status="on", status="Deceased", update_severity="on", severity="Mild",
             update_cull_date="on", cull_date="2026-03-01",
             update_protocol="on", protocol=self.protocol.pk,
             update_protocol_start_date="on", protocol_start_date="2026-02-01",
@@ -184,7 +184,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(self.mouse_1.breeding_pair, "")
         self.assertEqual(self.mouse_2.breeding_pair, "Shared pair")
         self.assertEqual(self.mouse_1.status, "Alive")
-        self.assertEqual(self.mouse_2.status, "Culled")
+        self.assertEqual(self.mouse_2.status, "Deceased")
         self.assertEqual(self.mouse_1.severity, "Moderate")
         self.assertEqual(self.mouse_2.severity, "Mild")
         self.assertIsNone(self.mouse_1.cull_date)
@@ -360,7 +360,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "return_url": self.return_url,
                 "selected_mouse": [self.mouse_1.pk, self.mouse_2.pk],
                 "update_status": "on",
-                "status": "Culled",
+                "status": "Deceased",
                 "notes_action": "append",
                 "notes": "Bulk note",
                 "new_procedure-procedure_type": self.procedure_type.pk,
@@ -376,8 +376,8 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
 
         self.mouse_1.refresh_from_db()
         self.mouse_2.refresh_from_db()
-        self.assertEqual(self.mouse_1.status, "Culled")
-        self.assertEqual(self.mouse_2.status, "Culled")
+        self.assertEqual(self.mouse_1.status, "Deceased")
+        self.assertEqual(self.mouse_2.status, "Deceased")
         self.assertIn("Existing note", self.mouse_1.notes)
         self.assertIn("Bulk note", self.mouse_1.notes)
         self.assertEqual(self.mouse_2.notes, "Bulk note")
@@ -507,7 +507,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "return_url": self.return_url,
                 "selected_mouse": [self.mouse_1.pk, self.other_mouse.pk],
                 "update_status": "on",
-                "status": "Culled",
+                "status": "Deceased",
             },
         )
 
@@ -521,14 +521,14 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
 
     def test_status_dropdown_prefills_current_status_for_single_and_matching_mice(self):
         for mouse in (self.mouse_1, self.mouse_2):
-            mouse.status = "Culled"
+            mouse.status = "Deceased"
             mouse.save(update_fields=["status"])
         for selection in ([self.mouse_1.pk], [self.mouse_1.pk, self.mouse_2.pk]):
             response = self.client.get(self.edit_selected_url, {"selected_mouse": selection})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.context["form"]["status"].value(), "Culled")
+            self.assertEqual(response.context["form"]["status"].value(), "Deceased")
             self.assertIn('<select ', str(response.context["form"]["status"]))
-            self.assertContains(response, '<option value="Culled" selected>Culled</option>', html=True)
+            self.assertContains(response, '<option value="Deceased" selected>Deceased</option>', html=True)
 
     def test_bulk_status_change_requires_valid_choice_and_rejects_all_changes_atomically(self):
         for status in ("", "Archived"):
@@ -546,7 +546,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                     self.assertNotEqual(mouse.notes, "Should not be saved")
 
     def test_notes_only_edit_preserves_current_and_legacy_status(self):
-        for status in ("Culled", "Archived"):
+        for status in ("Deceased", "Archived"):
             with self.subTest(status=status):
                 self.mouse_1.status = status
                 self.mouse_1.save(update_fields=["status"])
@@ -709,7 +709,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "crossing": "",
                 "crossing_type": "",
                 f"{individual_mouse_field_prefix(self.mouse_1)}_sex": "F",
-                "status": "Culled",
+                "status": "Deceased",
                 "protocol_start_date": "",
                 "cull_date": "",
                 "protocol": self.protocol.pk,
@@ -738,7 +738,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
             [(lines[0].pk, "het")],
         )
         self.assertEqual(self.mouse_1.sex, "F")
-        self.assertEqual(self.mouse_1.status, "Culled")
+        self.assertEqual(self.mouse_1.status, "Deceased")
         self.assertEqual(self.mouse_1.severity, "Mild")
         self.assertEqual(self.mouse_1.notes, "Updated mouse note")
         self.assertFalse(
@@ -864,7 +864,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
                 "tattoo": "",
                 "breeding_pair": "",
                 "sex": "",
-                "status": "Culled",
+                "status": "Deceased",
                 "protocol_start_date": "",
                 "cull_date": "",
                 "protocol": self.protocol.pk,
@@ -881,7 +881,7 @@ class EditSelectedMiceTests(AuthenticatedTestCase):
         self.assertEqual(legacy_mouse.crossing, "Legacy line")
         self.assertEqual(legacy_mouse.crossing_type, "Single")
         self.assertEqual(legacy_mouse.genotype, "Legacy genotype")
-        self.assertEqual(legacy_mouse.status, "Culled")
+        self.assertEqual(legacy_mouse.status, "Deceased")
 
         response = self.client.get(reverse("lab:animal_summary", args=[legacy_mouse.pk]))
 

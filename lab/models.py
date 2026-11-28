@@ -314,7 +314,7 @@ class Mouse(models.Model):
 
     STATUS_CHOICES = [
         ("Alive", "Alive"),
-        ("Culled", "Culled"),
+        ("Deceased", "Deceased"),
     ]
     sex = models.CharField(
         max_length=1,

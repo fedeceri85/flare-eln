@@ -71,14 +71,14 @@ class AddLitterTests(AuthenticatedTestCase):
                 payload[f"pup_{number}_genotype_line_{line.pk}"] = "het"
         return payload
 
-    def test_status_defaults_to_alive_and_allows_creating_culled_animals(self):
+    def test_status_defaults_to_alive_and_allows_creating_deceased_animals(self):
         response = self.client.get(self.add_litter_url)
         self.assertEqual(response.context["form"]["status"].value(), "Alive")
         self.assertIn('<select ', str(response.context["form"]["status"]))
         self.assertContains(response, '<option value="Alive" selected>Alive</option>', html=True)
-        response = self.client.post(self.add_litter_url, self.litter_payload(status="Culled"))
+        response = self.client.post(self.add_litter_url, self.litter_payload(status="Deceased"))
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(list(Mouse.objects.values_list("status", flat=True)), ["Culled", "Culled"])
+        self.assertEqual(list(Mouse.objects.values_list("status", flat=True)), ["Deceased", "Deceased"])
 
     def test_creation_rejects_blank_or_unrecognised_status_without_creating_mice(self):
         for status in ("", "Archived"):

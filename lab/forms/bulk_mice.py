@@ -555,7 +555,7 @@ class BulkMouseUpdateForm(forms.Form):
         update_genotype = cleaned_data.get("update_genotype")
 
         if cleaned_data.get("update_status") and not cleaned_data.get("status") and "status" not in self.errors:
-            self.add_error("status", "Select Alive or Culled.")
+            self.add_error("status", "Select Alive or Deceased.")
 
         if (
             cleaned_data.get("update_protocol")

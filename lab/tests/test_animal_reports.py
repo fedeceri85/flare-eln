@@ -21,7 +21,7 @@ class AnimalReportTests(AuthenticatedTestCase):
             mouse_id="Animal / 001", tattoo="007", sex="F", colour="Black and white",
             date_of_birth=date(2026, 1, 2), breeding_pair="Pair A", father=self.dad,
             mother_external_id="External mum", protocol=self.protocol, crossing_definition=self.crossing,
-            status="Culled", cull_date=date(2026, 10, 29), notes="Café <healthy> & calm",
+            status="Deceased", cull_date=date(2026, 10, 29), notes="Café <healthy> & calm",
         )
         MouseGenotype.objects.create(mouse=self.mouse, mouse_line=self.lines[0], zygosity="het", is_uncertain=True)
         self.other = Mouse.objects.create(mouse_id="Other strain", crossing="Legacy strain", genotype="Legacy call", protocol=self.protocol)

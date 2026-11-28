@@ -101,7 +101,7 @@ rows separately.
 **No ID available — generate IDs** generates a prefix from birth date, crossing
 and breeding pair, then appends each Number. These IDs are **Temporary**.
 Manually entered IDs are **Assigned**; older records can have status **Unknown**.
-ID status differs from animal status **Alive/Culled**. Temporary IDs work for
+ID status differs from animal status **Alive/Deceased**. Temporary IDs work for
 ELN links and can later be renamed to assigned IDs.
 
 To rename, open an Animal summary → **Edit animals** → **Animal IDs**. Edit the

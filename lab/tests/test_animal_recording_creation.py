@@ -180,7 +180,7 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
         response = self.client.post(self.url, self.save_payload(
             **self.selection_data(),
             update_status="on",
-            status="Culled",
+            status="Deceased",
         ))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
@@ -191,7 +191,7 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
         self.assertEqual(set(Procedure.objects.values_list("mouse_id", flat=True)), {mouse.pk for mouse in self.mice})
         for mouse in self.mice:
             mouse.refresh_from_db()
-            self.assertEqual(mouse.status, "Culled")
+            self.assertEqual(mouse.status, "Deceased")
 
     def test_invalid_pending_changes_block_recording_navigation_without_partial_save(self):
         invalid_draft = [{
@@ -203,7 +203,7 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
             **self.selection_data(),
             procedure_drafts=json.dumps(invalid_draft),
             update_status="on",
-            status="Culled",
+            status="Deceased",
         ))
         self.assertEqual(response.status_code, 200)
         self.assertIn("procedure_drafts", response.context["form"].errors)
@@ -219,7 +219,7 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
                 "recording-experiment": str(self.incompatible.pk),
             }),
             update_status="on",
-            status="Culled",
+            status="Deceased",
         ))
         self.assertEqual(response.status_code, 200)
         self.assertIn("experiment", response.context["recording_destination_form"].errors)
@@ -241,7 +241,7 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
         response = self.client.post(self.url, self.save_payload(
             save_and_continue_url="http://testserver" + continuation,
             update_status="on",
-            status="Culled",
+            status="Deceased",
         ))
         destination = urlsplit(response["Location"])
         self.assertEqual(destination.path, reverse("lab:add_experiment", args=[self.project.pk]))
@@ -254,13 +254,13 @@ class AnimalRecordingCreationTests(AuthenticatedTestCase):
         self.assertEqual(resume_query["recording_recording_type"], [str(self.recording_type.pk)])
         self.assertEqual(resume_query["recording_project"], [str(self.project.pk)])
         self.assertEqual(Procedure.objects.count(), len(self.mice))
-        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Culled"})
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Deceased"})
 
     def test_unsafe_save_continuation_is_rejected_without_saving(self):
         response = self.client.post(self.url, self.save_payload(
             save_and_continue_url="https://example.invalid/steal",
             update_status="on",
-            status="Culled",
+            status="Deceased",
         ))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "requested recording page is unavailable")

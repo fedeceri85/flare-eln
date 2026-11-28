@@ -51,7 +51,7 @@ class MicePageTests(AuthenticatedTestCase):
             date_of_birth=date(self.current_year - 2, 1, 1),
             genotype="Vglut",
             sex="M",
-            status="Culled",
+            status="Deceased",
             cull_date=date(self.current_year - 1, 9, 1),
         )
         self.no_dob_mouse = Mouse.objects.create(
@@ -159,7 +159,7 @@ class MicePageTests(AuthenticatedTestCase):
             ("mouse_id=MICE-RECENT", self.recent_mouse),
             ("genotype=NonRegulated", self.non_regulated_mouse),
             ("sex=F", self.recent_mouse),
-            ("status=Culled", self.old_mouse),
+            ("status=Deceased", self.old_mouse),
             (
                 f"dob={self.recent_mouse.date_of_birth:%Y-%m-%d}",
                 self.recent_mouse,
@@ -476,7 +476,7 @@ class MicePageTests(AuthenticatedTestCase):
                     self.non_regulated_mouse.pk,
                 ],
                 "update_status": "on",
-                "status": "Culled",
+                "status": "Deceased",
             },
         )
 
@@ -487,9 +487,9 @@ class MicePageTests(AuthenticatedTestCase):
         self.old_mouse.refresh_from_db()
         self.non_regulated_mouse.refresh_from_db()
         self.no_dob_mouse.refresh_from_db()
-        self.assertEqual(self.recent_mouse.status, "Culled")
-        self.assertEqual(self.old_mouse.status, "Culled")
-        self.assertEqual(self.non_regulated_mouse.status, "Culled")
+        self.assertEqual(self.recent_mouse.status, "Deceased")
+        self.assertEqual(self.old_mouse.status, "Deceased")
+        self.assertEqual(self.non_regulated_mouse.status, "Deceased")
         self.assertEqual(self.no_dob_mouse.status, "Alive")
 
     def test_unscoped_delete_selected_removes_mixed_protocol_mice(self):

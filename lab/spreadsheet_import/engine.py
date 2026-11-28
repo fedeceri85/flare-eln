@@ -146,7 +146,7 @@ def group_details(draft, table, group):
     if details["status"]:
         states = {s.casefold(): s for s, _ in Mouse.STATUS_CHOICES}
         if str(details["status"]).casefold() not in states:
-            raise ValidationError(f"Animal {group['identifier']}: choose Alive or Culled.")
+            raise ValidationError(f"Animal {group['identifier']}: choose Alive or Deceased.")
         details["status"] = states[str(details["status"]).casefold()]
     raw_crossing = str(details.pop("crossing")).strip()
     crossing_id = definition["defaults"].get("crossing_id")

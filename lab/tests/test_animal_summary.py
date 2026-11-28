@@ -63,7 +63,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
 
     def test_cull_date_is_visible_with_animal_status_properties(self):
         self.mice[0].cull_date = date(2026, 3, 1)
-        self.mice[0].status = "Culled"
+        self.mice[0].status = "Deceased"
         self.mice[0].save(update_fields=["cull_date", "status"])
         response = self.client.get(
             reverse("lab:animal_summary", args=[self.mice[0].pk])
@@ -129,7 +129,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
     def test_single_animal_summary_rejects_missing_animals_and_requires_login(self):
         url = reverse("lab:animal_summary", args=[self.mice[0].pk])
         self.assertEqual(self.client.get(reverse("lab:animal_summary", args=["Missing animal"])).status_code, 404)
-        self.assertEqual(self.client.post(url, {"status": "Culled"}).status_code, 405)
+        self.assertEqual(self.client.post(url, {"status": "Deceased"}).status_code, 405)
         self.mice[0].refresh_from_db()
         self.assertEqual(self.mice[0].status, "Alive")
         self.client.logout()
@@ -249,10 +249,10 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         result = self.client.post(self.edit_url, {
             "apply_bulk_edit": "1", "selected_mouse": [mouse.pk for mouse in self.mice],
             "return_url": summary_return, "mouse_editor_tab": "procedures",
-            "update_status": "on", "status": "Culled",
+            "update_status": "on", "status": "Deceased",
         })
         self.assertRedirects(result, summary_return)
-        self.assertEqual(list(Mouse.objects.filter(pk__in=[mouse.pk for mouse in self.mice]).values_list("status", flat=True)), ["Culled", "Culled"])
+        self.assertEqual(list(Mouse.objects.filter(pk__in=[mouse.pk for mouse in self.mice]).values_list("status", flat=True)), ["Deceased", "Deceased"])
 
     def test_renaming_in_editor_keeps_summary_link_valid(self):
         response, markup = self.summary(mouse_editor_tab="individual")
@@ -292,7 +292,7 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         response, markup = self.summary(return_url="https://example.com/unsafe")
         self.assertEqual(response.context["return_url"], self.list_url)
         self.assertNotContains(response, "https://example.com/unsafe")
-        result = self.client.post(self.url, {"update_status": "on", "status": "Culled"})
+        result = self.client.post(self.url, {"update_status": "on", "status": "Deceased"})
         self.assertEqual(result.status_code, 405)
         self.mice[0].refresh_from_db()
         self.assertEqual(self.mice[0].status, "Alive")
@@ -540,14 +540,14 @@ class AnimalSummaryTests(AuthenticatedTestCase):
         self.assertContains(editor, "Add record")
         saved = self.client.post(expected_edit_url, {
             "selected_mouse": selection, "return_url": summary_return,
-            "apply_bulk_edit": "1", "update_status": "on", "status": "Culled", "mouse_editor_tab": "services",
+            "apply_bulk_edit": "1", "update_status": "on", "status": "Deceased", "mouse_editor_tab": "services",
         })
         self.assertRedirects(saved, summary_return)
 
     def test_procedure_view_selection_post_only_redirects_and_never_saves_edits(self):
         view_url = reverse("lab:view_selected_mice_licence_protocol", args=[self.protocol.licence_reference, self.protocol.protocol_number])
         response = self.client.post(view_url, {
-            "selected_mouse": [self.mice[0].pk, self.mice[0].pk], "update_status": "on", "status": "Culled",
+            "selected_mouse": [self.mice[0].pk, self.mice[0].pk], "update_status": "on", "status": "Deceased",
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(parse_qs(urlsplit(response.url).query)["selected_mouse"], [self.mice[0].pk])

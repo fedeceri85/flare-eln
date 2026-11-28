@@ -73,7 +73,7 @@ class AnimalFormDraftInput(BaseModel):
     date_of_birth: date | None = None
     breeding_pair: Annotated[str, Field(max_length=100)] = ""
     colour: Annotated[str, Field(max_length=100)] = ""
-    status: Literal["Alive", "Culled"] = "Alive"
+    status: Literal["Alive", "Deceased"] = "Alive"
     severity: Literal["Non-recovery", "Mild", "Moderate", "Severe"] | None = None
     protocol_start_date: date | None = None
     cull_date: date | None = None
@@ -114,7 +114,7 @@ class MouseSearchInput(BaseModel):
     marking_type: Literal["other", "tattoo", "ear_clip"] | None = None
     colour: SearchText | None = None
     sex: Literal["M", "F", "unknown"] | None = None
-    status: Literal["Alive", "Culled"] | None = None
+    status: Literal["Alive", "Deceased"] | None = None
     severity: Literal["Non-recovery", "Mild", "Moderate", "Severe", "unknown"] | None = None
     severity_exceeded: bool | None = Field(
         default=None, description="Whether animal severity exceeds its protocol maximum."
@@ -318,7 +318,7 @@ class RecordingSearchInput(BaseModel):
     breeding_pair: SearchText | None = Field(
         default=None, description="Breeding pair identifier."
     )
-    status: Literal["Alive", "Culled"] | None = Field(
+    status: Literal["Alive", "Deceased"] | None = Field(
         default=None, description="Mouse status."
     )
     severity: Literal["Non-recovery", "Mild", "Moderate", "Severe", "unknown"] | None = Field(

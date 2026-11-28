@@ -109,7 +109,7 @@ class ParentageTests(TestCase):
 
     def test_unchecked_parent_fields_leave_links_unchanged(self):
         self.link()
-        response = self.client.post(reverse('lab:edit_selected_mice_all'), self.payload(update_status='on', status='Culled', mother_external_id='accident'))
+        response = self.client.post(reverse('lab:edit_selected_mice_all'), self.payload(update_status='on', status='Deceased', mother_external_id='accident'))
         self.assertEqual(response.status_code, 302)
         self.child.refresh_from_db()
         self.assertEqual(self.child.mother_id, self.mother.pk)
@@ -131,7 +131,7 @@ class ParentageTests(TestCase):
 
     def test_invalid_batch_rolls_back_other_edits(self):
         form = BulkMouseUpdateForm(self.payload(update_mother='on', mother=self.child.pk, mother_external_id=self.child.pk,
-                                  update_status='on', status='Culled'), selected_mice=[self.child])
+                                  update_status='on', status='Deceased'), selected_mice=[self.child])
         self.assertFalse(form.is_valid())
         self.child.refresh_from_db()
         self.assertEqual(self.child.status, 'Alive')

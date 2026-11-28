@@ -92,7 +92,7 @@ class MouseSearchTests(TestCase):
             mouse_id="AI-002", protocol=cls.other_protocol, crossing_definition=cls.crossing,
             date_of_birth=date(2026, 9, 1), date_added=date(2026, 9, 2),
             protocol_start_date=date(2026, 9, 3), cull_date=date(2026, 10, 1),
-            sex="M", status="Culled", severity="Mild", tattoo="02", id_status="temporary",
+            sex="M", status="Deceased", severity="Mild", tattoo="02", id_status="temporary",
             custom_metadata={"batch": "B-2", "flag": True, "number": 1},
         )
         cls.unknown = Mouse.objects.create(
@@ -124,7 +124,7 @@ class MouseSearchTests(TestCase):
         for name, value in cases.items():
             with self.subTest(field=name):
                 self.assertEqual(self.ids(**{name: value}), {self.alpha.pk})
-        self.assertEqual(self.ids(status="Culled"), {self.beta.pk})
+        self.assertEqual(self.ids(status="Deceased"), {self.beta.pk})
 
     def test_multiple_exact_ids_are_found_together(self):
         self.assertEqual(
@@ -146,7 +146,7 @@ class MouseSearchTests(TestCase):
 
     def test_filters_combine_with_and(self):
         self.assertEqual(self.ids(crossing="gcamp", sex="F", status="Alive"), {self.alpha.pk})
-        self.assertEqual(self.ids(crossing="gcamp", sex="F", status="Culled"), set())
+        self.assertEqual(self.ids(crossing="gcamp", sex="F", status="Deceased"), set())
 
     def test_crossing_names_aliases_legacy_and_duplicates(self):
         for value in ("gcamp", "CALCIUM INDICATOR", "shared alias"):

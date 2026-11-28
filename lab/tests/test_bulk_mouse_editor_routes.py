@@ -97,11 +97,11 @@ class BulkMouseEditorRouteTests(TestCase):
     def test_global_editor_can_save_mixed_protocol_mice(self):
         response = self.client.post(self.global_url, {
             "selected_mouse": [self.mice[0].pk, self.outside.pk], "apply_bulk_edit": "1",
-            "update_status": "on", "status": "Culled", "return_url": self.return_url,
+            "update_status": "on", "status": "Deceased", "return_url": self.return_url,
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], self.return_url)
-        self.assertEqual(set(Mouse.objects.filter(status="Culled").values_list("pk", flat=True)),
+        self.assertEqual(set(Mouse.objects.filter(status="Deceased").values_list("pk", flat=True)),
                          {self.mice[0].pk, self.outside.pk})
         self.assertFalse(Procedure.objects.exists())
 

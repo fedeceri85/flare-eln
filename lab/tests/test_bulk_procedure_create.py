@@ -70,16 +70,16 @@ class BulkProcedureCreationTests(TestCase):
 
     def test_multiple_procedures_and_animal_changes_commit_together(self):
         response = self.client.post(self.url, self.payload([self.draft(), self.draft(lab_member="CD")],
-                                                         update_status="on", status="Culled"))
+                                                         update_status="on", status="Deceased"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Procedure.objects.count(), 4)
         self.assertEqual(set(Procedure.objects.values_list("lab_member", flat=True)), {"AB", "CD"})
-        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Culled"})
+        self.assertEqual(set(Mouse.objects.values_list("status", flat=True)), {"Deceased"})
 
     def test_validation_keeps_pending_list_and_never_partially_saves(self):
         for invalid in ({"procedure_type": "999999"}, {"date": "invalid"}, {"lab_member": "X" * 101}):
             drafts = [self.draft(**invalid)]
-            response = self.client.post(self.url, self.payload(drafts, update_status="on", status="Culled"))
+            response = self.client.post(self.url, self.payload(drafts, update_status="on", status="Deceased"))
             self.assertEqual(response.status_code, 200)
             self.assertIn("procedure_drafts", response.context["form"].errors)
             self.assertEqual(json.loads(response.context["form"]["procedure_drafts"].value()), drafts)
@@ -92,7 +92,7 @@ class BulkProcedureCreationTests(TestCase):
 
     def test_final_protocol_restrictions_block_all_changes(self):
         response = self.client.post(self.url, self.payload(update_protocol="on", protocol=self.restricted.pk,
-                                                         update_status="on", status="Culled"))
+                                                         update_status="on", status="Deceased"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("procedure_drafts", response.context["form"].errors)
         self.assertFalse(Procedure.objects.exists())
@@ -117,7 +117,7 @@ class BulkProcedureCreationTests(TestCase):
                 raise IntegrityError("simulated")
             return create(**kwargs)
         with patch.object(Procedure.objects, "create", side_effect=fail_on_second):
-            response = self.client.post(self.url, self.payload(update_status="on", status="Culled"))
+            response = self.client.post(self.url, self.payload(update_status="on", status="Deceased"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No changes were saved")
         self.assertFalse(Procedure.objects.exists())

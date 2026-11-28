@@ -39,13 +39,13 @@ class LitterIndividualOverrideTests(TestCase):
 
     def test_checked_details_override_shared_values_and_blank_clears(self):
         form = self.form(pup_1_override_notes_enabled='on', pup_1_override_notes='',
-                         pup_1_override_status_enabled='on', pup_1_override_status='Culled',
+                         pup_1_override_status_enabled='on', pup_1_override_status='Deceased',
                          pup_1_override_date_of_birth_enabled='on', pup_1_override_date_of_birth='2026-10-01',
                          pup_1_override_protocol_enabled='on', pup_1_override_protocol=self.other_protocol.pk,
                          pup_2_override_notes='Unchecked tampering', pup_2_override_status='invalid')
         mice, _ = create_litter_mice(None, form)
         self.assertEqual((mice[0].notes, mice[0].status, mice[0].date_of_birth, mice[0].protocol),
-                         ('', 'Culled', date(2026, 10, 1), self.other_protocol))
+                         ('', 'Deceased', date(2026, 10, 1), self.other_protocol))
         self.assertEqual((mice[1].notes, mice[1].status), ('Shared notes', 'Alive'))
 
     def test_crossing_override_uses_its_own_genotypes(self):

@@ -251,9 +251,9 @@ class RecordingSearchTests(TestCase):
         self.assertIn(rec, results)
 
     def test_filters_by_status(self):
-        culled = Mouse.objects.create(mouse_id="AI-CULL", protocol=self.protocol, status="Culled")
-        rec = self._make_recording_with_mouse(culled)
-        results = list(filter_recordings(RecordingSearchInput(status="Culled")))
+        deceased = Mouse.objects.create(mouse_id="AI-CULL", protocol=self.protocol, status="Deceased")
+        rec = self._make_recording_with_mouse(deceased)
+        results = list(filter_recordings(RecordingSearchInput(status="Deceased")))
         self.assertIn(rec, results)
 
     def test_filters_by_severity(self):
